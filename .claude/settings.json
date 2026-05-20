@@ -14,7 +14,11 @@
       "Skill(ui-ux-pro-max-0.1.0)",
       "Skill(ui-ux-pro-max-0.1.0:*)",
       "Skill(find-skills)",
-      "Skill(find-skills:*)"
+      "Skill(find-skills:*)",
+      "Bash(git push *)",
+      "Bash(git push)",
+      "Bash(git push -u *)",
+      "Bash(git push --force *)"
     ]
   }
 }
