@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COBALT — 问答式需求处理平台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --bg-base: #FFFFFF;
+            --bg-sidebar: #F8FAFC;
+            --bg-surface: #F1F5F9;
+            --bg-surface-hover: #E2E8F0;
+            --bg-surface-active: #EFF6FF;
+            --border: #E2E8F0;
+            --border-strong: #CBD5E1;
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+            --text-muted: #94A3B8;
+            --accent: #2563EB;
+            --accent-soft: #EFF6FF;
+            --accent-hover: #3B82F6;
+            --accent-border: #BFDBFE;
+            --success: #16A34A;
+            --success-soft: #DCFCE7;
+            --warning: #EAB308;
+            --warning-soft: #FEF9C3;
+            --danger: #DC2626;
+            --radius-sm: 8px;
+            --radius: 12px;
+            --radius-lg: 16px;
+            --transition: 0.15s ease;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+            --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -1px rgba(0,0,0,0.04);
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { height:100vh; font-family:var(--font-sans); background:var(--bg-base); color:var(--text-primary); overflow:hidden; }
+        .app-container { display:flex; height:100vh; }
+
+        /* ===== Sidebar ===== */
+        .sidebar { width:var(--sidebar-width); background:var(--bg-sidebar); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; }
+        .sidebar-header { padding:16px 16px 12px; }
+        .sidebar-logo { display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--text-primary); }
+        .sidebar-logo-icon { width:32px; height:32px; border-radius:var(--radius-sm); background:var(--accent); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .sidebar-logo-icon svg { width:18px; height:18px; color:#fff; }
+        .sidebar-logo-text { font-weight:700; font-size:1.05rem; letter-spacing:-0.01em; }
+        .sidebar-logo-sub { font-size:0.7rem; color:var(--text-muted); margin-top:1px; }
+        .sidebar-new-btn { margin:0 16px 12px; padding:9px 14px; border-radius:var(--radius-sm); background:var(--accent); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; font-weight:600; font-size:0.82rem; transition:all var(--transition); }
+        .sidebar-new-btn:hover { background:var(--accent-hover); transform:translateY(-1px); box-shadow:var(--shadow-md); }
+        .sidebar-new-btn svg { width:16px; height:16px; }
+        .sidebar-nav { padding:4px 12px; }
+        .sidebar-section-label { padding:14px 12px 6px; font-size:0.65rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); }
+        .sidebar-nav-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:var(--radius-sm); cursor:pointer; color:var(--text-secondary); font-size:0.85rem; font-weight:500; margin-bottom:2px; transition:all var(--transition); position:relative; }
+        .sidebar-nav-item:hover { background:var(--bg-surface); color:var(--text-primary); }
+        .sidebar-nav-item.active { background:var(--accent-soft); color:var(--accent); font-weight:600; }
+        .sidebar-nav-item.active::before { content:''; position:absolute; left:4px; top:6px; bottom:6px; width:3px; border-radius:3px; background:var(--accent); }
+        .sidebar-nav-item svg { width:16px; height:16px; flex-shrink:0; }
+        .sidebar-badge { margin-left:auto; padding:1px 8px; border-radius:99px; font-size:0.65rem; font-weight:600; background:var(--success-soft); color:var(--success); }
+        .sidebar-projects { padding:4px 12px; flex:1; overflow-y:auto; }
+        .sidebar-project-item { display:flex; align-items:center; gap:8px; padding:7px 12px; border-radius:var(--radius-sm); cursor:pointer; font-size:0.82rem; color:var(--text-secondary); transition:all var(--transition); position:relative; }
+        .sidebar-project-item:hover { background:var(--bg-surface); color:var(--text-primary); }
+        .sidebar-project-item.active { background:var(--accent-soft); color:var(--accent); }
+        .sidebar-project-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+        .sidebar-project-dot.running { background:var(--warning); animation:pulse-dot 2s infinite; }
+        .sidebar-project-dot.completed { background:var(--success); }
+        .sidebar-project-dot.idle { background:var(--text-muted); }
+        .sidebar-project-dot.paused { background:#22d3ee; }
+        @keyframes pulse-dot { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+        .sidebar-project-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .sidebar-project-actions { display:none; gap:2px; margin-left:4px; }
+        .sidebar-project-item:hover .sidebar-project-actions { display:flex; }
+        .sidebar-project-action-btn { background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding:3px 5px; border-radius:4px; font-size:0.75rem; transition:all var(--transition); display:flex; align-items:center; }
+        .sidebar-project-action-btn:hover { background:var(--bg-surface-hover); color:var(--text-primary); }
+        .sidebar-project-action-btn svg { width:13px; height:13px; }
+        .sidebar-user { padding:12px 16px; border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+        .sidebar-user-avatar { width:30px; height:30px; border-radius:var(--radius-sm); background:var(--accent-soft); display:flex; align-items:center; justify-content:center; font-size:0.8rem; font-weight:700; color:var(--accent); }
+        .sidebar-user-name { font-weight:600; font-size:0.82rem; }
+        .sidebar-user-role { font-size:0.7rem; color:var(--text-muted); }
+
+        /* ===== Main Area ===== */
+        .main-area { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-base); }
+        .main-topbar { padding:12px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:14px; background:var(--bg-base); }
+        .main-topbar-left { display:flex; align-items:center; gap:12px; }
+        .main-topbar-title { font-weight:700; font-size:0.95rem; display:flex; align-items:center; gap:8px; }
+        .main-topbar-title svg { width:16px; height:16px; color:var(--text-secondary); }
+        .main-topbar-status { display:flex; align-items:center; gap:5px; font-size:0.72rem; padding:3px 10px; border-radius:99px; background:var(--bg-surface); color:var(--text-secondary); font-weight:500; }
+        .main-topbar-status.running { background:var(--accent-soft); color:var(--accent); }
+        .main-topbar-status.paused { background:var(--warning-soft); color:#A16207; }
+        .main-topbar-status.completed { background:var(--success-soft); color:var(--success); }
+        .main-topbar-status-dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
+        .main-topbar-status.running .main-topbar-status-dot { animation:pulse-dot 1.5s infinite; }
+
+        /* ===== View Container ===== */
+        .view-container { flex:1; overflow:hidden; position:relative; }
+        .chat-view, .panel-view { position:absolute; inset:0; overflow-y:auto; display:none; flex-direction:column; }
+        .chat-view.active, .panel-view.active { display:flex; }
+        .chat-area { flex:1; padding:20px 24px 12px; }
+        .panel-content { padding:24px; max-width:960px; }
+
+        /* ===== Flow Card Messages ===== */
+        .flow-card { max-width:720px; margin:0 auto 16px; animation:msgSlideIn 0.3s ease; border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; background:var(--bg-base); box-shadow:var(--shadow-sm); }
+        .flow-card:first-child { margin-top:8px; }
+        @keyframes msgSlideIn { from{ opacity:0; transform:translateY(12px); } to{ opacity:1; transform:none; } }
+        .flow-card-role { font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px; }
+        .flow-card-role.ai { color:var(--accent); }
+        .flow-card-role.user { color:var(--text-muted); }
+        .flow-card-content { line-height:1.6; font-size:0.88rem; word-break:break-word; }
+        .flow-card-time { font-size:0.65rem; color:var(--text-muted); margin-top:6px; }
+
+        /* ===== Quick Skills ===== */
+        .quick-skills { max-width:720px; margin:0 auto 12px; padding:0 16px; }
+        .quick-skills-label { font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-muted); margin-bottom:8px; }
+        .quick-skills-row { display:flex; gap:8px; flex-wrap:wrap; }
+        .quick-skill-chip { display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-base); cursor:pointer; font-size:0.8rem; font-weight:500; color:var(--text-secondary); transition:all var(--transition); }
+        .quick-skill-chip:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); transform:translateY(-1px); box-shadow:var(--shadow-md); }
+        .quick-skill-chip svg { width:16px; height:16px; }
+
+        /* ===== Skill Cards (in chat) ===== */
+
+        /* ===== Skill Cards (in chat) ===== */
+        .skill-cards-wrap { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+        .skill-card { background:var(--bg-base); border:1px solid var(--border); border-radius:var(--radius); padding:14px; cursor:pointer; display:flex; gap:12px; transition:all var(--transition); }
+        .skill-card:hover { border-color:var(--accent); box-shadow:var(--shadow-md); transform:translateY(-1px); }
+        .skill-card.selected { border-color:var(--accent); background:var(--accent-soft); }
+        .skill-card-icon { width:40px; height:40px; border-radius:var(--radius-sm); background:var(--accent-soft); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .skill-card-icon svg { width:20px; height:20px; color:var(--accent); }
+        .skill-card-name { font-weight:600; font-size:0.88rem; }
+        .skill-card-desc { font-size:0.78rem; color:var(--text-secondary); margin-top:2px; }
+
+        /* ===== Workflow Stepper ===== */
+        .stepper { display:flex; align-items:center; gap:4px; margin-top:10px; padding:12px 16px; background:var(--bg-surface); border-radius:var(--radius); border:1px solid var(--border); }
+        .stepper-step { display:flex; align-items:center; gap:6px; }
+        .stepper-step-icon { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .stepper-step.done .stepper-step-icon { background:var(--success-soft); color:var(--success); }
+        .stepper-step.done .stepper-step-icon svg { width:12px; height:12px; }
+        .stepper-step.active .stepper-step-icon { background:var(--accent-soft); color:var(--accent); border:2px solid var(--accent); animation:pulse-dot 1.5s infinite; }
+        .stepper-step.active .stepper-step-icon svg { width:12px; height:12px; }
+        .stepper-step.pending .stepper-step-icon { border:1.5px dashed var(--border-strong); color:var(--text-muted); }
+        .stepper-step.pending .stepper-step-icon svg { width:12px; height:12px; }
+        .stepper-step-label { font-size:0.75rem; color:var(--text-secondary); white-space:nowrap; }
+        .stepper-step.active .stepper-step-label { color:var(--accent); font-weight:600; }
+        .stepper-step.done .stepper-step-label { color:var(--text-muted); }
+        .stepper-connector { flex:1; height:2px; background:var(--border); border-radius:1px; max-width:24px; margin:0 2px; }
+        .stepper-connector.done { background:var(--success); }
+        .stepper-connector.active { background:var(--accent); }
+
+        /* ===== Confirm Block ===== */
+        .confirm-block { background:var(--warning-soft); border:1px solid #FDE68A; border-radius:var(--radius); padding:14px 16px; margin-top:10px; }
+        .confirm-question { font-weight:600; margin-bottom:10px; color:#92400E; font-size:0.88rem; }
+        .confirm-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+        .confirm-option { padding:6px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-strong); background:var(--bg-base); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; transition:all var(--transition); }
+        .confirm-option:hover { border-color:var(--accent); color:var(--accent); }
+        .confirm-option.selected { border-color:var(--accent); background:var(--accent-soft); color:var(--accent); font-weight:500; }
+        .confirm-input { flex:1; min-width:120px; padding:6px 10px; border-radius:var(--radius-sm); background:var(--bg-base); border:1px solid var(--border-strong); color:var(--text-primary); font-size:0.82rem; outline:none; font-family:var(--font-sans); }
+        .confirm-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+
+        /* ===== Output Card ===== */
+        .output-card { background:var(--bg-base); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-top:10px; box-shadow:var(--shadow-sm); }
+        .output-card-header { display:flex; align-items:center; gap:8px; font-weight:600; color:var(--success); font-size:0.88rem; margin-bottom:10px; }
+        .output-card-header svg { width:16px; height:16px; }
+        .output-card-preview { background:#0F172A; border-radius:var(--radius-sm); padding:14px; font-family:var(--font-mono); font-size:0.75rem; color:#E2E8F0; max-height:200px; overflow-y:auto; white-space:pre-wrap; line-height:1.5; }
+        .output-card-actions { margin-top:10px; display:flex; gap:8px; }
+
+        /* ===== Buttons ===== */
+        .btn { padding:7px 14px; border-radius:var(--radius-sm); font-weight:500; font-size:0.8rem; border:1px solid transparent; cursor:pointer; transition:all var(--transition); display:inline-flex; align-items:center; gap:5px; text-decoration:none; }
+        .btn-primary { background:var(--accent); color:#fff; }
+        .btn-primary:hover { background:var(--accent-hover); }
+        .btn-outline { background:var(--bg-base); border:1px solid var(--border); color:var(--text-secondary); }
+        .btn-outline:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+        .btn-ghost { background:transparent; border:1px solid transparent; color:var(--text-secondary); }
+        .btn-ghost:hover { background:var(--bg-surface); color:var(--text-primary); }
+        .btn-sm { padding:5px 10px; font-size:0.75rem; }
+        .btn svg { width:14px; height:14px; }
+
+        /* ===== Input Area ===== */
+        .input-area { padding:12px 24px 16px; border-top:1px solid var(--border); background:var(--bg-base); }
+        .input-row { display:flex; align-items:flex-end; gap:8px; background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius); padding:8px 12px; transition:all var(--transition); }
+        .input-row:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+        .input-row textarea { flex:1; background:transparent; border:none; color:var(--text-primary); font-family:var(--font-sans); font-size:0.88rem; resize:none; outline:none; padding:4px 0; max-height:120px; line-height:1.5; }
+        .input-row textarea::placeholder { color:var(--text-muted); }
+        .input-btn { width:34px; height:34px; border-radius:var(--radius-sm); background:transparent; border:none; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all var(--transition); flex-shrink:0; }
+        .input-btn:hover { background:var(--bg-surface-hover); color:var(--text-secondary); }
+        .input-btn svg { width:18px; height:18px; }
+        .input-send { background:var(--accent); color:#fff; width:auto; padding:0 16px; border-radius:var(--radius-sm); font-weight:600; font-size:0.82rem; gap:5px; }
+        .input-send:hover { background:var(--accent-hover); }
+        .input-send:disabled { background:var(--bg-surface-hover); color:var(--text-muted); cursor:not-allowed; }
+        .input-send svg { width:16px; height:16px; }
+        .input-hint { font-size:0.68rem; color:var(--text-muted); margin-top:8px; text-align:center; }
+
+        /* ===== Panel Cards ===== */
+        .panel-card { background:var(--bg-base); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:16px; }
+        .panel-title { font-weight:700; font-size:1rem; margin-bottom:14px; display:flex; align-items:center; gap:8px; color:var(--text-primary); }
+        .panel-title svg { width:18px; height:18px; color:var(--text-secondary); }
+
+        /* ===== Skill Cards (panel grid) ===== */
+        .skills-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; }
+        @media (max-width:800px) { .skills-grid { grid-template-columns:1fr; } }
+        .skill-card-panel { background:var(--bg-base); border:1px solid var(--border); border-radius:var(--radius); padding:16px; cursor:pointer; display:flex; gap:14px; transition:all var(--transition); }
+        .skill-card-panel:hover { border-color:var(--accent); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+        .skill-card-panel-icon { width:44px; height:44px; border-radius:var(--radius-sm); background:var(--accent-soft); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .skill-card-panel-icon svg { width:22px; height:22px; color:var(--accent); }
+        .skill-card-panel-name { font-weight:600; font-size:0.88rem; }
+        .skill-card-panel-desc { font-size:0.78rem; color:var(--text-secondary); margin-top:2px; line-height:1.4; }
+        .skill-card-panel-meta { font-size:0.7rem; color:var(--text-muted); margin-top:6px; }
+        .skill-card-panel-meta span { display:inline-flex; align-items:center; gap:3px; }
+        .skill-card-panel-meta svg { width:12px; height:12px; }
+
+        /* ===== Timeline (workflow panel) ===== */
+        .timeline { position:relative; padding-left:20px; }
+        .timeline::before { content:''; position:absolute; left:7px; top:4px; bottom:4px; width:2px; background:var(--border); border-radius:1px; }
+        .timeline-item { position:relative; padding-bottom:16px; }
+        .timeline-item:last-child { padding-bottom:0; }
+        .timeline-dot { position:absolute; left:-17px; top:2px; width:14px; height:14px; border-radius:50%; border:2px solid var(--border); background:var(--bg-base); display:flex; align-items:center; justify-content:center; }
+        .timeline-item.done .timeline-dot { border-color:var(--success); background:var(--success-soft); }
+        .timeline-item.done .timeline-dot svg { width:8px; height:8px; color:var(--success); }
+        .timeline-item.active .timeline-dot { border-color:var(--accent); background:var(--accent-soft); }
+        .timeline-item.active .timeline-dot svg { width:8px; height:8px; color:var(--accent); }
+        .timeline-item.pending .timeline-dot { border-color:var(--border-strong); }
+        .timeline-content { background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px; }
+        .timeline-content-title { font-weight:600; font-size:0.82rem; }
+        .timeline-content-time { font-size:0.7rem; color:var(--text-muted); margin-top:2px; }
+        .timeline-item.active .timeline-content { border-color:var(--accent-border); background:var(--accent-soft); }
+        .timeline-item.active .timeline-content-title { color:var(--accent); }
+
+        /* ===== Output list ===== */
+        .output-list-item { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); gap:12px; }
+        .output-list-item:last-child { border-bottom:none; }
+        .output-list-left { display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
+        .output-list-icon { width:36px; height:36px; border-radius:var(--radius-sm); background:var(--bg-surface); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .output-list-icon svg { width:18px; height:18px; color:var(--text-secondary); }
+        .output-list-info { min-width:0; }
+        .output-list-title { font-weight:500; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .output-list-meta { font-size:0.72rem; color:var(--text-muted); margin-top:1px; }
+        .output-list-actions { display:flex; gap:4px; flex-shrink:0; }
+
+        /* ===== Empty States ===== */
+        .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; color:var(--text-muted); text-align:center; }
+        .empty-state-icon { width:56px; height:56px; border-radius:var(--radius); background:var(--bg-surface); display:flex; align-items:center; justify-content:center; margin-bottom:16px; }
+        .empty-state-icon svg { width:28px; height:28px; color:var(--text-muted); }
+        .empty-state-title { font-weight:600; font-size:0.95rem; color:var(--text-secondary); margin-bottom:6px; }
+        .empty-state-desc { font-size:0.82rem; color:var(--text-muted); max-width:320px; line-height:1.5; margin-bottom:16px; }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar { width:6px; height:6px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+        ::-webkit-scrollbar-thumb:hover { background:var(--border-strong); }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a class="sidebar-logo" href="#">
+                <div class="sidebar-logo-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </div>
+                <div>
+                    <div class="sidebar-logo-text">COBALT</div>
+                    <div class="sidebar-logo-sub">需求处理平台 v2.0</div>
+                </div>
+            </a>
+        </div>
+        <button class="sidebar-new-btn" onclick="startNewProject()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            新建项目
+        </button>
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-label">核心功能</div>
+            <div class="sidebar-nav-item active" data-nav="chat" onclick="switchNav(this, 'chat')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                问答助手
+            </div>
+            <div class="sidebar-nav-item" data-nav="workflow" onclick="switchNav(this, 'workflow')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                工作流监控
+            </div>
+            <div class="sidebar-nav-item" data-nav="outputs" onclick="switchNav(this, 'outputs')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                产出管理
+            </div>
+            <div class="sidebar-section-label">历史项目</div>
+        </nav>
+        <div class="sidebar-projects" id="sidebarProjects"></div>
+        <div class="sidebar-user">
+            <div class="sidebar-user-avatar">李</div>
+            <div>
+                <div class="sidebar-user-name">李明</div>
+                <div class="sidebar-user-role">QA 工程师</div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-area">
+        <div class="main-topbar">
+            <div class="main-topbar-left">
+                <span class="main-topbar-title" id="topbarTitle">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    问答助手
+                </span>
+            </div>
+            <span class="main-topbar-status running" id="topbarStatus">
+                <span class="main-topbar-status-dot"></span> 就绪
+            </span>
+        </div>
+        <div class="view-container">
+            <div class="chat-view active" id="chatView">
+                <div class="chat-area" id="chatArea"></div>
+                <div class="quick-skills" id="quickSkills"></div>
+                <div class="input-area">
+                    <div class="input-row">
+                        <textarea id="chatInput" rows="1" placeholder="输入需求描述，或拖拽文件到此处…" onkeydown="handleInputKey(event)"></textarea>
+                        <button class="input-btn" onclick="document.getElementById('fileInput').click()" title="上传附件">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        </button>
+                        <input type="file" id="fileInput" hidden accept=".md,.docx,.pdf,.csv,.xlsx,.json,.yaml,.txt" onchange="handleFileUpload(this)">
+                        <button class="input-btn input-send" id="sendBtn" onclick="sendMessage()" title="发送">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                            发送
+                        </button>
+                    </div>
+                    <div class="input-hint">支持 Markdown、DOCX、PDF、CSV 等，最大 20MB</div>
+                </div>
+            </div>
+            <div class="panel-view" id="panelView">
+                <div class="panel-content" id="panelContent"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    const STATE = {
+        currentNav: 'chat',
+        projectId: null,
+        projectName: '未命名项目',
+        workflowStatus: 'idle',
+        selectedSkill: null,
+        preselectedSkill: null,
+        messages: [],
+        steps: [],
+        projects: [],
+        projectMessages: {}
+    };
+
+    const ICONS = {
+        bot: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg>',
+        user: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+        check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+        circle: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>',
+        fileText: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>',
+        download: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+        copy: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+        clipboard: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>',
+        code: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+        ruler: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>',
+        checkCircle: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+        pencil: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
+        trash: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+        activity: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+        arrowRight: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>',
+        messageSquare: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+        puzzle: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.378 1.378a1 1 0 0 1 0 1.415l-2.797 2.797a1 1 0 0 1-1.415 0l-1.378-1.378a1.07 1.07 0 0 0-.878-.29c-.323.05-.65-.058-.879-.288l-1.85-1.85a1.07 1.07 0 0 1-.288-.879c.05-.323-.059-.65-.289-.879L8.07 5.91a1 1 0 0 1 0-1.415l2.797-2.797a1 1 0 0 1 1.415 0l1.378 1.378c.23.23.556.338.878.29.323-.05.65.058.879.288l1.85 1.85c.23.23.338.556.29.879z"/><circle cx="12" cy="12" r="3"/></svg>',
+        fileOutput: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>',
+        inbox: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>',
+        sparkle: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>'
+    };
+
+    const chatView = document.getElementById('chatView');
+    const chatArea = document.getElementById('chatArea');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const topbarTitle = document.getElementById('topbarTitle');
+    const topbarStatus = document.getElementById('topbarStatus');
+    const panelView = document.getElementById('panelView');
+    const panelContent = document.getElementById('panelContent');
+    const sidebarProjects = document.getElementById('sidebarProjects');
+
+    function init() {
+        STATE.projects = [
+            { id: 'proj-001', name: '用户中心 API 测试用例', status: 'completed' },
+            { id: 'proj-002', name: '支付模块 PRD 分析', status: 'paused' },
+            { id: 'proj-003', name: '库存系统 QA 清单', status: 'completed' }
+        ];
+        STATE.projectMessages = {
+            'proj-001': [
+                { role: 'ai', content: '欢迎回到「用户中心 API 测试用例」项目。', time: new Date(Date.now() - 3600000) },
+                { role: 'user', content: '请根据用户中心 API 文档生成测试用例', time: new Date(Date.now() - 3500000) },
+                { role: 'ai', content: '已为您生成 12 条测试用例，涵盖正常登录、密码错误、空输入等场景。', time: new Date(Date.now() - 3400000) }
+            ],
+            'proj-002': [
+                { role: 'ai', content: '支付模块 PRD 分析已暂停，请确认付款回调接口的参数。', time: new Date(Date.now() - 7200000) }
+            ],
+            'proj-003': [
+                { role: 'ai', content: '库存系统 QA 清单已生成，共 20 项检查点。', time: new Date(Date.now() - 10800000) }
+            ]
+        };
+        loadProjectById(STATE.projects[0].id);
+    }
+
+    function saveCurrentMessages() { if (STATE.projectId) STATE.projectMessages[STATE.projectId] = [...STATE.messages]; }
+    function loadProjectMessages(projectId) {
+        STATE.messages = STATE.projectMessages[projectId] || [];
+        chatArea.innerHTML = '';
+        if (STATE.messages.length === 0) {
+            renderEmptyState();
+        } else {
+            STATE.messages.forEach(msg => renderMessage(msg));
+            renderQuickSkills();
+        }
+        scrollToBottom();
+    }
+    function scrollToBottom() { requestAnimationFrame(() => { chatView.scrollTop = chatView.scrollHeight; }); }
+
+    const QUICK_SKILLS = [
+        { id:'test-cases', name:'测试用例', icon:'clipboard' },
+        { id:'test-plan', name:'测试计划', icon:'ruler' },
+        { id:'qa-checklist', name:'QA 清单', icon:'checkCircle' },
+        { id:'test-code', name:'测试代码', icon:'code' }
+    ];
+
+    function renderQuickSkills() {
+        const container = document.getElementById('quickSkills');
+        if (!container) return;
+        if (STATE.workflowStatus === 'running') {
+            container.innerHTML = '';
+            return;
+        }
+        let html = '<div class="quick-skills-label">常用方案</div><div class="quick-skills-row">';
+        QUICK_SKILLS.forEach(s => {
+            html += `<div class="quick-skill-chip" onclick="startNewProjectWithSkill('${s.id}', '${s.name}')">${ICONS[s.icon]} ${s.name}</div>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function renderEmptyState() {
+        chatArea.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">${ICONS.sparkle}</div>
+                <div class="empty-state-title">开始一个新的流程</div>
+                <div class="empty-state-desc">描述你的需求，或选择一个常用方案开始自动化处理。</div>
+            </div>
+        `;
+        renderQuickSkills();
+    }
+
+    function addMessage(role, content, extra = {}) {
+        const msg = { id: 'msg-' + Date.now(), role, content, time: new Date(), ...extra };
+        STATE.messages.push(msg);
+        if (STATE.messages.length === 1 && role === 'user') {
+            chatArea.innerHTML = '';
+        }
+        renderMessage(msg);
+        saveCurrentMessages();
+        scrollToBottom();
+        return msg;
+    }
+
+    function renderMessage(msg) {
+        const div = document.createElement('div');
+        div.className = 'flow-card';
+        div.id = msg.id;
+        let content = formatContent(msg.content);
+        if (msg.skillCards) content += renderSkillCards(msg.skillCards);
+        if (msg.workflowSteps) content += renderWorkflowSteps(msg.workflowSteps);
+        if (msg.confirmQuestion) content += renderConfirmBlock(msg.confirmQuestion);
+        if (msg.outputCard) content += renderOutputCard(msg.outputCard);
+        const roleLabel = msg.role === 'ai' ? 'AI' : '你';
+        const roleClass = msg.role === 'ai' ? 'ai' : 'user';
+        div.innerHTML = `<div class="flow-card-role ${roleClass}">${roleLabel}</div><div class="flow-card-content">${content}</div><div class="flow-card-time">${msg.time.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</div>`;
+        chatArea.appendChild(div);
+        if (msg.skillCards) bindSkillCards(div);
+        if (msg.confirmQuestion) bindConfirm(div);
+    }
+
+    function formatContent(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>'); }
+
+    function renderSkillCards(cards) {
+        return '<div class="skill-cards-wrap">' + cards.map(c =>
+            `<div class="skill-card" data-skill-id="${c.id}">
+                <div class="skill-card-icon">${c.iconSvg || ICONS.clipboard}</div>
+                <div>
+                    <div class="skill-card-name">${c.name}</div>
+                    <div class="skill-card-desc">${c.description}</div>
+                </div>
+            </div>`
+        ).join('') + '</div>';
+    }
+
+    function renderWorkflowSteps(steps) {
+        let html = '<div class="stepper">';
+        steps.forEach((s, i) => {
+            const isLast = i === steps.length - 1;
+            const icon = s.status === 'done' ? ICONS.check : s.status === 'active' ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>' : ICONS.circle;
+            html += `<div class="stepper-step ${s.status}"><div class="stepper-step-icon">${icon}</div><span class="stepper-step-label">${s.label}</span></div>`;
+            if (!isLast) {
+                html += `<div class="stepper-connector ${s.status === 'done' ? 'done' : s.status === 'active' ? 'active' : ''}"></div>`;
+            }
+        });
+        html += '</div>';
+        return html;
+    }
+
+    function renderConfirmBlock(q) {
+        return `<div class="confirm-block">
+            <div class="confirm-question">${q.text}</div>
+            <div class="confirm-actions">
+                ${(q.options||[]).map(o=>`<button class="confirm-option" data-value="${o}">${o}</button>`).join('')}
+                <input class="confirm-input" placeholder="自定义回答…">
+                <button class="btn btn-primary btn-sm confirm-submit">确认</button>
+            </div>
+        </div>`;
+    }
+
+    function renderOutputCard(o) {
+        return `<div class="output-card">
+            <div class="output-card-header">${ICONS.fileText} ${o.title}</div>
+            <div class="output-card-preview">${o.preview.replace(/&/g,'&amp;')}</div>
+            <div class="output-card-actions">
+                <button class="btn btn-primary btn-sm">${ICONS.download} 下载</button>
+                <button class="btn btn-outline btn-sm">${ICONS.copy} 复制</button>
+            </div>
+        </div>`;
+    }
+
+    function bindSkillCards(container) {
+        container.querySelectorAll('.skill-card').forEach(card => card.addEventListener('click', () => {
+            container.querySelectorAll('.skill-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            const name = card.querySelector('.skill-card-name')?.textContent || 'Skill';
+            selectSkill(card.dataset.skillId, name);
+        }));
+    }
+
+    function bindConfirm(container) {
+        const submit = container.querySelector('.confirm-submit');
+        const input = container.querySelector('.confirm-input');
+        const options = container.querySelectorAll('.confirm-option');
+        let val = null;
+        options.forEach(o => o.addEventListener('click', () => {
+            options.forEach(x => x.classList.remove('selected'));
+            o.classList.add('selected');
+            val = o.dataset.value;
+        }));
+        submit.addEventListener('click', () => submitConfirmation(val || input?.value?.trim() || '确认'));
+    }
+
+    function removeMessageById(id) {
+        const el = document.getElementById(id);
+        if (el) { el.style.opacity='0'; el.style.transform='translateY(-8px)'; el.style.transition='0.2s'; setTimeout(() => el.remove(), 200); }
+        STATE.messages = STATE.messages.filter(m => m.id !== id);
+        saveCurrentMessages();
+    }
+
+    function handleFileUpload(input) {
+        if (input.files[0]) {
+            const file = input.files[0];
+            addMessage('user', `已上传文件：**${file.name}** (${(file.size/1024).toFixed(1)} KB)`);
+            simulateAI('[文件上传]');
+        }
+        input.value = '';
+    }
+
+    function sendMessage() {
+        const text = chatInput.value.trim();
+        if (!text && !STATE._pendingFile) return;
+        const content = text || `已上传文件`;
+        addMessage('user', content);
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        sendBtn.disabled = true;
+        simulateAI(content);
+    }
+
+    function handleInputKey(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        sendBtn.disabled = !chatInput.value.trim();
+    }
+
+    function simulateAI(content) {
+        STATE.workflowStatus = 'running'; updateTopbar();
+        const thinkMsg = addMessage('ai', '分析需求中…');
+        setTimeout(() => {
+            removeMessageById(thinkMsg.id);
+            if (STATE.preselectedSkill) {
+                const skill = STATE.preselectedSkill;
+                STATE.selectedSkill = skill;
+                STATE.preselectedSkill = null;
+                addMessage('ai', `需求解析完成。已为您自动加载预选 Skill：**${skill.name}**`);
+                startWorkflow(skill);
+            } else {
+                addMessage('ai', '需求解析完成，为您推荐以下常用方案：', {
+                    skillCards: [
+                        { id:'test-cases', name:'测试用例生成', description:'基于 PRD 生成结构化测试用例', iconSvg: ICONS.clipboard },
+                        { id:'test-plan', name:'测试计划生成', description:'生成完整测试计划文档', iconSvg: ICONS.ruler },
+                        { id:'qa-checklist', name:'QA 检查清单', description:'功能点覆盖检查清单', iconSvg: ICONS.checkCircle }
+                    ]
+                });
+                STATE.workflowStatus = 'paused'; updateTopbar();
+            }
+        }, 1200);
+    }
+
+    function selectSkill(id, name) {
+        STATE.selectedSkill = { id, name };
+        STATE.workflowStatus = 'running'; updateTopbar();
+        addMessage('user', `选择 Skill：**${name}**`);
+        startWorkflow({ id, name });
+    }
+
+    function startWorkflow(skill) {
+        const thinkMsg = addMessage('ai', '启动工作流…');
+        setTimeout(() => {
+            removeMessageById(thinkMsg.id);
+            STATE.steps = [
+                { label:'解析输入', status:'done' }, { label:'AI 分析', status:'done' }, { label:'Skill 匹配', status:'done' },
+                { label:'澄清确认', status:'active' }, { label:'生成产出', status:'pending' }, { label:'审核输出', status:'pending' }
+            ];
+            addMessage('ai', `工作流已启动 — ${skill.name} v1.2.0`, { workflowSteps: STATE.steps });
+            setTimeout(() => {
+                addMessage('ai', '', { confirmQuestion: { text:'请确认测试用例覆盖范围：', options:['全部功能模块','仅核心流程','仅异常场景'], allowFreeText:true } });
+                STATE.workflowStatus = 'paused'; updateTopbar();
+            }, 900);
+        }, 1200);
+    }
+
+    function submitConfirmation(answer) {
+        addMessage('user', `${answer}`);
+        STATE.workflowStatus = 'running'; updateTopbar();
+        STATE.steps[3].status = 'done';
+        STATE.steps[4].status = 'active';
+        const thinkMsg = addMessage('ai', '生成产出中…');
+        setTimeout(() => {
+            removeMessageById(thinkMsg.id);
+            STATE.steps[4].status = 'done';
+            STATE.steps[5].status = 'active';
+            addMessage('ai', '工作流进度更新', { workflowSteps: STATE.steps });
+            setTimeout(() => {
+                addMessage('ai', '产出已生成，请审核：', { outputCard: { title:'测试用例文档', preview:'# 测试用例\n## TC-001 用户登录正常流程\n- 前置条件：用户已注册\n...' } });
+                updateCurrentProjectStatus('completed');
+            }, 1300);
+        }, 1600);
+    }
+
+    function updateCurrentProjectStatus(status) {
+        STATE.workflowStatus = status;
+        const project = STATE.projects.find(p => p.id === STATE.projectId);
+        if (project) project.status = status;
+        renderHistoryProjects();
+        updateTopbar();
+    }
+
+    function renderHistoryProjects() {
+        if (!sidebarProjects) return;
+        let html = '';
+        if (STATE.projects.length === 0) {
+            html = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:0.78rem;">暂无项目</div>';
+        } else {
+            STATE.projects.forEach(proj => {
+                const isActive = proj.id === STATE.projectId;
+                html += `<div class="sidebar-project-item ${isActive ? 'active' : ''}" data-project-id="${proj.id}">
+                    <span class="sidebar-project-dot ${proj.status || 'idle'}"></span>
+                    <span class="sidebar-project-name" onclick="loadProject('${proj.id}')">${escapeHtml(proj.name)}</span>
+                    <div class="sidebar-project-actions">
+                        <button class="sidebar-project-action-btn" onclick="event.stopPropagation(); startRenameProject('${proj.id}')">${ICONS.pencil}</button>
+                        <button class="sidebar-project-action-btn" onclick="event.stopPropagation(); deleteHistoryProject('${proj.id}')">${ICONS.trash}</button>
+                    </div>
+                </div>`;
+            });
+        }
+        sidebarProjects.innerHTML = html;
+    }
+
+    function escapeHtml(text) { return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function loadProject(projectId) { saveCurrentMessages(); loadProjectById(projectId); }
+    function loadProjectById(projectId) {
+        const project = STATE.projects.find(p => p.id === projectId);
+        if (!project) return;
+        STATE.projectId = project.id;
+        STATE.projectName = project.name;
+        STATE.workflowStatus = project.status;
+        STATE.selectedSkill = null;
+        STATE.preselectedSkill = null;
+        STATE.steps = [];
+        loadProjectMessages(projectId);
+        updateTopbar();
+        switchNav(document.querySelector('.sidebar-nav-item[data-nav="chat"]') || document.querySelector('.sidebar-nav-item'), 'chat');
+        renderHistoryProjects();
+    }
+
+    function startNewProject() {
+        saveCurrentMessages();
+        const newId = 'proj-' + Date.now().toString(36);
+        STATE.projects.unshift({ id: newId, name: '未命名项目', status: 'idle' });
+        STATE.projectMessages[newId] = [];
+        STATE.projectId = newId;
+        STATE.projectName = '未命名项目';
+        STATE.workflowStatus = 'idle';
+        STATE.messages = [];
+        chatArea.innerHTML = '';
+        addMessage('ai', '新项目已创建。请上传需求文件或直接描述您的需求。');
+        switchNav(document.querySelector('.sidebar-nav-item[data-nav="chat"]'), 'chat');
+        updateTopbar();
+        renderHistoryProjects();
+        renderQuickSkills();
+        chatInput.value = ''; sendBtn.disabled = true; chatInput.focus();
+    }
+
+    function startNewProjectWithSkill(skillId, skillName) {
+        saveCurrentMessages();
+        const newId = 'proj-' + Date.now().toString(36);
+        STATE.projects.unshift({ id: newId, name: `${skillName} 项目`, status: 'idle' });
+        STATE.projectMessages[newId] = [];
+        STATE.projectId = newId;
+        STATE.projectName = `${skillName} 项目`;
+        STATE.preselectedSkill = { id: skillId, name: skillName };
+        STATE.messages = [];
+        chatArea.innerHTML = '';
+        addMessage('ai', `新项目已创建，已预选方案 **${skillName}**。\n请上传需求文件或直接描述需求。`);
+        switchNav(document.querySelector('.sidebar-nav-item[data-nav="chat"]'), 'chat');
+        updateTopbar();
+        renderHistoryProjects();
+        renderQuickSkills();
+        chatInput.value = ''; sendBtn.disabled = true; chatInput.focus();
+    }
+
+    function deleteHistoryProject(projectId) {
+        if (!confirm('确定删除项目？')) return;
+        STATE.projects = STATE.projects.filter(p => p.id !== projectId);
+        delete STATE.projectMessages[projectId];
+        if (STATE.projectId === projectId) {
+            if (STATE.projects.length > 0) loadProject(STATE.projects[0].id);
+            else startNewProject();
+        }
+        renderHistoryProjects();
+    }
+
+    function startRenameProject(projectId) {
+        const project = STATE.projects.find(p => p.id === projectId);
+        if (!project) return;
+        const itemEl = document.querySelector(`.sidebar-project-item[data-project-id="${projectId}"]`);
+        if (!itemEl) return;
+        const nameSpan = itemEl.querySelector('.sidebar-project-name');
+        if (!nameSpan) return;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.style.cssText = 'background:transparent;border:none;border-bottom:1px dashed var(--accent);color:var(--text-primary);font-size:0.82rem;width:100%;outline:none;padding:0;';
+        input.value = project.name;
+        nameSpan.replaceWith(input);
+        input.focus(); input.select();
+        const save = () => {
+            const newName = input.value.trim();
+            if (newName && newName !== project.name) {
+                project.name = newName;
+                if (STATE.projectId === projectId) { STATE.projectName = newName; }
+            }
+            renderHistoryProjects();
+        };
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } else if (e.key === 'Escape') { input.value = project.name; input.blur(); } });
+    }
+
+    function switchNav(el, nav) {
+        document.querySelectorAll('.sidebar-nav-item').forEach(item => item.classList.remove('active'));
+        el.classList.add('active');
+        STATE.currentNav = nav;
+        if (nav === 'chat') {
+            topbarTitle.innerHTML = `${ICONS.messageSquare} 问答助手`;
+            chatView.classList.add('active'); panelView.classList.remove('active');
+        } else if (nav === 'workflow') {
+            topbarTitle.innerHTML = `${ICONS.activity} 工作流监控`;
+            chatView.classList.remove('active'); panelView.classList.add('active');
+            renderWorkflowPanel();
+        } else if (nav === 'outputs') {
+            topbarTitle.innerHTML = `${ICONS.fileOutput} 产出管理`;
+            chatView.classList.remove('active'); panelView.classList.add('active');
+            renderOutputsPanel();
+        }
+    }
+
+    function renderSkillsPanel() {
+        const skills = [
+            { id:'test-cases', name:'测试用例生成', desc:'基于 PRD / 用户故事生成结构化测试用例文档', icon:'clipboard', tokens:25000 },
+            { id:'test-code', name:'测试代码生成', desc:'生成可执行的自动化测试代码（Playwright / Jest 等）', icon:'code', tokens:50000 },
+            { id:'test-plan', name:'测试计划生成', desc:'生成包含范围、策略、资源分配的完整测试计划', icon:'ruler', tokens:15000 },
+            { id:'qa-checklist', name:'QA 检查清单', desc:'生成功能点覆盖检查清单，确保无遗漏', icon:'checkCircle', tokens:8000 }
+        ];
+        let html = '<div class="panel-card"><div class="panel-title">可用 Skills</div><div class="skills-grid">';
+        skills.forEach(s => {
+            html += `<div class="skill-card-panel" onclick="startNewProjectWithSkill('${s.id}', '${s.name}')">
+                <div class="skill-card-panel-icon">${ICONS[s.icon]}</div>
+                <div style="flex:1;min-width:0;">
+                    <div class="skill-card-panel-name">${s.name}</div>
+                    <div class="skill-card-panel-desc">${s.desc}</div>
+                    <div class="skill-card-panel-meta">
+                        <span>~${s.tokens.toLocaleString()} tokens</span>
+                        <span style="margin-left:8px;">输入：Markdown, DOCX, PDF…</span>
+                    </div>
+                </div>
+            </div>`;
+        });
+        html += '</div></div><p style="margin-top:12px; color:var(--text-muted); font-size:0.78rem;">点击任意 Skill 将创建一个新的问答项目，并自动预选该 Skill。</p>';
+        panelContent.innerHTML = html;
+    }
+
+    function renderWorkflowPanel() {
+        let html = '<div class="panel-card"><div class="panel-title">当前工作流状态</div>';
+        if (STATE.workflowStatus === 'idle' || STATE.workflowStatus === 'completed') {
+            const exampleSteps = [
+                { label:'解析输入', status:'done', time:'2026-05-20 09:12' },
+                { label:'AI 需求分析', status:'done', time:'2026-05-20 09:13' },
+                { label:'Skill 匹配', status:'done', time:'2026-05-20 09:14' },
+                { label:'澄清确认', status:'done', time:'2026-05-20 09:15' },
+                { label:'生成产出', status:'done', time:'2026-05-20 09:17' },
+                { label:'审核输出', status:'done', time:'2026-05-20 09:18' }
+            ];
+            html += '<div class="timeline">';
+            exampleSteps.forEach(s => {
+                html += `<div class="timeline-item ${s.status}">
+                    <div class="timeline-dot">${s.status === 'done' ? ICONS.check : ''}</div>
+                    <div class="timeline-content">
+                        <div class="timeline-content-title">${s.label}</div>
+                        <div class="timeline-content-time">${s.time}</div>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            html += '<p style="margin-top:16px; font-size:0.75rem; color:var(--text-muted);">示例 · 工作流已完成</p>';
+        } else {
+            html += `<p style="margin-bottom:12px; font-size:0.85rem;">项目：<strong>${STATE.projectName}</strong></p>`;
+            if (STATE.steps.length) {
+                html += '<div class="timeline">';
+                STATE.steps.forEach((s, i) => {
+                    const timeStr = s.status === 'done' ? '已完成' : s.status === 'active' ? '进行中' : '待开始';
+                    html += `<div class="timeline-item ${s.status}">
+                        <div class="timeline-dot">${s.status === 'done' ? ICONS.check : s.status === 'active' ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>' : ''}</div>
+                        <div class="timeline-content">
+                            <div class="timeline-content-title">${s.label}</div>
+                            <div class="timeline-content-time">${timeStr}</div>
+                        </div>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+        }
+        html += '</div>';
+        panelContent.innerHTML = html;
+    }
+
+    function renderOutputsPanel() {
+        const outputs = [
+            { title: '用户中心 API 测试用例', date: '2026-05-18', skill: 'test-cases' },
+            { title: '支付模块 PRD 分析报告', date: '2026-05-17', skill: 'test-plan' },
+            { title: '库存系统 QA 检查清单', date: '2026-05-16', skill: 'qa-checklist' }
+        ];
+        let html = '<div class="panel-card"><div class="panel-title">历史产出</div>';
+        outputs.forEach(o => {
+            html += `<div class="output-list-item">
+                <div class="output-list-left">
+                    <div class="output-list-icon">${ICONS.fileText}</div>
+                    <div class="output-list-info">
+                        <div class="output-list-title">${o.title}</div>
+                        <div class="output-list-meta">${o.date} · ${o.skill}</div>
+                    </div>
+                </div>
+                <div class="output-list-actions">
+                    <button class="btn btn-ghost btn-sm">${ICONS.arrowRight}</button>
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        panelContent.innerHTML = html;
+    }
+
+    function updateTopbar() {
+        const map = {
+            idle: { text:'就绪', cls:'running' },
+            running: { text:'运行中', cls:'running' },
+            paused: { text:'等待确认', cls:'paused' },
+            completed: { text:'已完成', cls:'completed' }
+        };
+        const s = map[STATE.workflowStatus] || map.idle;
+        topbarStatus.className = `main-topbar-status ${s.cls}`;
+        topbarStatus.innerHTML = s.cls !== 'completed' ? `<span class="main-topbar-status-dot"></span> ${s.text}` : s.text;
+        renderQuickSkills();
+        if (STATE.currentNav === 'workflow') renderWorkflowPanel();
+    }
+
+    chatInput.addEventListener('input', () => {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+        sendBtn.disabled = !chatInput.value.trim();
+    });
+
+    init();
+</script>
+</body>
+</html>

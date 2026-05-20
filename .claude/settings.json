@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/**)",
+      "Bash(*)",
+      "Read(/**)",
+      "Write(/**)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "Skill(using-superpowers)",
+      "Skill(using-superpowers:*)",
+      "Skill(brainstorming)",
+      "Skill(brainstorming:*)",
+      "Skill(ui-ux-pro-max-0.1.0)",
+      "Skill(ui-ux-pro-max-0.1.0:*)",
+      "Skill(find-skills)",
+      "Skill(find-skills:*)"
+    ]
+  }
+}
