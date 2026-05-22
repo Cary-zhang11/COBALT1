@@ -98,9 +98,45 @@ Step 5: 调用 md2xmind.py 输出思维导图
 ### 执行模型
 
 Skill 的 `.md` body 作为 **System Prompt** 发给 LLM，LLM 按 Prompt 里的指示决定：
-- 什么时候调用工具（`<TOOL>docx2text</TOOL>`）
-- 什么时候暂停问用户（`<PAUSE>请确认以上模块划分</PAUSE>`）
+- 什么时候调用工具
+- 什么时候暂停问用户
 - 什么时候输出最终结果
+
+#### 推荐方案：Vercel AI SDK Tool Use（结构化工具调用）
+
+优先使用 Vercel AI SDK 的 `tool()` 函数实现工具调用，而非文本标记解析：
+
+| 对比维度 | 文本标记 `<TOOL>` | Tool Use（推荐） |
+|---------|-------------------|-----------------|
+| 可靠性 | 依赖 LLM 输出格式正确（易出现遗漏闭合标签、空格误差） | SDK 保证结构化 JSON，无格式歧义 |
+| 安全性 | LLM 可能"幻觉"不存在的工具名 | 平台预注册工具白名单，LLM 只能调用已定义工具 |
+| 并行调用 | 难以处理多个工具同时调用 | SDK 原生支持并行 tool calls |
+| 错误处理 | 需自行实现解析容错 | SDK 内置错误类型，处理标准化 |
+
+```typescript
+// Vercel AI SDK Tool Use 示例
+const tools = {
+  docx2text: tool({
+    description: "将 .docx 文件转换为 Markdown",
+    parameters: z.object({ filePath: z.string() }),
+    execute: async ({ filePath }) => {
+      return await execPython('docx2text.py', [filePath]);
+    }
+  }),
+  pause_for_user: tool({
+    description: "暂停执行，等待用户确认",
+    parameters: z.object({ message: z.string() }),
+    // 标记暂停点，由 Task Engine 接管状态切换
+  })
+};
+```
+
+#### 备用方案：文本标记解析（降级策略）
+
+若因特殊原因无法使用 Tool Use，回退到文本标记解析，但必须增加容错逻辑：
+- 正则宽松匹配（容忍多余空格、大小写差异）
+- 工具名白名单校验（遇到未知工具名直接报错，不执行）
+- 标记完整性检查（检测未闭合标签，超时自动中断）
 
 平台解析 LLM 的输出，遇到标记就执行对应操作：
 - 遇到 `<TOOL>` → 调用 Tool Layer → 结果返回给 LLM
@@ -108,25 +144,64 @@ Skill 的 `.md` body 作为 **System Prompt** 发给 LLM，LLM 按 Prompt 里的
 - 用户回复后 → 继续对话 → LLM 继续执行
 
 ### LLM 配置
-通过环境变量切换，不绑定任何模型：
+通过环境变量切换，不绑定任何模型，支持多级 Fallback：
 
 ```bash
-# 可选方案
-LLM_PROVIDER=deepseek      # 或 anthropic / openai
+# 主模型配置
+LLM_PROVIDER=deepseek           # anthropic / openai / deepseek
 DEEPSEEK_API_KEY=sk-...
 LLM_MODEL=deepseek-chat
+
+# Fallback 链（主模型不可用时自动切换）
+LLM_FALLBACK_PROVIDER=openai    # 备用模型
+OPENAI_API_KEY=sk-...
+LLM_FALLBACK_MODEL=gpt-4o-mini
+
+# 超时与重试
+LLM_TIMEOUT=30000               # 单次调用超时 30s
+LLM_MAX_RETRIES=2               # 每个模型最多重试 2 次
 ```
+
+**Fallback 逻辑**：`deepseek-chat → 超时/失败 → 重试2次 → 仍失败 → gpt-4o-mini → 超时/失败 → 返回错误`
 
 ### 工具层（Tool Layer）
 
-| 工具 | 功能 | 实现 |
-|------|------|------|
-| `docx2text` | .docx → Markdown + 图片提取 | Python 标准库 |
-| `md2xmind` | Markdown → XMind 思维导图 | Python + xmind 库 |
-| `file_read/write` | 文件读写 | Node.js fs |
-| `dir_create` | 目录创建 | Node.js fs |
-| `exec_python` | 执行 Python 脚本 | Node.js child_process |
-| `exec_command` | 受限 shell 命令 | Node.js child_process |
+| 工具 | 功能 | 实现 | 超时 | 失败策略 |
+|------|------|------|------|---------|
+| `docx2text` | .docx → Markdown + 图片提取 | Python 标准库 | 60s | 保留已提取文本片段，标记失败页 |
+| `md2xmind` | Markdown → XMind 思维导图 | Python + xmind 库 | 30s | 自动重试 1 次，失败则仅提供 .md 下载 |
+| `file_read/write` | 文件读写 | Node.js fs | 10s | 返回详细 errno 错误信息 |
+| `dir_create` | 目录创建 | Node.js fs | 5s | 已存在则跳过，权限不足则报错 |
+| `exec_python` | 执行 Python 脚本 | Node.js child_process | 30s | SIGTERM → 5s → SIGKILL 渐进 kill，记录 stderr |
+| `exec_command` | 受限 shell 命令（白名单制） | Node.js child_process | 15s | 非白名单命令直接拒绝，超时 kill |
+
+### 安全沙箱
+
+#### 4.1 Python 脚本隔离
+- 使用 `child_process.spawn` 启动独立子进程，非主进程内执行
+- 每个任务分配独立临时工作目录（`/tmp/skillflow/{taskId}/`）
+- 30 秒超时自动 kill（先 SIGTERM，5 秒后 SIGKILL）
+- 禁止网络访问（环境变量 `HTTP_PROXY=""`、`no_proxy="*"`）
+
+#### 4.2 exec_command 白名单
+仅允许以下命令，其余直接拒绝执行：
+- `python` / `python3` — 执行脚本
+- `pip` — 安装依赖（仅限 requirements.txt 内声明）
+- `node` — 执行 JS 脚本
+- 明确禁止：`rm`、`curl`、`wget`、`sh`、`bash` 及任何网络操作命令
+
+#### 4.3 用户上传安全
+
+| 上传类型 | 安全措施 |
+|---------|---------|
+| Skill `.md` 文件 | Frontmatter 严格 YAML 解析；Body 仅作为 Prompt 文本发送给 LLM，不执行任何代码 |
+| 需求文件（.docx/.txt） | 文件类型白名单校验（魔数检测，非扩展名判断）；最大 20MB |
+| 输出文件（.xmind/.md） | 写入前校验路径在沙箱目录内，防止路径穿越 |
+
+#### 4.4 数据清理
+- 任务完成后 7 天自动清理临时文件
+- 用户上传的 Skill 文件保留至用户删除
+- 日志数据保留 90 天（可配置）
 
 ---
 
@@ -199,19 +274,30 @@ pending → running → completed
 | `completed` | 执行完成，结果可用 |
 | `failed` | 执行失败，记录错误日志 |
 
+### 前端轮询策略
+
+MVP 阶段使用前端轮询获取任务状态，后续升级 WebSocket 实时推送：
+
+| 任务状态 | 轮询间隔 | 理由 |
+|---------|---------|------|
+| `pending` | 5s | 排队等待，低频即可 |
+| `running` | 2s | 用户正在查看实时日志流 |
+| `paused` → `running`（恢复后前 30s） | 1s | 用户刚提交确认，期望即时响应 |
+| `completed` / `failed` | 停止轮询 | 终态无需轮询 |
+
 ---
 
 ## 八、数据模型
 
 ### 核心实体
 
-| 实体 | 说明 |
-|------|------|
-| **User** | 用户（邮箱、姓名、头像） |
-| **Skill** | 技能（名称、描述、来源、文件路径、配置） |
-| **Task** | 任务（用户、Skill、状态、输入、输出、耗时、Token） |
-| **TaskLog** | 执行日志（步骤、类型、输入、输出、耗时） |
-| **TaskFeedback** | 用户反馈（评分、评论） |
+| 实体 | 关键字段 | 说明 |
+|------|---------|------|
+| **User** | email, name, avatar, passwordHash | 用户（邮箱、姓名、头像、密码哈希） |
+| **Skill** | name, description, source, filePath, version, updatedAt | 技能（名称、描述、来源、文件路径、版本号追踪） |
+| **Task** | userId, skillId, skillVersion, status, input, output, duration, tokens, retryCount | 任务（用户、Skill、Skill版本快照、状态、输入、输出、耗时、Token、重试次数） |
+| **TaskLog** | taskId, sequence, type, input, output, duration, parentLogId | 执行日志（任务、步骤序号、类型、输入、输出、耗时、父日志ID支持嵌套） |
+| **TaskFeedback** | taskId, rating, comment | 用户反馈（评分 1-5、评论） |
 
 ### 数据存储
 - **PostgreSQL**：用户、任务、日志、反馈等结构化数据
@@ -298,6 +384,21 @@ pending → running → completed
 - 下载结果文件（.md / .xmind）
 - 统计信息：处理时间、Token 用量、输出规模
 - 满意度评分：1-5 星 + 评论
+
+### 前端状态管理策略
+
+MVP 推荐使用 **TanStack Query + React Context** 组合方案：
+
+| 方案 | 职责 | 推荐度 |
+|------|------|--------|
+| **TanStack Query** | 服务端状态缓存、轮询管理（`refetchInterval`）、自动重取 | ⭐⭐⭐ 强烈推荐 |
+| **React Context + useReducer** | 任务执行会话状态（当前步骤、暂停/运行切换、实时日志流） | ⭐⭐⭐ MVP 推荐 |
+| **Zustand** | 跨页面全局状态（后续迭代考虑） | ⭐⭐ 后续迭代 |
+
+**职责划分**：
+- **TanStack Query** 管理所有 API 数据（任务列表、Skill 列表、统计），内置 `refetchInterval` 替代手写 `setInterval` 轮询
+- **React Context** 管理单次任务执行会话（WebSocket/轮询结果流、暂停状态、用户输入），任务完成后销毁，避免跨页面污染
+- **页面级状态**（表单输入、UI 开关）使用组件内部 `useState`，不上提
 
 ---
 
@@ -419,6 +520,41 @@ npm run dev
 | Skill 格式不兼容 | 严格 frontmatter 解析，不兼容时明确报错 |
 | Token 成本过高 | 任务级配额、使用审计、模型降级 |
 | 用户上传恶意文件 | 文件类型白名单、大小限制、沙箱执行 |
+
+---
+
+## 十六、统计看板指标
+
+### 16.1 使用行为与交互维度
+
+| 指标 | 定义 | 采集方式 |
+|------|------|---------|
+| **调用量（PV）** | Skill 被调用的总次数 | 每次 Task 创建时 +1 |
+| **调用用户数（UV）** | 使用 Skill 的去重用户数 | 按 userId 去重统计 |
+| **人均使用次数** | PV / UV | 计算指标 |
+| **使用时长/耗时** | 单次任务从提交到完成的耗时（ms） | Task.duration 字段 |
+| **使用频率分布** | 日均/周均调用次数 | 按 createdAt 聚合 |
+| **输入参数词云** | 用户高频输入的关键词提取 | 分析 Task.input 文本，提取高频词 |
+| **中断/跳出点** | 用户在哪个环节取消或退出 | 记录 Task 状态变更到 cancelled 的触发点 |
+
+### 16.2 结果与效果维度
+
+| 指标 | 定义 | 采集方式 |
+|------|------|---------|
+| **调用成功率** | completed / (completed + failed + timeout) | 按 Task.status 统计 |
+| **错误详情分布** | 失败原因的分类统计 | TaskLog.type = 'error' 的分类聚合 |
+| **用户满意度** | 1-5 星评分平均分 | TaskFeedback.rating 聚合 |
+| **转化贡献** | 核心目标完成率（如：产出文件被下载） | Task.outputFiles 下载次数统计 |
+| **技能新增用户数** | 首次使用某 Skill 的用户数 | 按 Skill + userId 去重统计 |
+
+### 16.3 意见收集维度
+
+| 指标 | 定义 | 采集方式 |
+|------|------|---------|
+| **高频关键词** | 从反馈文本中提取的痛点或赞扬点 | NLP 分析 TaskFeedback.comment |
+| **反馈关联技能** | 具体指向哪个 Skill 或功能环节 | TaskFeedback 关联 Task → Skill |
+| **反馈解决率** | 已回复/已解决反馈的占比 | 后台标记反馈处理状态 |
+| **反馈渠道** | 用户提交反馈的入口来源 | 前端埋点记录来源页面 |
 
 ---
 

@@ -1,0 +1,40 @@
+{
+  "skill_name": "prd-to-tests-with-context",
+  "evals": [
+    {
+      "id": 1,
+      "name": "历史用例补充",
+      "prompt": "请基于以下资料完善测试用例文档：\n\n1. 新用例文件：docs/卖车页面改版_20260509/卖车页面改版_测试用例.md（这是当前版本 prd-to-tests-new 生成的测试用例）\n2. 历史测试用例：prd-to-tests-with-context-workspace/test-materials/历史用例_卖车页面V1.md（上一版本的测试用例）\n\n要求：\n- 对比历史用例和新用例，识别新用例中遗漏的场景\n- 历史用例中有但新用例缺失的异常场景、边界条件、兼容性场景需要补充\n- 历史用例中完全适用于新需求的场景标记为【历史复用】\n- 生成完善后的测试用例文档，保存到 prd-to-tests-with-context-workspace/iteration-1/eval-1/with_skill/outputs/\n- 同时输出分析摘要",
+      "expected_output": "完善后的测试用例文档，包含补充用例（标注【历史用例补充】或【历史复用】），以及历史资料分析摘要",
+      "files": [
+        "docs/卖车页面改版_20260509/卖车页面改版_测试用例.md",
+        "prd-to-tests-with-context-workspace/test-materials/历史用例_卖车页面V1.md"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 2,
+      "name": "Bug回归分析",
+      "prompt": "请基于以下资料完善测试用例文档：\n\n1. 新用例文件：docs/卖车页面改版_20260509/卖车页面改版_测试用例.md\n2. Bug记录：prd-to-tests-with-context-workspace/test-materials/bug_records.xlsx\n\n要求：\n- 读取Bug记录，提取高价值Bug场景（P0/P1级别、涉及核心流程的Bug）\n- 判断Bug涉及的功能模块是否在新需求中仍然存在\n- 为仍存在的模块生成回归验证用例，标注【历史Bug补充】\n- 回归用例预期结果需包含'验证Bug已修复'的具体表现\n- 生成完善后的测试用例文档，保存到 prd-to-tests-with-context-workspace/iteration-1/eval-2/with_skill/outputs/\n- 同时输出Bug回归分析摘要",
+      "expected_output": "完善后的测试用例文档，包含Bug回归验证用例（标注【历史Bug补充】），以及Bug回归分析摘要",
+      "files": [
+        "docs/卖车页面改版_20260509/卖车页面改版_测试用例.md",
+        "prd-to-tests-with-context-workspace/test-materials/bug_records.xlsx"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 3,
+      "name": "完整关联分析",
+      "prompt": "请基于以下资料完善测试用例文档：\n\n1. 新用例文件：docs/卖车页面改版_20260509/卖车页面改版_测试用例.md\n2. 老需求文档：prd-to-tests-with-context-workspace/test-materials/老需求_卖车页面V1.md\n3. 历史测试用例：prd-to-tests-with-context-workspace/test-materials/历史用例_卖车页面V1.md\n4. Bug记录：prd-to-tests-with-context-workspace/test-materials/bug_records.xlsx\n\n要求：\n- 执行完整的四类分析：变更分析（新老需求对比）、用例复用分析、Bug回归分析、维度覆盖分析\n- 输出分析摘要（变更/复用/Bug/维度覆盖统计）\n- 基于分析结果补充用例（需求变更补充、历史用例补充、历史Bug补充、维度覆盖补充）\n- 生成完善后的测试用例文档，保存到 prd-to-tests-with-context-workspace/iteration-1/eval-3/with_skill/outputs/\n- 文档需包含：原用例 + 补充用例 + 回归测试清单 + 历史资料分析摘要 + 完整性检查报告",
+      "expected_output": "完整完善后的测试用例文档，包含所有四类分析的摘要和补充用例，以及新增的回归测试清单和历史资料分析摘要章节",
+      "files": [
+        "docs/卖车页面改版_20260509/卖车页面改版_测试用例.md",
+        "prd-to-tests-with-context-workspace/test-materials/老需求_卖车页面V1.md",
+        "prd-to-tests-with-context-workspace/test-materials/历史用例_卖车页面V1.md",
+        "prd-to-tests-with-context-workspace/test-materials/bug_records.xlsx"
+      ],
+      "assertions": []
+    }
+  ]
+}

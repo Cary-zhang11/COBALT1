@@ -48,7 +48,7 @@ interface WorkflowStep {
 const workflowSteps: WorkflowStep[] = [
   { id: "parse", name: "解析输入", status: "completed", icon: <FileText className="w-4 h-4" /> },
   { id: "analyze", name: "AI 分析", status: "completed", icon: <Sparkles className="w-4 h-4" /> },
-  { id: "match", name: "匹配 Skill", status: "completed", icon: <CheckCircle2 className="w-4 h-4" /> },
+  { id: "match", name: "匹配技能", status: "completed", icon: <CheckCircle2 className="w-4 h-4" /> },
   { id: "generate", name: "生成内容", status: "running", icon: <Loader2 className="w-4 h-4" /> },
   { id: "review", name: "人工审核", status: "pending", icon: <MessageSquare className="w-4 h-4" /> },
   { id: "output", name: "输出结果", status: "pending", icon: <CheckCircle2 className="w-4 h-4" /> },
@@ -59,7 +59,7 @@ const initialMessages: Message[] = [
     id: "msg-1",
     role: "system",
     type: "status",
-    content: "工作流已启动，使用 Skill: **test-cases**",
+    content: "工作流已启动，使用技能: **test-cases**",
     timestamp: "14:30:05",
   },
   {
@@ -263,7 +263,7 @@ export default function WorkflowPage() {
                   "flex gap-4",
                   msg.role === "user" ? "flex-row-reverse" : ""
                 )}
-003e
+                >
                 {/* Avatar */}
                 <div
                   className={cn(

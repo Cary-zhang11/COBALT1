@@ -106,10 +106,10 @@ export default function SkillsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
               <Wand2 className="w-6 h-6 text-skill-600" />
-              Skill 管理
+              技能管理
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              管理和浏览所有可用的 Skills
+              管理和浏览所有可用的技能
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -117,7 +117,7 @@ export default function SkillsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="搜索 Skills..."
+                placeholder="搜索技能..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-4 py-2.5 bg-background border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-skill-500/30 focus:border-skill-500 transition-all w-64"
@@ -130,11 +130,11 @@ export default function SkillsPage() {
       {/* Content */}
       <div className="flex-1 overflow-auto p-8">
         <div className="max-w-4xl mx-auto space-y-4">
-          {/* Built-in Skills */}
+          {/* 内置技能 */}
           <div className="flex items-center gap-2 mb-4">
             <Cpu className="w-4 h-4 text-muted-foreground" />
             <span className="text-sm font-medium text-muted-foreground">
-              内置 Skills ({filtered.length})
+              内置技能 ({filtered.length})
             </span>
           </div>
 
@@ -241,7 +241,7 @@ export default function SkillsPage() {
                         href="/projects/new"
                         className="px-4 py-2 bg-skill-600 text-white rounded-lg text-sm font-medium hover:bg-skill-700 transition-colors flex items-center gap-1.5"
                       >
-                        使用此 Skill
+                        使用此技能
                         <ArrowRight className="w-3.5 h-3.5" />
                       </Link>
                     </div>
@@ -254,7 +254,7 @@ export default function SkillsPage() {
           {filtered.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <Wand2 className="w-10 h-10 mx-auto mb-3 opacity-40" />
-              <p>未找到匹配的 Skills</p>
+              <p>未找到匹配的技能</p>
             </div>
           )}
         </div>

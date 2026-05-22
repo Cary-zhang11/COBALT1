@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "SkillFlow - AI 驱动需求处理平台",
-  description: "上传需求，选择 Skill，生成高质量产出",
+  description: "上传需求，选择技能，生成高质量产出",
 };
 
 export default function RootLayout({

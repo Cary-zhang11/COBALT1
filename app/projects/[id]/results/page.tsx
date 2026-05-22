@@ -117,7 +117,7 @@ export default function ResultsPage() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight">执行完成</h1>
               <p className="text-sm text-muted-foreground">
-                Skill: test-cases v1.0 · 耗时 5 分 23 秒 · 消耗 18.5K tokens
+                技能: test-cases v1.0 · 耗时 5 分 23 秒 · 消耗 18.5K tokens
               </p>
             </div>
           </div>

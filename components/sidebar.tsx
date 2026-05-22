@@ -15,7 +15,7 @@ import {
 const navItems = [
   { href: "/", label: "项目列表", icon: LayoutDashboard },
   { href: "/projects/new", label: "新建项目", icon: PlusCircle },
-  { href: "/skills", label: "Skill 管理", icon: Wand2 },
+  { href: "/skills", label: "技能管理", icon: Wand2 },
 ];
 
 export function Sidebar() {

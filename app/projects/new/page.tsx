@@ -49,7 +49,7 @@ const initialMessages: Message[] = [
     role: "ai",
     type: "text",
     content:
-      "你好！我是 **SkillFlow** 智能助手。\n\n请告诉我你想处理什么需求？你可以：\n\n1. **直接描述**你的需求场景\n2. **上传需求文档**（PRD、用户故事、API 文档等）\n3. **两者结合**——先描述再补充文档\n\n我会根据你的需求自动推荐最适合的 Skill。",
+      "你好！我是 **SkillFlow** 智能助手。\n\n请告诉我你想处理什么需求？你可以：\n\n1. **直接描述**你的需求场景\n2. **上传需求文档**（PRD、用户故事、API 文档等）\n3. **两者结合**——先描述再补充文档\n\n我会根据你的需求自动推荐最适合的技能。",
     timestamp: new Date().toLocaleTimeString("zh-CN", {
       hour: "2-digit",
       minute: "2-digit",
@@ -163,7 +163,7 @@ export default function NewProjectPage() {
         role: "ai",
         type: "skill-recommend",
         content:
-          "基于你的需求描述和文档分析，我为你匹配了以下 Skills。推荐度综合考虑了需求类型、文档格式和预期产出：",
+          "基于你的需求描述和文档分析，我为你匹配了以下技能。推荐度综合考虑了需求类型、文档格式和预期产出：",
         skills: mockSkills,
         timestamp: new Date().toLocaleTimeString("zh-CN", {
           hour: "2-digit",
@@ -226,7 +226,7 @@ export default function NewProjectPage() {
       id: `ai-confirm-${Date.now()}`,
       role: "ai",
       type: "text",
-      content: `已选择 **${skill?.name}**。\n\n我将基于你的需求文档，使用此 Skill 生成对应的产出。整个过程大约需要 3-5 分钟，期间可能会暂停向你确认一些关键细节。\n\n准备好了吗？`,
+      content: `已选择 **${skill?.name}**。\n\n我将基于你的需求文档，使用此技能生成对应的产出。整个过程大约需要 3-5 分钟，期间可能会暂停向你确认一些关键细节。\n\n准备好了吗？`,
       timestamp: new Date().toLocaleTimeString("zh-CN", {
         hour: "2-digit",
         minute: "2-digit",
@@ -354,7 +354,7 @@ export default function NewProjectPage() {
                 </div>
               )}
 
-              {/* Skill Recommendation Cards */}
+              {/* 技能推荐卡片 */}
               {msg.type === "skill-recommend" && msg.skills && (
                 <div className="w-full space-y-3">
                   <div className="rounded-2xl px-4 py-3 text-sm bg-card border shadow-sm">
@@ -558,7 +558,7 @@ export default function NewProjectPage() {
           <div className="flex items-center gap-2 mt-3">
             <Lightbulb className="w-3 h-3 text-muted-foreground" />
             <span className="text-[11px] text-muted-foreground">
-              提示：描述越详细，匹配的 Skill 越精准。支持 Markdown、Word、PDF、Excel 等格式。
+              提示：描述越详细，匹配的技能越精准。支持 Markdown、Word、PDF、Excel 等格式。
             </span>
           </div>
         </div>

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COBALT — 需求处理平台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-width: 210px;
+            --bg-base: #FAF7F3;
+            --bg-sidebar: #FFFFFF;
+            --bg-surface: #F5F2EE;
+            --bg-surface-hover: #EDE8E3;
+            --bg-active: #FDE8E4;
+            --border: #E8E4DF;
+            --border-strong: #D8D3CD;
+            --text-primary: #1A1A1A;
+            --text-secondary: #6B6B6B;
+            --text-muted: #A0A0A0;
+            --accent: #E07A5F;
+            --accent-soft: #FDE8E4;
+            --accent-hover: #D0694F;
+            --accent-border: #F0C4B8;
+            --success: #16A34A;
+            --success-soft: #DCFCE7;
+            --warning: #EAB308;
+            --warning-soft: #FEF9C3;
+            --danger: #E53935;
+            --danger-soft: #FFEBEE;
+            --radius-sm: 8px;
+            --radius: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --radius-full: 9999px;
+            --transition: 0.2s ease;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+            --shadow: 0 2px 8px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { height:100vh; font-family:var(--font-sans); background:var(--bg-base); color:var(--text-primary); overflow:hidden; }
+        .app-container { display:flex; height:100vh; position:relative; z-index:1; }
+
+        /* ===== Sidebar ===== */
+        .sidebar { width:var(--sidebar-width); background:var(--bg-sidebar); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; }
+        .sidebar-header { padding:20px 16px 12px; }
+        .sidebar-logo { display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--text-primary); }
+        .sidebar-logo-icon { width:32px; height:32px; border-radius:var(--radius-sm); background:var(--accent); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .sidebar-logo-icon svg { width:18px; height:18px; color:#fff; }
+        .sidebar-logo-text { font-weight:700; font-size:0.95rem; letter-spacing:-0.01em; line-height:1.2; }
+        .sidebar-logo-sub { font-size:0.6rem; color:var(--text-muted); font-weight:500; letter-spacing:0.04em; text-transform:uppercase; }
+        .sidebar-new-btn { margin:0 12px 14px; padding:10px 14px; border-radius:var(--radius-sm); background:var(--accent); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:600; font-size:0.84rem; transition:all var(--transition); }
+        .sidebar-new-btn:hover { background:var(--accent-hover); transform:translateY(-1px); box-shadow:var(--shadow-md); }
+        .sidebar-new-btn svg { width:16px; height:16px; }
+        .sidebar-divider { height:1px; background:var(--border); margin:0 12px; }
+        .sidebar-nav { padding:14px 10px; flex:1; display:flex; flex-direction:column; gap:2px; }
+        .sidebar-section-label { padding:14px 12px 6px; font-size:0.62rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); }
+        .sidebar-nav-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:var(--radius-sm); cursor:pointer; color:var(--text-secondary); font-size:0.84rem; font-weight:500; transition:all var(--transition); position:relative; }
+        .sidebar-nav-item:hover { background:var(--bg-surface); color:var(--text-primary); }
+        .sidebar-nav-item.active { background:var(--bg-active); color:var(--accent); font-weight:600; }
+        .sidebar-nav-item svg { width:17px; height:17px; flex-shrink:0; }
+        .sidebar-spacer { flex:1; }
+        .sidebar-user { padding:12px 16px; border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+        .sidebar-user-avatar { width:30px; height:30px; border-radius:var(--radius-sm); background:var(--accent-soft); display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; color:var(--accent); flex-shrink:0; }
+        .sidebar-user-name { font-weight:600; font-size:0.82rem; }
+        .sidebar-user-role { font-size:0.68rem; color:var(--text-muted); }
+
+        /* ===== Main Area ===== */
+        .main-area { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-base); }
+        .main-topbar { padding:10px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:var(--bg-base); }
+        .main-topbar-title { font-weight:700; font-size:0.88rem; display:flex; align-items:center; gap:8px; color:var(--text-primary); }
+        .main-topbar-title svg { width:15px; height:15px; color:var(--text-secondary); }
+        .main-topbar-status { display:flex; align-items:center; gap:5px; font-size:0.7rem; padding:3px 12px; border-radius:var(--radius-full); background:var(--bg-surface); color:var(--text-secondary); font-weight:500; }
+        .main-topbar-status.running { background:var(--accent-soft); color:var(--accent); }
+        .main-topbar-status.paused { background:var(--warning-soft); color:#A16207; }
+        .main-topbar-status.completed { background:var(--success-soft); color:var(--success); }
+        .main-topbar-status-dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
+        .main-topbar-status.running .main-topbar-status-dot { animation:pulse-dot 1.5s infinite; }
+        @keyframes pulse-dot { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+
+        /* ===== View Container ===== */
+        .view-container { flex:1; overflow:hidden; position:relative; }
+        .home-view, .panel-view { position:absolute; inset:0; overflow-y:auto; display:none; flex-direction:column; }
+        .home-view.active, .panel-view.active { display:flex; }
+        .home-content { flex:1; display:flex; flex-direction:column; align-items:center; padding:36px 24px 20px; }
+
+        /* ===== Hero Section ===== */
+        .hero-section { display:flex; flex-direction:column; align-items:center; text-align:center; padding:28px 20px 24px; max-width:540px; width:100%; }
+        .hero-icon { width:42px; height:42px; border-radius:var(--radius-sm); background:var(--accent); display:flex; align-items:center; justify-content:center; margin-bottom:18px; }
+        .hero-icon svg { width:22px; height:22px; color:#fff; }
+        .hero-title { font-weight:800; font-size:1.5rem; color:var(--text-primary); letter-spacing:-0.02em; margin-bottom:8px; line-height:1.3; }
+        .hero-subtitle { font-size:0.83rem; color:var(--text-secondary); line-height:1.6; max-width:420px; }
+
+        /* ===== Prompt Input ===== */
+        .prompt-wrap { width:100%; max-width:540px; margin:0 auto 14px; }
+        .prompt-box { background:var(--bg-sidebar); border:1px solid var(--border); border-radius:var(--radius-lg); padding:12px 16px; display:flex; align-items:flex-end; gap:10px; transition:all var(--transition); box-shadow:var(--shadow-sm); }
+        .prompt-box:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px rgba(224,122,95,0.1); }
+        .prompt-box textarea { flex:1; background:transparent; border:none; color:var(--text-primary); font-family:var(--font-sans); font-size:0.87rem; resize:none; outline:none; padding:2px 0; line-height:1.5; min-height:24px; max-height:100px; }
+        .prompt-box textarea::placeholder { color:var(--text-muted); }
+        .prompt-send { width:36px; height:36px; border-radius:50%; background:var(--accent); border:none; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all var(--transition); }
+        .prompt-send:hover { background:var(--accent-hover); transform:scale(1.05); }
+        .prompt-send:disabled { background:var(--bg-surface-hover); color:var(--text-muted); cursor:not-allowed; transform:none; }
+        .prompt-send svg { width:18px; height:18px; }
+        .prompt-hint { display:flex; align-items:center; gap:5px; margin-top:8px; padding:0 4px; }
+        .prompt-hint span { font-size:0.7rem; color:var(--text-muted); }
+
+        /* ===== Action Pills ===== */
+        .action-pills { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:24px; max-width:540px; width:100%; }
+        .action-pill { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:var(--radius-full); border:1px solid var(--border); background:var(--bg-sidebar); cursor:pointer; font-size:0.82rem; color:var(--text-secondary); transition:all var(--transition); white-space:nowrap; box-shadow:var(--shadow-sm); }
+        .action-pill:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); transform:translateY(-1px); box-shadow:var(--shadow); }
+        .action-pill svg { width:15px; height:15px; }
+
+        /* ===== Recent Sessions ===== */
+        .sessions-wrap { width:100%; max-width:540px; margin:0 auto; padding-bottom:40px; }
+        .sessions-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+        .sessions-title { font-weight:600; font-size:0.8rem; color:var(--text-secondary); }
+        .sessions-view-all { font-size:0.76rem; color:var(--accent); cursor:pointer; font-weight:500; transition:all var(--transition); }
+        .sessions-view-all:hover { color:var(--accent-hover); }
+        .session-card { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; background:var(--bg-sidebar); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:8px; cursor:pointer; transition:all var(--transition); box-shadow:var(--shadow-sm); }
+        .session-card:hover { border-color:var(--accent-border); box-shadow:var(--shadow); transform:translateY(-1px); }
+        .session-left { display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
+        .session-icon { width:34px; height:34px; border-radius:var(--radius-sm); background:var(--bg-surface); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .session-icon svg { width:17px; height:17px; color:var(--text-secondary); }
+        .session-name { font-weight:500; font-size:0.85rem; color:var(--text-primary); }
+        .session-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+        .session-status { display:flex; align-items:center; gap:5px; font-size:0.75rem; font-weight:500; }
+        .session-status.failed { color:var(--danger); }
+        .session-status.completed { color:var(--success); }
+        .session-status.paused { color:var(--warning); }
+        .session-status-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+        .session-time { font-size:0.72rem; color:var(--text-muted); }
+
+        /* ===== Panel Content ===== */
+        .panel-content { padding:32px; max-width:900px; margin:0 auto; }
+        .panel-card { background:var(--bg-sidebar); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; margin-bottom:16px; box-shadow:var(--shadow-sm); }
+        .panel-title { font-weight:700; font-size:1rem; margin-bottom:16px; display:flex; align-items:center; gap:8px; color:var(--text-primary); }
+        .panel-title svg { width:18px; height:18px; color:var(--text-secondary); }
+
+        /* ===== Skill Grid ===== */
+        .skills-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; }
+        @media (max-width:800px) { .skills-grid { grid-template-columns:1fr; } }
+        .skill-card-panel { background:var(--bg-sidebar); border:1px solid var(--border); border-radius:var(--radius); padding:16px; cursor:pointer; display:flex; gap:14px; transition:all var(--transition); box-shadow:var(--shadow-sm); }
+        .skill-card-panel:hover { border-color:var(--accent); box-shadow:var(--shadow); transform:translateY(-2px); }
+        .skill-card-panel-icon { width:44px; height:44px; border-radius:var(--radius-sm); background:var(--accent-soft); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .skill-card-panel-icon svg { width:22px; height:22px; color:var(--accent); }
+        .skill-card-panel-name { font-weight:600; font-size:0.88rem; }
+        .skill-card-panel-desc { font-size:0.78rem; color:var(--text-secondary); margin-top:2px; line-height:1.4; }
+        .skill-card-panel-meta { font-size:0.7rem; color:var(--text-muted); margin-top:6px; }
+
+        /* ===== Timeline ===== */
+        .timeline { position:relative; padding-left:20px; }
+        .timeline::before { content:''; position:absolute; left:7px; top:4px; bottom:4px; width:2px; background:var(--border); border-radius:1px; }
+        .timeline-item { position:relative; padding-bottom:16px; }
+        .timeline-item:last-child { padding-bottom:0; }
+        .timeline-dot { position:absolute; left:-17px; top:2px; width:14px; height:14px; border-radius:50%; border:2px solid var(--border); background:var(--bg-sidebar); display:flex; align-items:center; justify-content:center; }
+        .timeline-item.done .timeline-dot { border-color:var(--success); background:var(--success-soft); }
+        .timeline-item.done .timeline-dot svg { width:8px; height:8px; color:var(--success); }
+        .timeline-item.active .timeline-dot { border-color:var(--accent); background:var(--accent-soft); }
+        .timeline-item.active .timeline-dot svg { width:8px; height:8px; color:var(--accent); }
+        .timeline-item.pending .timeline-dot { border-color:var(--border-strong); }
+        .timeline-content { background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px; }
+        .timeline-content-title { font-weight:600; font-size:0.82rem; }
+        .timeline-content-time { font-size:0.7rem; color:var(--text-muted); margin-top:2px; }
+        .timeline-item.active .timeline-content { border-color:var(--accent-border); background:var(--accent-soft); }
+        .timeline-item.active .timeline-content-title { color:var(--accent); }
+
+        /* ===== Output List ===== */
+        .output-list-item { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); gap:12px; }
+        .output-list-item:last-child { border-bottom:none; }
+        .output-list-left { display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
+        .output-list-icon { width:36px; height:36px; border-radius:var(--radius-sm); background:var(--bg-surface); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .output-list-icon svg { width:18px; height:18px; color:var(--text-secondary); }
+        .output-list-info { min-width:0; }
+        .output-list-title { font-weight:500; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .output-list-meta { font-size:0.72rem; color:var(--text-muted); margin-top:1px; }
+        .output-list-actions { display:flex; gap:4px; flex-shrink:0; }
+
+        /* ===== Buttons ===== */
+        .btn { padding:8px 16px; border-radius:var(--radius-full); font-weight:500; font-size:0.82rem; border:1px solid transparent; cursor:pointer; transition:all var(--transition); display:inline-flex; align-items:center; gap:6px; }
+        .btn-primary { background:var(--accent); color:#fff; }
+        .btn-primary:hover { background:var(--accent-hover); }
+        .btn-outline { background:var(--bg-sidebar); border:1px solid var(--border); color:var(--text-secondary); }
+        .btn-outline:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+        .btn-ghost { background:transparent; border-color:transparent; color:var(--text-secondary); }
+        .btn-ghost:hover { background:var(--bg-surface); color:var(--text-primary); }
+        .btn-sm { padding:5px 12px; font-size:0.75rem; }
+        .btn svg { width:14px; height:14px; }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar { width:6px; height:6px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+        ::-webkit-scrollbar-thumb:hover { background:var(--border-strong); }
+
+        /* ===== Watermark ===== */
+        .watermark { position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+        .watermark-text { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-25deg); font-size:5.5rem; font-weight:800; color:rgba(0,0,0,0.012); white-space:nowrap; letter-spacing:0.12em; user-select:none; }
+    </style>
+</head>
+<body>
+<div class="watermark"><span class="watermark-text">COBALT</span></div>
+<div class="app-container">
+    <!-- ===== Sidebar ===== -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a class="sidebar-logo" href="#">
+                <div class="sidebar-logo-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </div>
+                <div>
+                    <div class="sidebar-logo-text">COBALT</div>
+                    <div class="sidebar-logo-sub">需求处理平台</div>
+                </div>
+            </a>
+        </div>
+        <button class="sidebar-new-btn" onclick="newSession()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            新会话
+        </button>
+        <div class="sidebar-divider"></div>
+        <nav class="sidebar-nav">
+            <div class="sidebar-nav-item active" data-nav="home" onclick="switchNav(this,'home')">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                需求处理
+            </div>
+            <div class="sidebar-nav-item" data-nav="workflow" onclick="switchNav(this,'workflow')">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                工作流监控
+            </div>
+            <div class="sidebar-nav-item" data-nav="outputs" onclick="switchNav(this,'outputs')">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                产出管理
+            </div>
+            <div class="sidebar-nav-item" data-nav="skills" onclick="switchNav(this,'skills')">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.378 1.378a1 1 0 0 1 0 1.415l-2.797 2.797a1 1 0 0 1-1.415 0l-1.378-1.378a1.07 1.07 0 0 0-.878-.29c-.323.05-.65-.058-.879-.288l-1.85-1.85a1.07 1.07 0 0 1-.288-.879c.05-.323-.059-.65-.289-.879L8.07 5.91a1 1 0 0 1 0-1.415l2.797-2.797a1 1 0 0 1 1.415 0l1.378 1.378c.23.23.556.338.878.29.323-.05.65.058.879.288l1.85 1.85c.23.23.338.556.29.879z"/><circle cx="12" cy="12" r="3"/></svg>
+                技能
+            </div>
+            <div class="sidebar-spacer"></div>
+        </nav>
+        <div class="sidebar-user">
+            <div class="sidebar-user-avatar">李</div>
+            <div>
+                <div class="sidebar-user-name">李明</div>
+                <div class="sidebar-user-role">QA 工程师</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ===== Main Area ===== -->
+    <main class="main-area">
+        <div class="main-topbar">
+            <span class="main-topbar-title" id="topbarTitle">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                需求处理
+            </span>
+            <span class="main-topbar-status running" id="topbarStatus">
+                <span class="main-topbar-status-dot"></span> 就绪
+            </span>
+        </div>
+        <div class="view-container">
+            <!-- Home View -->
+            <div class="home-view active" id="homeView">
+                <div class="home-content" id="homeContent"></div>
+            </div>
+            <!-- Panel View -->
+            <div class="panel-view" id="panelView">
+                <div class="panel-content" id="panelContent"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    const STATE = {
+        currentNav: 'home',
+        sessionId: null,
+        sessionName: '未命名',
+        workflowStatus: 'idle',
+        sessions: []
+    };
+
+    const ICONS = {
+        check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+        fileText: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>',
+        arrowRight: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>',
+        clipboard: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>',
+        code: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+        ruler: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>',
+        checkCircle: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+        activity: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+        star: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+        activityS: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+        fileOutput: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>',
+        puzzle: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.378 1.378a1 1 0 0 1 0 1.415l-2.797 2.797a1 1 0 0 1-1.415 0l-1.378-1.378a1.07 1.07 0 0 0-.878-.29c-.323.05-.65-.058-.879-.288l-1.85-1.85a1.07 1.07 0 0 1-.288-.879c.05-.323-.059-.65-.289-.879L8.07 5.91a1 1 0 0 1 0-1.415l2.797-2.797a1 1 0 0 1 1.415 0l1.378 1.378c.23.23.556.338.878.29.323-.05.65.058.879.288l1.85 1.85c.23.23.338.556.29.879z"/><circle cx="12" cy="12" r="3"/></svg>',
+        download: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+        copy: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+        sparkle: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>'
+    };
+
+    const homeView = document.getElementById('homeView');
+    const homeContent = document.getElementById('homeContent');
+    const panelView = document.getElementById('panelView');
+    const panelContent = document.getElementById('panelContent');
+    const topbarTitle = document.getElementById('topbarTitle');
+    const topbarStatus = document.getElementById('topbarStatus');
+
+    const QUICK_SKILLS = [
+        { id:'test-cases', name:'测试用例', icon:'clipboard' },
+        { id:'test-plan', name:'测试计划', icon:'ruler' },
+        { id:'qa-checklist', name:'QA 清单', icon:'checkCircle' },
+        { id:'test-code', name:'测试代码', icon:'code' }
+    ];
+
+    function init() {
+        STATE.sessions = [
+            { id:'sess-001', name:'用户中心 API 测试用例', status:'completed', time:'今天 10:30' },
+            { id:'sess-002', name:'支付模块 PRD 需求分析', status:'failed', time:'今天 10:00' },
+            { id:'sess-003', name:'库存系统 QA 检查清单', status:'completed', time:'昨天 17:50' }
+        ];
+        renderHome();
+    }
+
+    function renderHome() {
+        homeContent.innerHTML = `
+            <div class="hero-section">
+                <div class="hero-icon">${ICONS.star}</div>
+                <h1 class="hero-title">告诉我，你想处理什么需求？</h1>
+                <p class="hero-subtitle">描述你的需求，COBALT 理解意图 → 解析需求 → 匹配技能 → 生成产出</p>
+            </div>
+            <div class="prompt-wrap">
+                <div class="prompt-box">
+                    <textarea id="promptInput" rows="1" placeholder="描述你的需求，例如：根据用户中心 API 文档生成测试用例…" onkeydown="handlePromptKey(event)"></textarea>
+                    <button class="prompt-send" id="promptSend" onclick="handlePromptSubmit()" title="发送" disabled>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="5 12 12 5 19 12"/></svg>
+                    </button>
+                </div>
+                <div class="prompt-hint">
+                    <span>Enter 发送</span>
+                    <span style="color:var(--border);">|</span>
+                    <span>Shift+Enter 换行</span>
+                    <span style="color:var(--border);">|</span>
+                    <span>支持 Markdown / DOCX / PDF / CSV</span>
+                </div>
+            </div>
+            <div class="action-pills">
+                ${QUICK_SKILLS.map(s => `<div class="action-pill" onclick="newSessionWithSkill('${s.id}','${s.name}')">${ICONS[s.icon]} ${s.name}</div>`).join('')}
+            </div>
+            ${renderSessionsHTML()}
+        `;
+        // bind
+        const inp = document.getElementById('promptInput');
+        const snd = document.getElementById('promptSend');
+        if (inp) {
+            inp.addEventListener('input', () => {
+                inp.style.height = 'auto';
+                inp.style.height = Math.min(inp.scrollHeight, 100) + 'px';
+                snd.disabled = !inp.value.trim();
+            });
+        }
+    }
+
+    function renderSessionsHTML() {
+        if (STATE.sessions.length === 0) return '';
+        let html = '<div class="sessions-wrap">';
+        html += '<div class="sessions-header"><span class="sessions-title">最近会话</span><span class="sessions-view-all" onclick="switchNav(document.querySelector(\'[data-nav=home]\'),\'home\')">查看全部 →</span></div>';
+        STATE.sessions.forEach(s => {
+            const stCls = s.status === 'failed' ? 'failed' : s.status === 'completed' ? 'completed' : s.status === 'paused' ? 'paused' : '';
+            const stText = s.status === 'failed' ? '失败' : s.status === 'completed' ? '完成' : s.status === 'paused' ? '暂停' : '进行中';
+            html += `<div class="session-card" onclick="openSession('${s.id}')">
+                <div class="session-left">
+                    <div class="session-icon">${ICONS.fileText}</div>
+                    <span class="session-name">${escHtml(s.name)}</span>
+                </div>
+                <div class="session-right">
+                    <span class="session-status ${stCls}"><span class="session-status-dot"></span>${stText}</span>
+                    <span class="session-time">${s.time}</span>
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        return html;
+    }
+
+    function handlePromptKey(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePromptSubmit(); }
+    }
+
+    function handlePromptSubmit() {
+        const inp = document.getElementById('promptInput');
+        const text = inp?.value.trim();
+        if (!text) return;
+        // Create new session with the prompt
+        const newId = 'sess-' + Date.now().toString(36);
+        const sessionName = text.length > 20 ? text.substring(0, 20) + '…' : text;
+        STATE.sessions.unshift({ id: newId, name: sessionName, status: 'running', time: '刚刚' });
+        STATE.sessionId = newId;
+        STATE.sessionName = sessionName;
+        STATE.workflowStatus = 'running';
+        updateTopbar();
+        inp.value = '';
+        document.getElementById('promptSend').disabled = true;
+        // Simulate processing -> show result in workflow panel
+        setTimeout(() => {
+            STATE.workflowStatus = 'completed';
+            const s = STATE.sessions.find(x => x.id === newId);
+            if (s) { s.status = 'completed'; s.time = '刚刚'; }
+            updateTopbar();
+            renderHome();
+            switchNav(document.querySelector('.sidebar-nav-item[data-nav="home"]'), 'home');
+        }, 2000);
+        renderHome();
+    }
+
+    function newSession() {
+        STATE.sessionId = null;
+        STATE.sessionName = '未命名';
+        STATE.workflowStatus = 'idle';
+        updateTopbar();
+        renderHome();
+        switchNav(document.querySelector('.sidebar-nav-item[data-nav="home"]'), 'home');
+    }
+
+    function newSessionWithSkill(skillId, skillName) {
+        const newId = 'sess-' + Date.now().toString(36);
+        STATE.sessions.unshift({ id: newId, name: `${skillName} 项目`, status: 'running', time: '刚刚' });
+        STATE.sessionId = newId;
+        STATE.sessionName = `${skillName} 项目`;
+        STATE.workflowStatus = 'running';
+        updateTopbar();
+        renderHome();
+        switchNav(document.querySelector('.sidebar-nav-item[data-nav="home"]'), 'home');
+        // simulate flow
+        setTimeout(() => {
+            STATE.workflowStatus = 'completed';
+            const s = STATE.sessions.find(x => x.id === newId);
+            if (s) { s.status = 'completed'; }
+            updateTopbar();
+            renderHome();
+        }, 2000);
+    }
+
+    function openSession(sessionId) {
+        const s = STATE.sessions.find(x => x.id === sessionId);
+        if (!s) return;
+        STATE.sessionId = s.id;
+        STATE.sessionName = s.name;
+        STATE.workflowStatus = s.status;
+        updateTopbar();
+    }
+
+    function switchNav(el, nav) {
+        document.querySelectorAll('.sidebar-nav-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        STATE.currentNav = nav;
+        const titleMap = {
+            home: { icon:'activityS', text:'需求处理' },
+            workflow: { icon:'activityS', text:'工作流监控' },
+            outputs: { icon:'fileOutput', text:'产出管理' },
+            skills: { icon:'puzzle', text:'技能' }
+        };
+        const t = titleMap[nav] || titleMap.home;
+        topbarTitle.innerHTML = `${ICONS[t.icon]} ${t.text}`;
+        if (nav === 'home') {
+            homeView.classList.add('active'); panelView.classList.remove('active');
+        } else {
+            homeView.classList.remove('active'); panelView.classList.add('active');
+            if (nav === 'workflow') renderWorkflowPanel();
+            else if (nav === 'outputs') renderOutputsPanel();
+            else if (nav === 'skills') renderSkillsPanel();
+        }
+    }
+
+    function renderSkillsPanel() {
+        const skills = [
+            { id:'test-cases', name:'测试用例生成', desc:'基于 PRD / 用户故事生成结构化测试用例文档', icon:'clipboard', tokens:25000 },
+            { id:'test-code', name:'测试代码生成', desc:'生成可执行的自动化测试代码（Playwright / Jest 等）', icon:'code', tokens:50000 },
+            { id:'test-plan', name:'测试计划生成', desc:'生成包含范围、策略、资源分配的完整测试计划', icon:'ruler', tokens:15000 },
+            { id:'qa-checklist', name:'QA 检查清单', desc:'生成功能点覆盖检查清单，确保无遗漏', icon:'checkCircle', tokens:8000 }
+        ];
+        let html = '<div class="panel-card"><div class="panel-title">可用技能</div><div class="skills-grid">';
+        skills.forEach(s => {
+            html += `<div class="skill-card-panel" onclick="newSessionWithSkill('${s.id}','${s.name}')">
+                <div class="skill-card-panel-icon">${ICONS[s.icon]}</div>
+                <div style="flex:1;min-width:0;">
+                    <div class="skill-card-panel-name">${s.name}</div>
+                    <div class="skill-card-panel-desc">${s.desc}</div>
+                    <div class="skill-card-panel-meta">~${s.tokens.toLocaleString()} tokens</div>
+                </div>
+            </div>`;
+        });
+        html += '</div></div><p style="margin-top:12px;color:var(--text-muted);font-size:0.78rem;">点击任意方案将创建新会话并自动预选该技能。</p>';
+        panelContent.innerHTML = html;
+    }
+
+    function renderWorkflowPanel() {
+        let html = '<div class="panel-card"><div class="panel-title">工作流状态</div>';
+        if (STATE.workflowStatus === 'idle') {
+            html += '<p style="font-size:0.85rem;color:var(--text-muted);">当前没有运行中的工作流。</p><p style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">在「需求处理」中输入需求描述来启动一个新的工作流。</p>';
+        } else {
+            const current = STATE.sessions.find(s => s.id === STATE.sessionId);
+            html += `<p style="font-size:0.85rem;margin-bottom:14px;">会话：<strong>${escHtml(current ? current.name : STATE.sessionName)}</strong></p>`;
+            const steps = [
+                { label:'解析输入', status:'done', time:'--' },
+                { label:'AI 需求分析', status:STATE.workflowStatus==='running'?'active':'done', time:'--' },
+                { label:'技能匹配', status:STATE.workflowStatus==='running'?'pending':'done', time:'--' },
+                { label:'生成产出', status:'pending', time:'--' },
+                { label:'审核输出', status:'pending', time:'--' }
+            ];
+            html += '<div class="timeline">';
+            steps.forEach(st => {
+                html += `<div class="timeline-item ${st.status}">
+                    <div class="timeline-dot">${st.status==='done'?ICONS.check:st.status==='active'?'<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>':''}</div>
+                    <div class="timeline-content">
+                        <div class="timeline-content-title">${st.label}</div>
+                        <div class="timeline-content-time">${st.time}</div>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+        }
+        html += '</div>';
+        panelContent.innerHTML = html;
+    }
+
+    function renderOutputsPanel() {
+        const outputs = [
+            { title:'用户中心 API 测试用例', date:'2026-05-18', skill:'test-cases' },
+            { title:'支付模块 PRD 分析报告', date:'2026-05-17', skill:'test-plan' },
+            { title:'库存系统 QA 检查清单', date:'2026-05-16', skill:'qa-checklist' }
+        ];
+        let html = '<div class="panel-card"><div class="panel-title">历史产出</div>';
+        outputs.forEach(o => {
+            html += `<div class="output-list-item">
+                <div class="output-list-left">
+                    <div class="output-list-icon">${ICONS.fileText}</div>
+                    <div class="output-list-info">
+                        <div class="output-list-title">${o.title}</div>
+                        <div class="output-list-meta">${o.date} · ${o.skill}</div>
+                    </div>
+                </div>
+                <div class="output-list-actions">
+                    <button class="btn btn-ghost btn-sm">${ICONS.arrowRight}</button>
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        panelContent.innerHTML = html;
+    }
+
+    function updateTopbar() {
+        const map = {
+            idle: { text:'就绪', cls:'running' },
+            running: { text:'运行中', cls:'running' },
+            paused: { text:'等待确认', cls:'paused' },
+            completed: { text:'已完成', cls:'completed' }
+        };
+        const s = map[STATE.workflowStatus] || map.idle;
+        topbarStatus.className = `main-topbar-status ${s.cls}`;
+        topbarStatus.innerHTML = s.cls !== 'completed' ? `<span class="main-topbar-status-dot"></span> ${s.text}` : s.text;
+        if (STATE.currentNav === 'workflow') renderWorkflowPanel();
+    }
+
+    function escHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    init();
+</script>
+</body>
+</html>

@@ -98,16 +98,16 @@ export default function SkillRecommendPage() {
             新建项目
           </Link>
           <span>/</span>
-          <span className="text-foreground font-medium">选择 Skill</span>
+          <span className="text-foreground font-medium">选择技能</span>
         </div>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-skill-600" />
-              推荐 Skills
+              推荐技能
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              基于您的需求文档，AI 为您匹配了以下 Skills
+              基于您的需求文档，AI 为您匹配了以下技能
             </p>
           </div>
           <Link
@@ -115,7 +115,7 @@ export default function SkillRecommendPage() {
             className="text-sm text-skill-600 hover:text-skill-700 font-medium flex items-center gap-1"
           >
             <Wand2 className="w-4 h-4" />
-            浏览全部 Skills
+            浏览全部技能
           </Link>
         </div>
       </header>
@@ -203,8 +203,7 @@ export default function SkillRecommendPage() {
                   </div>
 
                   {/* Meta */}
-                  <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground"
-003e
+                  <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Zap className="w-3.5 h-3.5" />
                       预估 {skill.estimatedTokens} tokens
