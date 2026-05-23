@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/sidebar";
+import { QueryProvider } from "@/components/query-provider";
+import { AuthProvider } from "@/components/auth-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -18,12 +20,16 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className={inter.variable}>
       <body className="font-sans">
-        <div className="flex h-screen bg-background">
-          <Sidebar />
-          <main className="flex-1 flex flex-col overflow-hidden">
-            {children}
-          </main>
-        </div>
+        <QueryProvider>
+          <AuthProvider>
+            <div className="flex h-screen bg-background">
+              <Sidebar />
+              <main className="flex-1 flex flex-col overflow-hidden">
+                {children}
+              </main>
+            </div>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

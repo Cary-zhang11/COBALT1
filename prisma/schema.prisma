@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String?
+  avatar       String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tasks     Task[]
+  skills    Skill[]
+  feedbacks TaskFeedback[]
+}
+
+model Skill {
+  id           String   @id @default(uuid())
+  name         String
+  description  String
+  source       String   // builtin | user_upload | git
+  filePath     String
+  version      String
+  allowedTools String[] @default([])
+  maxSteps     Int      @default(30)
+  tokenBudget  Int?
+  visibility   String   @default("private")
+  requires     String[] @default([])
+  displayMeta  Json?
+
+  uploadedBy String?
+  uploader   User?   @relation(fields: [uploadedBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks    Task[]
+  versions SkillVersion[]
+}
+
+model SkillVersion {
+  id              String   @id @default(uuid())
+  skillId         String
+  skill           Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  version         String
+  content         String   @db.Text
+  changelog       String?
+  createdAt       DateTime @default(now())
+
+  tasks Task[]
+}
+
+model Task {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  skillId        String
+  skill          Skill        @relation(fields: [skillId], references: [id])
+  skillVersionId String
+  skillVersion   SkillVersion @relation(fields: [skillVersionId], references: [id])
+
+  status      String   @default("pending")
+  input       String   @db.Text
+  inputFiles  String[] @default([])
+  output      String?  @db.Text
+  outputFiles String[] @default([])
+  duration    Int?
+
+  agentRuntime  String  @default("claude-cli")
+  modelProvider String?
+  tokenUsage    Int?
+
+  sessionId   String?
+  pauseReason String?
+  pausedAt    DateTime?
+
+  retryCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  logs     TaskLog[]
+  feedback TaskFeedback[]
+}
+
+model TaskLog {
+  id           String   @id @default(uuid())
+  taskId       String
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  sequence     Int
+  type         String
+  input        String?  @db.Text
+  output       String?  @db.Text
+  duration     Int?
+  errorCode    String?
+  errorMessage String?  @db.Text
+  stack        String?  @db.Text
+  parentLogId  String?
+  createdAt    DateTime @default(now())
+}
+
+model TaskFeedback {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
