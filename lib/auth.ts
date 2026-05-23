@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
+import { prisma } from "./prisma";
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "fallback-secret-change-me"
@@ -43,12 +44,22 @@ export async function verifyToken(
 }
 
 /**
- * 从请求中提取用户身份。AUTH 关闭时返回匿名用户，不抛错。
+ * 从请求中提取用户身份。AUTH 关闭时返回匿名用户（自动 upsert 到数据库），不抛错。
  */
 export async function getAuthUser(
   token: string | undefined
 ): Promise<{ userId: string; email: string }> {
   if (!AUTH_ENABLED) {
+    await prisma.user.upsert({
+      where: { id: ANONYMOUS_USER.userId },
+      update: {},
+      create: {
+        id: ANONYMOUS_USER.userId,
+        email: ANONYMOUS_USER.email,
+        name: "Anonymous",
+        passwordHash: "",
+      },
+    });
     return ANONYMOUS_USER;
   }
   if (!token) {

@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
 import { createTask } from "@/lib/task-engine";
 
 export async function GET(req: NextRequest) {
   try {
     const token = req.cookies.get("token")?.value;
-    if (!token)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const { userId } = await verifyToken(token);
+    const { userId } = await getAuthUser(token);
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
@@ -34,10 +31,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("token")?.value;
-    if (!token)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const { userId } = await verifyToken(token);
+    const { userId } = await getAuthUser(token);
     const { skillId, input, uploadedFiles } = await req.json();
 
     if (!skillId || !input) {

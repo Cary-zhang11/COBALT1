@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
     const token = req.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
-    }
-
-    const { userId } = await verifyToken(token);
+    const { userId } = await getAuthUser(token);
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, name: true, avatar: true },

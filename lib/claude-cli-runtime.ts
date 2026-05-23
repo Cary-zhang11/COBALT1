@@ -19,32 +19,41 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     await ensureSandbox(input.taskId);
 
     const cwd = getWorkspacePath(input.taskId);
+    const tempDir = getTempPath(input.taskId);
     const env = {
       ...process.env,
       SKILL_DIR: input.skillDirectory,
       WORKSPACE_ROOT: cwd,
       TASK_OUTPUT_DIR: getOutputPath(input.taskId),
-      TASK_TEMP_DIR: getTempPath(input.taskId),
+      TASK_TEMP_DIR: tempDir,
       TASK_ID: input.taskId,
     };
 
     const systemPrompt = this.buildSystemPrompt(input);
     const userPrompt = this.buildUserPrompt(input);
 
+    // Combine system + user prompt into a single stdin payload
+    // This avoids Windows shell argument length limits and escaping issues
+    const combinedPrompt = [
+      "<system_instructions>",
+      systemPrompt,
+      "</system_instructions>",
+      "",
+      "<user_request>",
+      userPrompt,
+      "</user_request>",
+    ].join("\n");
+
     const args = [
       "-p",
-      userPrompt,
-      "--system-prompt",
-      systemPrompt,
       "--output-format",
       "stream-json",
       "--verbose",
-      "--no-session-persistence",
       "--add-dir",
       cwd,
     ];
 
-    yield* this.spawnCLI(args, env, cwd, input.taskId);
+    yield* this.spawnCLI(args, env, cwd, input.taskId, combinedPrompt);
   }
 
   async *resume(sessionId: string, userReply: string): AsyncIterable<AgentEvent> {
@@ -52,13 +61,18 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
       "--resume",
       sessionId,
       "-p",
-      userReply,
       "--output-format",
       "stream-json",
       "--verbose",
     ];
 
-    yield* this.spawnCLI(args, process.env as NodeJS.ProcessEnv, process.cwd(), sessionId);
+    yield* this.spawnCLI(
+      args,
+      process.env as NodeJS.ProcessEnv,
+      process.cwd(),
+      sessionId,
+      userReply
+    );
   }
 
   async cancel(taskId: string): Promise<void> {
@@ -73,7 +87,8 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     args: string[],
     env: NodeJS.ProcessEnv,
     cwd: string,
-    processKey: string
+    processKey: string,
+    stdinData?: string
   ): AsyncIterable<AgentEvent> {
     const proc = spawn("claude", args, {
       cwd,
@@ -83,6 +98,19 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     });
 
     this.processes.set(processKey, proc);
+
+    if (stdinData) {
+      proc.stdin?.write(stdinData + "\n", "utf-8", () => {
+        proc.stdin?.end();
+      });
+    } else {
+      proc.stdin?.end();
+    }
+
+    // Capture stderr for debugging
+    proc.stderr?.on("data", (data: Buffer) => {
+      console.error(`[claude-cli stderr] ${data.toString().trim()}`);
+    });
 
     const rl = createInterface({ input: proc.stdout! });
 
@@ -121,23 +149,26 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
       }
 
       if (data.type === "assistant" && data.message?.content) {
-        for (const block of data.message.content) {
-          if (block.type === "text") {
-            return { type: "chunk", content: block.text };
-          }
-          if (block.type === "tool_use") {
-            return {
-              type: "tool_call",
-              toolName: block.name,
-              toolInput: block.input,
-            };
-          }
-          if (block.type === "thinking") {
-            return {
-              type: "chunk",
-              content: `[thinking] ${block.thinking?.slice(0, 200)}...`,
-            };
-          }
+        const blocks = data.message.content;
+        // Prefer text over thinking/tool_use
+        const textBlock = blocks.find((b: { type: string }) => b.type === "text");
+        if (textBlock) {
+          return { type: "chunk", content: textBlock.text };
+        }
+        const toolBlock = blocks.find((b: { type: string }) => b.type === "tool_use");
+        if (toolBlock) {
+          return {
+            type: "tool_call",
+            toolName: toolBlock.name,
+            toolInput: toolBlock.input,
+          };
+        }
+        const thinkingBlock = blocks.find((b: { type: string }) => b.type === "thinking");
+        if (thinkingBlock) {
+          return {
+            type: "chunk",
+            content: `[thinking] ${thinkingBlock.thinking?.slice(0, 200)}...`,
+          };
         }
         return null;
       }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
 import { cancelTask } from "@/lib/task-engine";
 
 export async function POST(
@@ -8,10 +8,7 @@ export async function POST(
 ) {
   try {
     const token = req.cookies.get("token")?.value;
-    if (!token)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    await verifyToken(token);
+    await getAuthUser(token);
     await cancelTask(params.id);
 
     return NextResponse.json({ success: true, status: "cancelled" });

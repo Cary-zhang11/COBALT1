@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -9,14 +9,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const token = req.cookies.get("token")?.value;
-  if (!token) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
   try {
-    await verifyToken(token);
+    await getAuthUser(token);
   } catch {
-    return new Response("Invalid token", { status: 401 });
+    return new Response("Unauthorized", { status: 401 });
   }
 
   const encoder = new TextEncoder();

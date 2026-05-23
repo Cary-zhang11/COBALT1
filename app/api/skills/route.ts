@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
 import AdmZip from "adm-zip";
 import path from "path";
 import fs from "fs/promises";
@@ -29,10 +29,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("token")?.value;
-    if (!token)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const { userId } = await verifyToken(token);
+    const { userId } = await getAuthUser(token);
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;

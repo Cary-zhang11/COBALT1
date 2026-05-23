@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
 import { startTaskExecution } from "@/lib/task-engine";
 
 export async function POST(
@@ -9,10 +9,7 @@ export async function POST(
 ) {
   try {
     const token = req.cookies.get("token")?.value;
-    if (!token)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const { userId } = await verifyToken(token);
+    const { userId } = await getAuthUser(token);
 
     const result = await prisma.task.updateMany({
       where: { id: params.id, userId, status: "pending" },
