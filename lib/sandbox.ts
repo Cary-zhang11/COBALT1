@@ -25,6 +25,23 @@ export async function ensureSandbox(taskId: string): Promise<void> {
   await fs.mkdir(getTempPath(taskId), { recursive: true });
 }
 
+export async function copyFilesToWorkspace(
+  taskId: string,
+  filePaths: string[]
+): Promise<string[]> {
+  const workspaceDir = getWorkspacePath(taskId);
+  await fs.mkdir(workspaceDir, { recursive: true });
+
+  const copiedPaths: string[] = [];
+  for (const filePath of filePaths) {
+    const fileName = path.basename(filePath);
+    const destPath = path.join(workspaceDir, fileName);
+    await fs.copyFile(filePath, destPath);
+    copiedPaths.push(destPath);
+  }
+  return copiedPaths;
+}
+
 export async function cleanupSandbox(taskId: string): Promise<void> {
   const taskDir = path.resolve(process.cwd(), SANDBOX_ROOT, taskId);
   try {
