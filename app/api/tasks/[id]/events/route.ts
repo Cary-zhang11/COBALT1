@@ -18,6 +18,7 @@ export async function GET(
   const encoder = new TextEncoder();
   let lastSequence = 0;
   let isActive = true;
+  let lastPausedState: { reason: string | null; toolName: string | null; toolInput: unknown | null } | null = null;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -32,7 +33,7 @@ export async function GET(
           try {
             const task = await prisma.task.findUnique({
               where: { id: params.id },
-              select: { status: true },
+              select: { status: true, pauseReason: true },
             });
 
             if (!task) {
@@ -55,6 +56,20 @@ export async function GET(
                 createdAt: log.createdAt,
               });
               lastSequence = log.sequence;
+
+              // Track pause details from the latest pause log
+              if (log.type === "pause" && log.input) {
+                try {
+                  const data = JSON.parse(log.input);
+                  lastPausedState = {
+                    reason: data.reason || null,
+                    toolName: data.tool || null,
+                    toolInput: data.input || null,
+                  };
+                } catch {
+                  lastPausedState = null;
+                }
+              }
             }
 
             if (["completed", "failed", "cancelled"].includes(task.status)) {
@@ -64,7 +79,11 @@ export async function GET(
             }
 
             if (task.status === "paused") {
-              send("paused", { status: "paused" });
+              send("paused", {
+                status: "paused",
+                reason: task.pauseReason,
+                ...lastPausedState,
+              });
             }
 
             await new Promise((r) => setTimeout(r, 1000));

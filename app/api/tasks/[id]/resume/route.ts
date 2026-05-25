@@ -18,9 +18,7 @@ export async function POST(
       );
     }
 
-    resumeTask(params.id, userReply).catch((err) => {
-      console.error("Task resume error:", err);
-    });
+    await resumeTask(params.id, userReply);
 
     return NextResponse.json({ success: true, status: "running" });
   } catch (error) {
