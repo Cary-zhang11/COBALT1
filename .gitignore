@@ -6,3 +6,4 @@ sandbox/
 storage/
 
 /lib/generated/prisma
+.next/ 
