@@ -32,6 +32,7 @@ export async function matchSkills(
       OR: [
         { visibility: "public" },
         { uploadedBy: userId },
+        { uploadedBy: null }, // built-in skills are visible to all users
       ],
     },
     select: { id: true, name: true, description: true },
