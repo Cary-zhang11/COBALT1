@@ -34,17 +34,23 @@ export function useTaskEvents({
   const [status, setStatus] = useState<string>("connecting");
   const [pausedData, setPausedData] = useState<PausedEvent | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const seenSequencesRef = useRef<Set<number>>(new Set());
 
   const connect = useCallback(() => {
     if (!taskId || !enabled) return;
 
     const es = new EventSource(`/api/tasks/${taskId}/events`);
     eventSourceRef.current = es;
-    setStatus("connected");
+
+    // Only set status to connected on initial connection, not on reconnect
+    setStatus((prev) => (prev === "connecting" ? "connected" : prev));
 
     es.addEventListener("log", (e) => {
       const data = JSON.parse(e.data) as TaskLogEvent;
-      setLogs((prev) => [...prev, data]);
+      if (!seenSequencesRef.current.has(data.sequence)) {
+        seenSequencesRef.current.add(data.sequence);
+        setLogs((prev) => [...prev, data]);
+      }
     });
 
     es.addEventListener("done", (e) => {
@@ -72,6 +78,7 @@ export function useTaskEvents({
   }, [taskId, enabled, onComplete, onPaused]);
 
   useEffect(() => {
+    seenSequencesRef.current.clear();
     connect();
     return () => {
       eventSourceRef.current?.close();

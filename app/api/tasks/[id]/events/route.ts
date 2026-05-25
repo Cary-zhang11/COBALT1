@@ -42,6 +42,14 @@ export async function GET(
               return;
             }
 
+            // If task is already terminal, just send done and close immediately
+            // This prevents re-sending all logs on EventSource reconnect
+            if (["completed", "failed", "cancelled"].includes(task.status)) {
+              send("done", { status: task.status });
+              controller.close();
+              return;
+            }
+
             const newLogs = await prisma.taskLog.findMany({
               where: { taskId: params.id, sequence: { gt: lastSequence } },
               orderBy: { sequence: "asc" },
@@ -57,7 +65,6 @@ export async function GET(
               });
               lastSequence = log.sequence;
 
-              // Track pause details from the latest pause log
               if (log.type === "pause" && log.input) {
                 try {
                   const data = JSON.parse(log.input);
@@ -70,12 +77,6 @@ export async function GET(
                   lastPausedState = null;
                 }
               }
-            }
-
-            if (["completed", "failed", "cancelled"].includes(task.status)) {
-              send("done", { status: task.status });
-              controller.close();
-              return;
             }
 
             if (task.status === "paused") {
