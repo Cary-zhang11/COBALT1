@@ -20,8 +20,6 @@ export interface SkillInput {
 export interface IAgentRuntime {
   readonly name: string;
   start(input: SkillInput): AsyncIterable<AgentEvent>;
-  sendInput(sessionId: string, message: string): Promise<void>;
   resume(sessionId: string, userReply: string): AsyncIterable<AgentEvent>;
-  getProcessStatus(sessionId: string): "running" | "paused" | "crashed" | "exited" | null;
-  cancel(key: string): Promise<void>;
+  cancel(sessionId: string): Promise<void>;
 }

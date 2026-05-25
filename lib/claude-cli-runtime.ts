@@ -10,15 +10,10 @@ import {
 
 const TASK_MAX_STEPS = parseInt(process.env.TASK_MAX_STEPS || "30", 10);
 
-interface ProcessInfo {
-  process: ChildProcess;
-  sessionId: string | null;
-}
-
 export class ClaudeCodeCLIRuntime implements IAgentRuntime {
   readonly name = "claude-cli";
-  private processes = new Map<string, ProcessInfo>();
-  private taskSessionMap = new Map<string, string>(); // taskId -> sessionId
+  private processes = new Map<string, ChildProcess>();
+  private sessionId: string | null = null;
 
   async *start(input: SkillInput): AsyncIterable<AgentEvent> {
     await ensureSandbox(input.taskId);
@@ -37,8 +32,6 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     const systemPrompt = this.buildSystemPrompt(input);
     const userPrompt = this.buildUserPrompt(input);
 
-    // Combine system + user prompt into a single stdin payload
-    // This avoids Windows shell argument length limits and escaping issues
     const combinedPrompt = [
       "<system_instructions>",
       systemPrompt,
@@ -80,45 +73,11 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     );
   }
 
-  async sendInput(sessionId: string, message: string): Promise<void> {
-    const info = Array.from(this.processes.values()).find(
-      (p) => p.sessionId === sessionId
-    );
-    if (!info) {
-      throw new Error(`No active process for session ${sessionId}`);
-    }
-    const payload = JSON.stringify({ type: "user", content: message });
-    info.process.stdin?.write(payload + "\n", "utf-8");
-  }
-
-  getProcessStatus(sessionId: string): "running" | "paused" | "crashed" | "exited" | null {
-    const info = Array.from(this.processes.values()).find(
-      (p) => p.sessionId === sessionId
-    );
-    if (!info) return null;
-    const proc = info.process;
-    if (proc.killed || proc.exitCode !== null) return "exited";
-    return "running";
-  }
-
   async cancel(key: string): Promise<void> {
-    let info = this.processes.get(key);
-    if (!info) {
-      info = Array.from(this.processes.values()).find((p) => p.sessionId === key);
-    }
-    if (info && !info.process.killed && info.process.exitCode === null) {
-      info.process.kill("SIGTERM");
-    }
-    // Clean up all references
-    for (const [k, v] of Array.from(this.processes.entries())) {
-      if (v === info || k === key || v.sessionId === key) {
-        this.processes.delete(k);
-      }
-    }
-    for (const [taskId, sessionId] of Array.from(this.taskSessionMap.entries())) {
-      if (sessionId === key || taskId === key) {
-        this.taskSessionMap.delete(taskId);
-      }
+    const proc = this.processes.get(key);
+    if (proc && !proc.killed && proc.exitCode === null) {
+      proc.kill("SIGTERM");
+      this.processes.delete(key);
     }
   }
 
@@ -136,14 +95,16 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
       shell: true,
     });
 
-    this.processes.set(processKey, { process: proc, sessionId: null });
+    this.processes.set(processKey, proc);
 
     if (stdinData) {
-      proc.stdin?.write(stdinData + "\n", "utf-8");
-      // stdin stays open for sendInput
+      proc.stdin?.write(stdinData + "\n", "utf-8", () => {
+        proc.stdin?.end();
+      });
+    } else {
+      proc.stdin?.end();
     }
 
-    // Capture stderr for debugging
     proc.stderr?.on("data", (data: Buffer) => {
       console.error(`[claude-cli stderr] ${data.toString().trim()}`);
     });
@@ -152,7 +113,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
 
     try {
       for await (const line of rl) {
-        const event = this.parseStreamJson(line, processKey);
+        const event = this.parseStreamJson(line);
         if (event) {
           yield event;
           if (event.type === "complete" || event.type === "error") {
@@ -169,18 +130,14 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     }
   }
 
-  private parseStreamJson(line: string, processKey: string): AgentEvent | null {
+  private parseStreamJson(line: string): AgentEvent | null {
     const HIGH_RISK_TOOLS = ["Bash", "Edit", "Write", "Delete", "CreateFile"];
 
     try {
       const data = JSON.parse(line);
 
       if (data.type === "system" && data.subtype === "init") {
-        this.taskSessionMap.set(processKey, data.session_id);
-        const info = this.processes.get(processKey);
-        if (info) {
-          info.sessionId = data.session_id;
-        }
+        this.sessionId = data.session_id;
         return {
           type: "system",
           content: JSON.stringify({
@@ -192,7 +149,6 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
 
       if (data.type === "assistant" && data.message?.content) {
         const blocks = data.message.content;
-        // Prefer text over thinking/tool_use
         const textBlock = blocks.find((b: { type: string }) => b.type === "text");
         if (textBlock) {
           return { type: "chunk", content: textBlock.text };
@@ -255,6 +211,10 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
       prompt += `\n\n用户上传的文件:\n${input.uploadedFiles.map((f) => `- ${f}`).join("\n")}`;
     }
     return prompt;
+  }
+
+  getSessionId(): string | null {
+    return this.sessionId;
   }
 }
 

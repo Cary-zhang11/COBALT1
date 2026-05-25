@@ -47,7 +47,6 @@ export async function startTaskExecution(taskId: string): Promise<void> {
     throw new Error("Task not in running state (execute route should set it first)");
 
   try {
-    // Copy uploaded files to workspace
     if (task.inputFiles && task.inputFiles.length > 0) {
       await copyFilesToWorkspace(taskId, task.inputFiles);
     }
@@ -67,76 +66,59 @@ export async function startTaskExecution(taskId: string): Promise<void> {
 
     let sequence = 0;
     let output = "";
+    let isPaused = false;
     const startTime = Date.now();
 
-    // Start health check timer
-    const healthCheckInterval = setInterval(async () => {
-      if (!task.sessionId) return;
-      const status = runtime.getProcessStatus(task.sessionId);
-      if (status === "exited" || status === null) {
-        // Process crashed unexpectedly
-        clearInterval(healthCheckInterval);
+    for await (const event of stream) {
+      sequence++;
+      await logEvent(taskId, sequence, event);
+
+      if (event.type === "chunk" && event.content) {
+        output += event.content;
+      }
+
+      if (event.type === "system" && event.content) {
+        try {
+          const meta = JSON.parse(event.content);
+          if (meta.session_id) {
+            await prisma.task.update({
+              where: { id: taskId },
+              data: { sessionId: meta.session_id },
+            });
+          }
+        } catch {}
+      }
+
+      if (event.type === "pause") {
+        isPaused = true;
+        await prisma.task.update({
+          where: { id: taskId },
+          data: {
+            status: "paused",
+            pauseReason: event.pauseReason || "unknown",
+            pausedAt: new Date(),
+            output,
+            duration: Date.now() - startTime,
+          },
+        });
+        continue;
+      }
+
+      if (event.type === "error") {
         await prisma.task.update({
           where: { id: taskId },
           data: {
             status: "failed",
-            output: output + "\n\n[Error: Process terminated unexpectedly]",
+            output,
             duration: Date.now() - startTime,
           },
         });
+        return;
       }
-    }, 5000);
+    }
 
-    try {
-      for await (const event of stream) {
-        sequence++;
-        await logEvent(taskId, sequence, event);
-
-        if (event.type === "chunk" && event.content) {
-          output += event.content;
-        }
-
-        if (event.type === "system" && event.content) {
-          try {
-            const meta = JSON.parse(event.content);
-            if (meta.session_id) {
-              await prisma.task.update({
-                where: { id: taskId },
-                data: { sessionId: meta.session_id },
-              });
-            }
-          } catch {}
-        }
-
-        if (event.type === "pause") {
-          await prisma.task.update({
-            where: { id: taskId },
-            data: {
-              status: "paused",
-              pauseReason: event.pauseReason || "unknown",
-              pausedAt: new Date(),
-              output,
-              duration: Date.now() - startTime,
-            },
-          });
-          // Loop continues - process stays alive, waiting for sendInput
-          continue;
-        }
-
-        if (event.type === "error") {
-          await prisma.task.update({
-            where: { id: taskId },
-            data: {
-              status: "failed",
-              output,
-              duration: Date.now() - startTime,
-            },
-          });
-          return;
-        }
-      }
-
-      // Stream ended (process exited)
+    // Stream ended
+    if (!isPaused) {
       await collectOutputFiles(taskId);
       await prisma.task.update({
         where: { id: taskId },
@@ -146,8 +128,6 @@ export async function startTaskExecution(taskId: string): Promise<void> {
           duration: Date.now() - startTime,
         },
       });
-    } finally {
-      clearInterval(healthCheckInterval);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -166,7 +146,6 @@ export async function resumeTask(
   if (!task) throw new Error("Task not found");
   if (!task.sessionId) throw new Error("No session ID for resume");
 
-  // Allow resume from both paused and running states (user can interject anytime)
   if (!["paused", "running"].includes(task.status)) {
     throw new Error("Task not in a resumable state");
   }
@@ -181,15 +160,74 @@ export async function resumeTask(
     },
   });
 
-  await runtime.sendInput(task.sessionId, userReply);
-  // The existing stream in startTaskExecution continues processing
+  const stream = runtime.resume(task.sessionId, userReply);
+  let sequence = (await prisma.taskLog.count({ where: { taskId } })) + 1;
+  let output = task.output || "";
+  const startTime = Date.now();
+  const previousDuration = task.duration || 0;
+  let isPaused = false;
+
+  try {
+    for await (const event of stream) {
+      sequence++;
+      await logEvent(taskId, sequence, event);
+
+      if (event.type === "chunk" && event.content) {
+        output += event.content;
+      }
+
+      if (event.type === "pause") {
+        isPaused = true;
+        await prisma.task.update({
+          where: { id: taskId },
+          data: {
+            status: "paused",
+            pauseReason: event.pauseReason || "unknown",
+            pausedAt: new Date(),
+            output,
+            duration: previousDuration + (Date.now() - startTime),
+          },
+        });
+        continue;
+      }
+
+      if (event.type === "error") {
+        await prisma.task.update({
+          where: { id: taskId },
+          data: {
+            status: "failed",
+            output,
+            duration: previousDuration + (Date.now() - startTime),
+          },
+        });
+        return;
+      }
+    }
+
+    if (!isPaused) {
+      await collectOutputFiles(taskId);
+      await prisma.task.update({
+        where: { id: taskId },
+        data: {
+          status: "completed",
+          output,
+          duration: previousDuration + (Date.now() - startTime),
+        },
+      });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { status: "failed", output: `Error: ${message}` },
+    });
+  }
 }
 
 export async function cancelTask(taskId: string): Promise<void> {
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task) throw new Error("Task not found");
 
-  // Cancel by sessionId if available, otherwise by taskId
   await runtime.cancel(task.sessionId || taskId);
 
   await prisma.task.update({
