@@ -156,6 +156,7 @@ Engine 收到 pause 事件
   2. 记录 pauseReason（tool_call / complete / permission_request）
   3. 记录 pausedAt
   4. 停止遍历 stream（不 kill 进程）
+  5. **保存当前 sequence 到内存**（供下次 resume 继续使用）
         ↓
 SSE 推送 paused 事件 → 前端显示输入框
         ↓
@@ -457,18 +458,23 @@ function matchSkills(input: string, skills: Skill[]): MatchResult[] {
 
 ### 7.1 进程崩溃恢复
 
+Engine 在 `startTaskExecution` 中启动后台健康检查定时器（每 5 秒）：
+
 ```
-SSE 轮询时检测进程状态
-        ↓
-进程已退出？
-        ↓
-是 ──→ 尝试 `--resume <sessionId>` 重启进程
-        ↓
-恢复成功？
-        ↓
-是 ──→ SSE 推送 error 事件（recoverable: true）
-否 ──→ 标记任务 failed，SSE 推送 error 事件
+startTaskExecution()
+  ├─ 启动 CLI 进程
+  ├─ 启动健康检查定时器（每 5 秒）
+  │     ├─ 调用 runtime.getProcessStatus(sessionId)
+  │     ├─ 进程已退出且 status === "paused" / "running"？
+  │     │     ├─ 是 ──→ 尝试 `--resume <sessionId>` 重启进程
+  │     │     │         ├─ 成功 ──→ 推送 error 事件（recoverable: true）
+  │     │     │         └─ 失败 ──→ 标记 failed，推送 error 事件
+  │     │     └─ 否 ──→ 继续检测
+  │     └─ 任务 completed / failed / cancelled ──→ 停止定时器
+  └─ 遍历 stream 事件（主循环）
 ```
+
+**关键：** 健康检查与主循环并行运行，只在任务活跃期（非终态）执行。
 
 ### 7.2 超时处理
 
@@ -514,6 +520,7 @@ SSE 轮询时检测进程状态
 | `app/api/tasks/[id]/resume/route.ts` | 修改 | 改为 sendInput，放宽状态限制 |
 | `app/api/tasks/[id]/cancel/route.ts` | 修改 | kill 进程 + 清理 Map |
 | `app/api/tasks/[id]/events/route.ts` | 修改 | 扩展 paused 事件 payload |
+| `lib/sandbox.ts` | 修改 | 新增 `copyFilesToWorkspace(taskId, filePaths)` |
 | `prisma/schema.prisma` | 修改 | 新增 pauseCount |
 
 ### 前端
