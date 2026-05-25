@@ -3,6 +3,7 @@ export interface AgentEvent {
   content?: string;
   toolName?: string;
   toolInput?: unknown;
+  pauseReason?: "tool_call" | "output_complete" | "permission_request";
   error?: string;
 }
 
@@ -19,6 +20,8 @@ export interface SkillInput {
 export interface IAgentRuntime {
   readonly name: string;
   start(input: SkillInput): AsyncIterable<AgentEvent>;
+  sendInput(sessionId: string, message: string): Promise<void>;
   resume(sessionId: string, userReply: string): AsyncIterable<AgentEvent>;
-  cancel(sessionId: string): Promise<void>;
+  getProcessStatus(sessionId: string): "running" | "paused" | "crashed" | "exited" | null;
+  cancel(key: string): Promise<void>;
 }
