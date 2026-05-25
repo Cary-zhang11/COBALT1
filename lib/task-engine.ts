@@ -66,7 +66,6 @@ export async function startTaskExecution(taskId: string): Promise<void> {
 
     let sequence = 0;
     let output = "";
-    let isPaused = false;
     const startTime = Date.now();
 
     for await (const event of stream) {
@@ -90,7 +89,6 @@ export async function startTaskExecution(taskId: string): Promise<void> {
       }
 
       if (event.type === "pause") {
-        isPaused = true;
         await prisma.task.update({
           where: { id: taskId },
           data: {
@@ -101,7 +99,7 @@ export async function startTaskExecution(taskId: string): Promise<void> {
             duration: Date.now() - startTime,
           },
         });
-        continue;
+        return; // Stop the stream; CLI process will be killed in finally
       }
 
       if (event.type === "error") {
@@ -117,18 +115,16 @@ export async function startTaskExecution(taskId: string): Promise<void> {
       }
     }
 
-    // Stream ended
-    if (!isPaused) {
-      await collectOutputFiles(taskId);
-      await prisma.task.update({
-        where: { id: taskId },
-        data: {
-          status: "completed",
-          output,
-          duration: Date.now() - startTime,
-        },
-      });
-    }
+    // Stream ended normally
+    await collectOutputFiles(taskId);
+    await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        status: "completed",
+        output,
+        duration: Date.now() - startTime,
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     await prisma.task.update({
@@ -165,8 +161,6 @@ export async function resumeTask(
   let output = task.output || "";
   const startTime = Date.now();
   const previousDuration = task.duration || 0;
-  let isPaused = false;
-
   try {
     for await (const event of stream) {
       sequence++;
@@ -177,7 +171,6 @@ export async function resumeTask(
       }
 
       if (event.type === "pause") {
-        isPaused = true;
         await prisma.task.update({
           where: { id: taskId },
           data: {
@@ -188,7 +181,7 @@ export async function resumeTask(
             duration: previousDuration + (Date.now() - startTime),
           },
         });
-        continue;
+        return; // Stop the stream; CLI process will be killed in finally
       }
 
       if (event.type === "error") {
@@ -204,17 +197,16 @@ export async function resumeTask(
       }
     }
 
-    if (!isPaused) {
-      await collectOutputFiles(taskId);
-      await prisma.task.update({
-        where: { id: taskId },
-        data: {
-          status: "completed",
-          output,
-          duration: previousDuration + (Date.now() - startTime),
-        },
-      });
-    }
+    // Stream ended normally
+    await collectOutputFiles(taskId);
+    await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        status: "completed",
+        output,
+        duration: previousDuration + (Date.now() - startTime),
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     await prisma.task.update({
@@ -228,7 +220,8 @@ export async function cancelTask(taskId: string): Promise<void> {
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task) throw new Error("Task not found");
 
-  await runtime.cancel(task.sessionId || taskId);
+  // Cancel by taskId (process key in the runtime Map)
+  await runtime.cancel(taskId);
 
   await prisma.task.update({
     where: { id: taskId },
