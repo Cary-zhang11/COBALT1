@@ -10,11 +10,18 @@ interface TaskLogEvent {
   createdAt: string;
 }
 
+interface PausedEvent {
+  status: string;
+  reason?: string;
+  toolName?: string;
+  toolInput?: unknown;
+}
+
 interface UseTaskEventsOptions {
   taskId: string;
   enabled?: boolean;
   onComplete?: (status: string) => void;
-  onPaused?: () => void;
+  onPaused?: (data: PausedEvent) => void;
 }
 
 export function useTaskEvents({
@@ -25,6 +32,7 @@ export function useTaskEvents({
 }: UseTaskEventsOptions) {
   const [logs, setLogs] = useState<TaskLogEvent[]>([]);
   const [status, setStatus] = useState<string>("connecting");
+  const [pausedData, setPausedData] = useState<PausedEvent | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const connect = useCallback(() => {
@@ -46,9 +54,11 @@ export function useTaskEvents({
       es.close();
     });
 
-    es.addEventListener("paused", () => {
+    es.addEventListener("paused", (e) => {
+      const data = JSON.parse(e.data) as PausedEvent;
       setStatus("paused");
-      onPaused?.();
+      setPausedData(data);
+      onPaused?.(data);
     });
 
     es.addEventListener("error", (e) => {
@@ -73,5 +83,5 @@ export function useTaskEvents({
     eventSourceRef.current = null;
   }, []);
 
-  return { logs, status, disconnect };
+  return { logs, status, pausedData, disconnect };
 }
