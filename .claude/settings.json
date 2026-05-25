@@ -4,6 +4,7 @@
       "Edit(/**)",
       "Bash(*)",
       "Read(/**)",
+      "Read(D:\\\\qorder_workspace\\\\Cobalt\\\\.claude\\\\skills\\\\**)",
       "Write(/**)",
       "WebFetch(*)",
       "WebSearch(*)",
@@ -15,10 +16,8 @@
       "Skill(ui-ux-pro-max-0.1.0:*)",
       "Skill(find-skills)",
       "Skill(find-skills:*)",
-      "Bash(git push *)",
-      "Bash(git push)",
-      "Bash(git push -u *)",
-      "Bash(git push --force *)"
+      "Skill(prd-to-tests-new)",
+      "Skill(prd-to-tests-new:*)"
     ]
   }
 }

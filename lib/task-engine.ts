@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { cliRuntime } from "./claude-cli-runtime";
-import { getOutputPath, copyFilesToWorkspace } from "./sandbox";
+import { getWorkspacePath, getOutputPath, copyFilesToWorkspace } from "./sandbox";
 import type { AgentEvent } from "./agent-runtime";
 import fs from "fs/promises";
 import path from "path";
@@ -156,7 +156,8 @@ export async function resumeTask(
     },
   });
 
-  const stream = runtime.resume(task.sessionId, userReply);
+  const cwd = getWorkspacePath(taskId);
+  const stream = runtime.resume(task.sessionId, userReply, cwd);
   let sequence = (await prisma.taskLog.count({ where: { taskId } })) + 1;
   let output = task.output || "";
   const startTime = Date.now();
@@ -220,8 +221,11 @@ export async function cancelTask(taskId: string): Promise<void> {
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task) throw new Error("Task not found");
 
-  // Cancel by taskId (process key in the runtime Map)
+  // Cancel by taskId (initial start) or sessionId (after resume)
   await runtime.cancel(taskId);
+  if (task.sessionId) {
+    await runtime.cancel(task.sessionId);
+  }
 
   await prisma.task.update({
     where: { id: taskId },

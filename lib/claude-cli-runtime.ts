@@ -14,6 +14,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
   readonly name = "claude-cli";
   private processes = new Map<string, ChildProcess>();
   private sessionId: string | null = null;
+  private sessionCwdMap = new Map<string, string>();
 
   async *start(input: SkillInput): AsyncIterable<AgentEvent> {
     await ensureSandbox(input.taskId);
@@ -51,10 +52,22 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
       cwd,
     ];
 
-    yield* this.spawnCLI(args, env, cwd, input.taskId, combinedPrompt);
+    const stream = this.spawnCLI(args, env, cwd, input.taskId, combinedPrompt);
+    for await (const event of stream) {
+      if (event.type === "system" && event.content) {
+        try {
+          const meta = JSON.parse(event.content);
+          if (meta.session_id) {
+            this.sessionCwdMap.set(meta.session_id, cwd);
+          }
+        } catch {}
+      }
+      yield event;
+    }
   }
 
-  async *resume(sessionId: string, userReply: string): AsyncIterable<AgentEvent> {
+  async *resume(sessionId: string, userReply: string, cwd?: string): AsyncIterable<AgentEvent> {
+    const resolvedCwd = cwd || this.sessionCwdMap.get(sessionId) || process.cwd();
     const args = [
       "--resume",
       sessionId,
@@ -67,7 +80,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     yield* this.spawnCLI(
       args,
       process.env as NodeJS.ProcessEnv,
-      process.cwd(),
+      resolvedCwd,
       sessionId,
       userReply
     );

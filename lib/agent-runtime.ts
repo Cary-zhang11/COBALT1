@@ -20,6 +20,6 @@ export interface SkillInput {
 export interface IAgentRuntime {
   readonly name: string;
   start(input: SkillInput): AsyncIterable<AgentEvent>;
-  resume(sessionId: string, userReply: string): AsyncIterable<AgentEvent>;
+  resume(sessionId: string, userReply: string, cwd?: string): AsyncIterable<AgentEvent>;
   cancel(sessionId: string): Promise<void>;
 }
