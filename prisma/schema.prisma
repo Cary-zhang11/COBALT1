@@ -80,6 +80,7 @@ model Task {
   sessionId   String?
   pauseReason String?
   pausedAt    DateTime?
+  pauseCount  Int      @default(0)
 
   retryCount Int      @default(0)
   createdAt  DateTime @default(now())
