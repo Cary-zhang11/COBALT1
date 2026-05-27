@@ -15,7 +15,7 @@ import {
 const navItems = [
   { href: "/", label: "任务列表", icon: LayoutDashboard },
   { href: "/tasks/new", label: "新建任务", icon: PlusCircle },
-  { href: "/skills", label: "技能管理", icon: Wand2 },
+  { href: "/skills", label: "工具库", icon: Wand2 },
 ];
 
 export function Sidebar() {
@@ -31,10 +31,10 @@ export function Sidebar() {
           </div>
           <div>
             <h1 className="font-bold text-lg tracking-tight text-foreground">
-              SkillFlow
+              COBALT
             </h1>
             <p className="text-[10px] text-muted-foreground -mt-0.5">
-              AI Skill 执行平台
+              AI 执行平台
             </p>
           </div>
         </Link>

@@ -8,8 +8,8 @@ import { AuthProvider } from "@/components/auth-provider";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "SkillFlow - AI 驱动需求处理平台",
-  description: "上传需求，选择技能，生成高质量产出",
+  title: "COBALT - AI 驱动需求处理平台",
+  description: "上传需求，智能处理，生成高质量产出",
 };
 
 export default function RootLayout({
@@ -18,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN" className={inter.variable}>
+    <html lang="zh-CN" className={inter.variable} suppressHydrationWarning>
       <body className="font-sans">
         <QueryProvider>
           <AuthProvider>

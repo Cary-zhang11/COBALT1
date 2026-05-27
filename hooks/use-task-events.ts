@@ -24,6 +24,9 @@ interface UseTaskEventsOptions {
   onPaused?: (data: PausedEvent) => void;
 }
 
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_DELAY = 1000;
+
 export function useTaskEvents({
   taskId,
   enabled = true,
@@ -36,17 +39,32 @@ export function useTaskEvents({
   const eventSourceRef = useRef<EventSource | null>(null);
   const seenSequencesRef = useRef<Set<number>>(new Set());
   const callbacksRef = useRef({ onComplete, onPaused });
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fatalErrorRef = useRef(false);
 
   // Keep callbacks fresh without triggering reconnects
   callbacksRef.current = { onComplete, onPaused };
 
   const connect = useCallback(() => {
     if (!taskId || !enabled) return;
+    if (fatalErrorRef.current) return;
+
+    // Clear any pending reconnect timer
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
 
     const es = new EventSource(`/api/tasks/${taskId}/events`);
     eventSourceRef.current = es;
 
-    setStatus((prev) => (prev === "connecting" ? "connected" : prev));
+    setStatus((prev) => (prev === "connecting" ? "connecting" : prev));
+
+    es.addEventListener("open", () => {
+      reconnectAttemptsRef.current = 0;
+      setStatus("connected");
+    });
 
     es.addEventListener("log", (e) => {
       const data = JSON.parse(e.data) as TaskLogEvent;
@@ -71,11 +89,39 @@ export function useTaskEvents({
     });
 
     es.addEventListener("error", (e) => {
+      // Server-sent error events carry data (e.g. task not found, db error)
+      if (e.data) {
+        try {
+          const data = JSON.parse(e.data);
+          console.error("[SSE] Server error:", data.message);
+          setStatus("error");
+          fatalErrorRef.current = true;
+          es.close();
+          return;
+        } catch {
+          // ignore parse error, fall through to connection-error handling
+        }
+      }
+
+      // Native connection error (network drop, timeout, server restart)
       if (es.readyState === EventSource.CLOSED) {
         setStatus("disconnected");
+
+        if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+          const delay = Math.min(
+            RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttemptsRef.current),
+            30000
+          );
+          reconnectAttemptsRef.current++;
+          reconnectTimerRef.current = setTimeout(() => {
+            connect();
+          }, delay);
+        } else {
+          setStatus("error");
+        }
       } else {
-        setStatus("error");
-        es.close();
+        // CONNECTING or OPEN state transient error
+        setStatus("connecting");
       }
     });
   }, [taskId, enabled]);
@@ -85,15 +131,31 @@ export function useTaskEvents({
     setLogs([]);
     setStatus("connecting");
     setPausedData(null);
+    reconnectAttemptsRef.current = 0;
+    fatalErrorRef.current = false;
+
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+
     connect();
     return () => {
       eventSourceRef.current?.close();
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
     };
   }, [connect]);
 
   const disconnect = useCallback(() => {
+    fatalErrorRef.current = true;
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
   }, []);
 
   return { logs, status, pausedData, disconnect };

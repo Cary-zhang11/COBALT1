@@ -29,7 +29,7 @@ export default function NewTaskPage() {
     {
       id: "welcome",
       role: "ai",
-      content: "你好！我是 SkillFlow 智能助手。\n\n请告诉我你想处理什么需求？你可以直接描述，或上传需求文档。",
+      content: "你好！我是 COBALT 助手。\n\n请告诉我你想处理什么需求？你可以直接描述，或上传需求文档。",
     },
   ]);
   const [input, setInput] = useState("");
@@ -38,6 +38,7 @@ export default function NewTaskPage() {
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const [phase, setPhase] = useState<"input" | "matching" | "confirming">("input");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const uploadedFilesRef = useRef<string[]>([]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -61,19 +62,29 @@ export default function NewTaskPage() {
     }
 
     setFiles((prev) => [...prev, ...uploadedPaths]);
+    uploadedFilesRef.current = [...uploadedFilesRef.current, ...uploadedPaths];
     setUploading(false);
   };
 
   const handleSend = async () => {
     if (!input.trim() && files.length === 0) return;
 
+    let content = input.trim();
+    if (files.length > 0) {
+      const fileNames = files.map((f) => f.split(/[/\\]/).pop()).join(", ");
+      content = content
+        ? `${content}\n\n[附件: ${fileNames}]`
+        : `上传了 ${files.length} 个文件: ${fileNames}`;
+    }
+
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: input || `上传了 ${files.length} 个文件`,
+      content,
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setFiles([]);
     setPhase("matching");
 
     // Call skill matching
@@ -83,8 +94,8 @@ export default function NewTaskPage() {
       id: `ai-${Date.now()}`,
       role: "ai",
       content: result?.matches?.length
-        ? "基于你的需求，我为你匹配了以下 Skills："
-        : "未找到精确匹配的 Skill，请手动选择或继续。",
+        ? "基于你的需求，我为你匹配了以下工具："
+        : "未找到精确匹配的工具，请手动选择或继续。",
       skills: result?.matches || [],
     };
     setMessages((prev) => [...prev, aiMsg]);
@@ -118,8 +129,9 @@ export default function NewTaskPage() {
     const result = await createTask.mutateAsync({
       skillId: selectedSkillId,
       input: fullInput,
-      uploadedFiles: files.length > 0 ? files : undefined,
+      uploadedFiles: uploadedFilesRef.current.length > 0 ? uploadedFilesRef.current : undefined,
     });
+    uploadedFilesRef.current = [];
 
     await executeTask.mutateAsync(result.taskId);
     router.push(`/tasks/${result.taskId}/execute`);

@@ -1,5 +1,6 @@
-import { spawn, ChildProcess } from "child_process";
+import { spawn, ChildProcess, execSync } from "child_process";
 import { createInterface } from "readline";
+import path from "path";
 import type { AgentEvent, IAgentRuntime, SkillInput } from "./agent-runtime";
 import {
   getWorkspacePath,
@@ -9,6 +10,23 @@ import {
 } from "./sandbox";
 
 const TASK_MAX_STEPS = parseInt(process.env.TASK_MAX_STEPS || "30", 10);
+
+// Tools that modify files — pause only when target is outside workspace
+const FILE_WRITE_TOOLS = new Set(["Edit", "Write", "Delete", "NotebookEdit"]);
+
+function extractFilePath(input: Record<string, unknown>): string | null {
+  const field = input.file_path || input.target_file || input.notebook_path;
+  if (typeof field !== "string" || !field.trim()) return null;
+  return field;
+}
+
+function isPathInside(target: string, root: string): boolean {
+  const absolute = path.isAbsolute(target)
+    ? path.resolve(target)
+    : path.resolve(root, target);
+  const normalizedRoot = path.resolve(root) + path.sep;
+  return absolute.startsWith(normalizedRoot) || absolute === path.resolve(root);
+}
 
 export class ClaudeCodeCLIRuntime implements IAgentRuntime {
   readonly name = "claude-cli";
@@ -32,10 +50,12 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
 
     const systemPrompt = this.buildSystemPrompt(input);
     const userPrompt = this.buildUserPrompt(input);
+    const outputDir = getOutputPath(input.taskId);
 
     const combinedPrompt = [
       "<system_instructions>",
       systemPrompt,
+      `\n<output_rules>\n所有输出文件（.md, .xlsx, .xmind, .json 等）必须保存到以下目录:\n${outputDir}\n禁止将输出文件保存到其他目录（如 docs/, output/, workspace根目录等）。\n</output_rules>`,
       "</system_instructions>",
       "",
       "<user_request>",
@@ -48,6 +68,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
       "--output-format",
       "stream-json",
       "--verbose",
+      "--dangerously-skip-permissions",
       "--add-dir",
       cwd,
     ];
@@ -75,6 +96,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
       "--output-format",
       "stream-json",
       "--verbose",
+      "--dangerously-skip-permissions",
     ];
 
     yield* this.spawnCLI(
@@ -88,10 +110,35 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
 
   async cancel(key: string): Promise<void> {
     const proc = this.processes.get(key);
-    if (proc && !proc.killed && proc.exitCode === null) {
-      proc.kill("SIGTERM");
+    if (!proc || proc.killed || proc.exitCode !== null) {
       this.processes.delete(key);
+      return;
     }
+
+    const pid = proc.pid;
+    if (!pid) {
+      this.processes.delete(key);
+      return;
+    }
+
+    // Step 1: graceful SIGTERM
+    proc.kill("SIGTERM");
+
+    // Step 2: after 2s, force kill entire process tree (Windows-safe)
+    setTimeout(() => {
+      if (!proc.killed && proc.exitCode === null) {
+        try {
+          if (process.platform === "win32") {
+            execSync(`taskkill /F /T /PID ${pid}`, { stdio: "ignore" });
+          } else {
+            proc.kill("SIGKILL");
+          }
+        } catch {
+          // process already gone
+        }
+      }
+      this.processes.delete(key);
+    }, 2000);
   }
 
   private async *spawnCLI(
@@ -126,7 +173,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
 
     try {
       for await (const line of rl) {
-        const event = this.parseStreamJson(line);
+        const event = this.parseStreamJson(line, cwd);
         if (event) {
           yield event;
           if (event.type === "complete" || event.type === "error") {
@@ -137,15 +184,27 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     } finally {
       rl.close();
       if (!proc.killed && proc.exitCode === null) {
-        proc.kill();
+        const pid = proc.pid;
+        proc.kill("SIGTERM");
+        setTimeout(() => {
+          if (!proc.killed && proc.exitCode === null && pid) {
+            try {
+              if (process.platform === "win32") {
+                execSync(`taskkill /F /T /PID ${pid}`, { stdio: "ignore" });
+              } else {
+                proc.kill("SIGKILL");
+              }
+            } catch {
+              // already gone
+            }
+          }
+        }, 2000);
       }
       this.processes.delete(processKey);
     }
   }
 
-  private parseStreamJson(line: string): AgentEvent | null {
-    const HIGH_RISK_TOOLS = ["Bash", "Edit", "Write", "Delete", "CreateFile"];
-
+  private parseStreamJson(line: string, workspaceRoot: string): AgentEvent | null {
     try {
       const data = JSON.parse(line);
 
@@ -168,14 +227,19 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
         }
         const toolBlock = blocks.find((b: { type: string }) => b.type === "tool_use");
         if (toolBlock) {
-          if (HIGH_RISK_TOOLS.includes(toolBlock.name)) {
-            return {
-              type: "pause",
-              pauseReason: "tool_call",
-              toolName: toolBlock.name,
-              toolInput: toolBlock.input,
-            };
+          // File write tools: check if target is inside workspace
+          if (FILE_WRITE_TOOLS.has(toolBlock.name)) {
+            const targetPath = extractFilePath(toolBlock.input as Record<string, unknown>);
+            if (targetPath && !isPathInside(targetPath, workspaceRoot)) {
+              return {
+                type: "pause",
+                pauseReason: "tool_outside_workspace",
+                toolName: toolBlock.name,
+                toolInput: toolBlock.input,
+              };
+            }
           }
+          // Read tools, Bash, workspace-internal writes: pass through
           return {
             type: "tool_call",
             toolName: toolBlock.name,

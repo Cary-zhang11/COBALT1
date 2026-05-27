@@ -34,7 +34,7 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-2xl font-bold">任务列表</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              管理你的所有 Skill 执行任务
+              管理你的所有执行任务
             </p>
           </div>
           <Link

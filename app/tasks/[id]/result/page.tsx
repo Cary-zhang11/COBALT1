@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useTask } from "@/hooks/use-tasks";
 import {
@@ -11,8 +11,14 @@ import {
   Download,
   FileText,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
+
+interface OutputFile {
+  name: string;
+  path: string;
+}
 
 export default function TaskResultPage() {
   const params = useParams();
@@ -21,6 +27,14 @@ export default function TaskResultPage() {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [outputFiles, setOutputFiles] = useState<OutputFile[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/tasks/${taskId}/download`)
+      .then((r) => r.json())
+      .then((d) => setOutputFiles(d.files || []))
+      .catch(() => {});
+  }, [taskId]);
 
   if (isLoading) {
     return (
@@ -51,6 +65,17 @@ export default function TaskResultPage() {
     setFeedbackSent(true);
   };
 
+  const fileIcon = (name: string) => {
+    const ext = name.split(".").pop()?.toLowerCase();
+    const colors: Record<string, string> = {
+      xmind: "text-orange-500",
+      xlsx: "text-green-600",
+      json: "text-blue-500",
+      md: "text-violet-500",
+    };
+    return <FileText className={`w-4 h-4 ${colors[ext || ""] || "text-muted-foreground"}`} />;
+  };
+
   return (
     <div className="flex-1 overflow-auto p-8">
       <div className="max-w-3xl mx-auto">
@@ -67,7 +92,7 @@ export default function TaskResultPage() {
 
         <div className="grid grid-cols-3 gap-4 mb-8">
           <div className="p-4 bg-card border rounded-xl">
-            <p className="text-xs text-muted-foreground mb-1">技能</p>
+            <p className="text-xs text-muted-foreground mb-1">工具</p>
             <p className="font-medium text-sm">{task.skill?.name}</p>
           </div>
           <div className="p-4 bg-card border rounded-xl">
@@ -87,31 +112,33 @@ export default function TaskResultPage() {
           </div>
         </div>
 
-        {task.output && (
+        {isSuccess && outputFiles.length > 0 && (
           <div className="mb-8">
-            <h2 className="font-semibold mb-3">输出内容</h2>
-            <div className="bg-gray-50 border rounded-xl p-5 text-sm whitespace-pre-wrap max-h-96 overflow-auto font-mono">
-              {task.output}
+            <h2 className="font-semibold mb-3">输出文件</h2>
+            <div className="space-y-2">
+              {outputFiles.map((file, i) => (
+                <a
+                  key={i}
+                  href={file.path}
+                  download
+                  className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer group"
+                >
+                  {fileIcon(file.name)}
+                  <span className="text-sm flex-1 truncate font-medium group-hover:text-blue-600 transition-colors">
+                    {file.name}
+                  </span>
+                  <Download className="w-4 h-4 text-muted-foreground group-hover:text-blue-600 transition-colors" />
+                </a>
+              ))}
             </div>
           </div>
         )}
 
-        {task.outputFiles && task.outputFiles.length > 0 && (
+        {task.output && (
           <div className="mb-8">
-            <h2 className="font-semibold mb-3">输出文件</h2>
-            <div className="space-y-2">
-              {task.outputFiles.map((file: string, i: number) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 p-3 border rounded-lg"
-                >
-                  <FileText className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm flex-1 truncate">
-                    {file.split(/[/\\]/).pop()}
-                  </span>
-                  <Download className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-foreground" />
-                </div>
-              ))}
+            <h2 className="font-semibold mb-3">执行摘要</h2>
+            <div className="bg-gray-50 border rounded-xl p-5 text-sm whitespace-pre-wrap max-h-96 overflow-auto font-mono">
+              {task.output}
             </div>
           </div>
         )}

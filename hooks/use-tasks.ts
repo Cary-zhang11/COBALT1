@@ -85,14 +85,16 @@ export function useResumeTask() {
     mutationFn: async ({
       taskId,
       userReply,
+      uploadedFiles,
     }: {
       taskId: string;
       userReply: string;
+      uploadedFiles?: string[];
     }) => {
       const res = await fetch(`/api/tasks/${taskId}/resume`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userReply }),
+        body: JSON.stringify({ userReply, uploadedFiles }),
       });
       if (!res.ok) {
         const err = await res.json();

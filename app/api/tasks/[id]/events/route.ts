@@ -45,6 +45,19 @@ export async function GET(
             // If task is already terminal, just send done and close immediately
             // This prevents re-sending all logs on EventSource reconnect
             if (["completed", "failed", "cancelled"].includes(task.status)) {
+              const allLogs = await prisma.taskLog.findMany({
+                where: { taskId: params.id },
+                orderBy: { sequence: "asc" },
+              });
+              for (const log of allLogs) {
+                send("log", {
+                  sequence: log.sequence,
+                  type: log.type,
+                  output: log.output,
+                  input: log.input,
+                  createdAt: log.createdAt,
+                });
+              }
               send("done", { status: task.status });
               controller.close();
               return;

@@ -17,7 +17,9 @@
       "Skill(find-skills)",
       "Skill(find-skills:*)",
       "Skill(prd-to-tests-new)",
-      "Skill(prd-to-tests-new:*)"
+      "Skill(prd-to-tests-new:*)",
+      "Bash(rmdir /s /q .next)",
+      "Bash(del /f tsconfig.tsbuildinfo)"
     ]
   }
 }

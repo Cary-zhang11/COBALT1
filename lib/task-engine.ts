@@ -47,8 +47,9 @@ export async function startTaskExecution(taskId: string): Promise<void> {
     throw new Error("Task not in running state (execute route should set it first)");
 
   try {
+    let workspaceFiles: string[] = [];
     if (task.inputFiles && task.inputFiles.length > 0) {
-      await copyFilesToWorkspace(taskId, task.inputFiles);
+      workspaceFiles = await copyFilesToWorkspace(taskId, task.inputFiles);
     }
 
     const skillContent = task.skillVersion.content;
@@ -61,7 +62,7 @@ export async function startTaskExecution(taskId: string): Promise<void> {
       skillContent,
       skillDirectory: skillDir,
       userInput: task.input,
-      uploadedFiles: task.inputFiles,
+      uploadedFiles: workspaceFiles.length > 0 ? workspaceFiles : undefined,
     });
 
     let sequence = 0;
@@ -136,7 +137,8 @@ export async function startTaskExecution(taskId: string): Promise<void> {
 
 export async function resumeTask(
   taskId: string,
-  userReply: string
+  userReply: string,
+  uploadedFiles?: string[]
 ): Promise<void> {
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task) throw new Error("Task not found");
@@ -144,6 +146,10 @@ export async function resumeTask(
 
   if (!["paused", "running"].includes(task.status)) {
     throw new Error("Task not in a resumable state");
+  }
+
+  if (uploadedFiles && uploadedFiles.length > 0) {
+    await copyFilesToWorkspace(taskId, uploadedFiles);
   }
 
   await prisma.task.update({
