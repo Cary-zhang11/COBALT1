@@ -10,12 +10,14 @@ import {
   Wand2,
   LogOut,
   Cpu,
+  FileText,
 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "任务列表", icon: LayoutDashboard },
   { href: "/tasks/new", label: "新建任务", icon: PlusCircle },
   { href: "/skills", label: "工具库", icon: Wand2 },
+  { href: "/usecase-gen", label: "用例生成", icon: FileText },
 ];
 
 export function Sidebar() {
