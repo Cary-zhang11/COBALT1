@@ -7,6 +7,10 @@ function resolve(taskId: string, subdir: string): string {
   return path.resolve(process.cwd(), SANDBOX_ROOT, taskId, subdir);
 }
 
+export function getSandboxPath(taskId: string): string {
+  return path.resolve(process.cwd(), SANDBOX_ROOT, taskId);
+}
+
 export function getWorkspacePath(taskId: string): string {
   return resolve(taskId, "workspace");
 }

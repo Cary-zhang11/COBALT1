@@ -19,7 +19,8 @@
       "Skill(prd-to-tests-new)",
       "Skill(prd-to-tests-new:*)",
       "Bash(rmdir /s /q .next)",
-      "Bash(del /f tsconfig.tsbuildinfo)"
+      "Bash(del /f tsconfig.tsbuildinfo)",
+      "Edit(/.claude/skills/prd-to-tests-new/**)"
     ]
   }
 }

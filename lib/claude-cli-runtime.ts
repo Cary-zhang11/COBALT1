@@ -3,6 +3,7 @@ import { createInterface } from "readline";
 import path from "path";
 import type { AgentEvent, IAgentRuntime, SkillInput } from "./agent-runtime";
 import {
+  getSandboxPath,
   getWorkspacePath,
   getOutputPath,
   getTempPath,
@@ -38,6 +39,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     await ensureSandbox(input.taskId);
 
     const cwd = getWorkspacePath(input.taskId);
+    const sandboxRoot = getSandboxPath(input.taskId);
     const tempDir = getTempPath(input.taskId);
     const env = {
       ...process.env,
@@ -55,7 +57,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     const combinedPrompt = [
       "<system_instructions>",
       systemPrompt,
-      `\n<output_rules>\n所有输出文件（.md, .xlsx, .xmind, .json 等）必须保存到以下目录:\n${outputDir}\n禁止将输出文件保存到其他目录（如 docs/, output/, workspace根目录等）。\n</output_rules>`,
+      `\n<output_rules>\n所有输出文件（.md, .xlsx, .xmind, .json 等）必须直接保存到以下目录（不要创建子目录，直接放文件）:\n${outputDir}\n示例: ${outputDir}\\report.md（正确）\n示例: ${outputDir}\\xxx\\report.md（错误，禁止创建子目录）\n禁止将输出文件保存到其他任何目录。\n</output_rules>`,
       "</system_instructions>",
       "",
       "<user_request>",
@@ -73,7 +75,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
       cwd,
     ];
 
-    const stream = this.spawnCLI(args, env, cwd, input.taskId, combinedPrompt);
+    const stream = this.spawnCLI(args, env, cwd, sandboxRoot, input.taskId, combinedPrompt);
     for await (const event of stream) {
       if (event.type === "system" && event.content) {
         try {
@@ -89,6 +91,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
 
   async *resume(sessionId: string, userReply: string, cwd?: string): AsyncIterable<AgentEvent> {
     const resolvedCwd = cwd || this.sessionCwdMap.get(sessionId) || process.cwd();
+    const sandboxRoot = path.dirname(resolvedCwd);
     const args = [
       "--resume",
       sessionId,
@@ -103,6 +106,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
       args,
       process.env as NodeJS.ProcessEnv,
       resolvedCwd,
+      sandboxRoot,
       sessionId,
       userReply
     );
@@ -145,6 +149,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     args: string[],
     env: NodeJS.ProcessEnv,
     cwd: string,
+    sandboxRoot: string,
     processKey: string,
     stdinData?: string
   ): AsyncIterable<AgentEvent> {
@@ -173,7 +178,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
 
     try {
       for await (const line of rl) {
-        const event = this.parseStreamJson(line, cwd);
+        const event = this.parseStreamJson(line, sandboxRoot);
         if (event) {
           yield event;
           if (event.type === "complete" || event.type === "error") {
@@ -204,7 +209,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     }
   }
 
-  private parseStreamJson(line: string, workspaceRoot: string): AgentEvent | null {
+  private parseStreamJson(line: string, sandboxRoot: string): AgentEvent | null {
     try {
       const data = JSON.parse(line);
 
@@ -230,7 +235,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
           // File write tools: check if target is inside workspace
           if (FILE_WRITE_TOOLS.has(toolBlock.name)) {
             const targetPath = extractFilePath(toolBlock.input as Record<string, unknown>);
-            if (targetPath && !isPathInside(targetPath, workspaceRoot)) {
+            if (targetPath && !isPathInside(targetPath, sandboxRoot)) {
               return {
                 type: "pause",
                 pauseReason: "tool_outside_workspace",

@@ -268,13 +268,27 @@ async function logEvent(
 async function collectOutputFiles(taskId: string): Promise<void> {
   const outputDir = getOutputPath(taskId);
   try {
-    const files = await fs.readdir(outputDir);
-    const filePaths = files.map((f) => path.join(outputDir, f));
+    const files = await collectFilesRecursive(outputDir);
     await prisma.task.update({
       where: { id: taskId },
-      data: { outputFiles: filePaths },
+      data: { outputFiles: files },
     });
   } catch {
     // No output files
   }
+}
+
+async function collectFilesRecursive(dir: string): Promise<string[]> {
+  const results: string[] = [];
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const subFiles = await collectFilesRecursive(fullPath);
+      results.push(...subFiles);
+    } else {
+      results.push(fullPath);
+    }
+  }
+  return results;
 }
