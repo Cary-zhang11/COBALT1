@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { Loader2, CheckCircle2 } from "lucide-react";
 
@@ -12,11 +12,11 @@ interface WorkflowNode {
 }
 
 const WORKFLOW_TEMPLATE: WorkflowNode[] = [
-  { name: "文档解析", desc: "OCR + 结构提取", state: "wait", progress: 0 },
-  { name: "知识检索", desc: "RAG 召回相关规范", state: "wait", progress: 0 },
-  { name: "LLM 生成", desc: "工作流大模型节点", state: "wait", progress: 0 },
-  { name: "质量校验", desc: "格式 + 覆盖度检查", state: "wait", progress: 0 },
-  { name: "导出格式化", desc: "生成 XMind + Excel", state: "wait", progress: 0 },
+  { name: "文档解析", desc: "PRD 解析与规则预加载", state: "wait", progress: 0 },
+  { name: "需求分析", desc: "模块划分 · 场景分组 · 维度识别", state: "wait", progress: 0 },
+  { name: "用例生成", desc: "LLM 逐模块生成用例", state: "wait", progress: 0 },
+  { name: "质量校验", desc: "格式 + 完整度自检", state: "wait", progress: 0 },
+  { name: "导出格式", desc: "生成 XMind + Markdown", state: "wait", progress: 0 },
 ];
 
 interface ExecutionPanelProps {
@@ -33,14 +33,56 @@ interface ExecutionPanelProps {
 
 export function ExecutionPanel({ taskId, generating, configSummary, onComplete }: ExecutionPanelProps) {
   const [nodes, setNodes] = useState<WorkflowNode[]>(WORKFLOW_TEMPLATE);
+  const seenStepsRef = useRef(new Set<number>());
+  const prevLogCountRef = useRef(0);
 
-  const { status } = useTaskEvents({
+  const { status, logs } = useTaskEvents({
     taskId: taskId || "",
     enabled: !!taskId && generating,
     onComplete,
   });
 
-  // Mark all done when task completes
+  // Reset on generation start/stop
+  useEffect(() => {
+    if (generating) {
+      seenStepsRef.current.clear();
+      prevLogCountRef.current = 0;
+      setNodes(WORKFLOW_TEMPLATE.map((n, i) => ({
+        ...n,
+        state: i === 0 ? "running" as const : "wait" as const,
+      })));
+    }
+  }, [generating]);
+
+  // Scan new SSE logs for [WF:done:xxx] markers and advance nodes
+  useEffect(() => {
+    if (!generating) return;
+    const newLogs = logs.slice(prevLogCountRef.current);
+    prevLogCountRef.current = logs.length;
+
+    for (const log of newLogs) {
+      if (log.type !== "chunk" || !log.output) continue;
+      // Use global regex to catch multiple markers in one chunk
+      const re = /\[WF:done:(.+?)\]/g;
+      let match: RegExpExecArray | null;
+      while ((match = re.exec(log.output)) !== null) {
+        const stepName = match[1];
+        const idx = WORKFLOW_TEMPLATE.findIndex((n) => n.name === stepName);
+        if (idx === -1 || seenStepsRef.current.has(idx)) continue;
+        seenStepsRef.current.add(idx);
+
+        setNodes((prev) =>
+          prev.map((n, i) => {
+            if (i === idx) return { ...n, state: "done" as const, progress: 100 };
+            if (i === idx + 1 && prev[i]?.state === "wait") return { ...n, state: "running" as const };
+            return n;
+          })
+        );
+      }
+    }
+  }, [logs, generating]);
+
+  // Mark all remaining done when task completes
   useEffect(() => {
     if (status === "completed") {
       setNodes((prev) => prev.map((n) => ({ ...n, state: "done" as const, progress: 100 })));
@@ -55,11 +97,22 @@ export function ExecutionPanel({ taskId, generating, configSummary, onComplete }
       </div>
 
       {!generating && (
-        <div className="bg-muted rounded-lg p-3 space-y-2">
+        <>
+          {/* Idle: greyed-out workflow preview */}
+          <div className="space-y-2 mb-3 opacity-40">
+            {nodes.map((node, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0" />
+                <span className="text-xs text-muted-foreground">{node.name}</span>
+                <span className="text-xs text-muted-foreground/50 ml-auto">{node.desc}</span>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-border pt-3 bg-muted rounded-lg p-3 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground mb-1">当前配置预览</p>
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">物料来源</span>
-            <span className="font-medium">{configSummary.source}</span>
+            <span className="font-medium max-w-[120px] truncate">{configSummary.source}</span>
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">已选能力</span>
@@ -73,7 +126,11 @@ export function ExecutionPanel({ taskId, generating, configSummary, onComplete }
             <span className="text-muted-foreground">few-shot</span>
             <span className="font-medium">{configSummary.fewShot}</span>
           </div>
-        </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">输出格式</span>
+            <span className="font-medium">XMind + Markdown</span>
+          </div>
+        </div></>
       )}
 
       {generating && (

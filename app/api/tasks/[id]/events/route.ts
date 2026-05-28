@@ -23,9 +23,13 @@ export async function GET(
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: string, data: unknown) => {
-        controller.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-        );
+        try {
+          controller.enqueue(
+            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+          );
+        } catch {
+          // Controller closed (client disconnected) — silently ignore
+        }
       };
 
       const poll = async () => {
@@ -50,6 +54,7 @@ export async function GET(
                 orderBy: { sequence: "asc" },
               });
               for (const log of allLogs) {
+                if (!isActive) return; // Client disconnected — stop replay
                 send("log", {
                   sequence: log.sequence,
                   type: log.type,
@@ -69,6 +74,7 @@ export async function GET(
             });
 
             for (const log of newLogs) {
+              if (!isActive) return; // Client disconnected — stop pushing
               send("log", {
                 sequence: log.sequence,
                 type: log.type,
@@ -102,11 +108,16 @@ export async function GET(
 
             await new Promise((r) => setTimeout(r, 1000));
           } catch (error) {
-            send("error", {
-              message:
-                error instanceof Error ? error.message : "Polling error",
-            });
-            controller.close();
+            // Don't call send("error") here — controller may already be closed
+            // (e.g. client disconnected mid-poll). send() itself is guarded, but
+            // controller.close() on an already-closed controller also throws.
+            if (isActive) {
+              send("error", {
+                message:
+                  error instanceof Error ? error.message : "Polling error",
+              });
+            }
+            try { controller.close(); } catch { /* already closed */ }
             return;
           }
         }

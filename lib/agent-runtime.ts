@@ -3,7 +3,7 @@ export interface AgentEvent {
   content?: string;
   toolName?: string;
   toolInput?: unknown;
-  pauseReason?: "tool_call" | "output_complete" | "permission_request";
+  pauseReason?: "tool_call" | "output_complete" | "permission_request" | "tool_outside_workspace";
   error?: string;
 }
 

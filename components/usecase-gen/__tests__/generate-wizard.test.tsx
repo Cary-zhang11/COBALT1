@@ -52,12 +52,17 @@ describe("GenerateWizard", () => {
   it("renders step 1 upload area and textarea", () => {
     render(<GenerateWizard {...defaultProps} />);
     expect(screen.getByText("上传需求文档")).toBeDefined();
-    expect(screen.getByText("或直接粘贴需求文本")).toBeDefined();
     expect(screen.getByPlaceholderText("将需求描述、用户故事或功能说明粘贴到此处...")).toBeDefined();
+    expect(screen.getByText("下一步：选择平台能力")).toBeDefined();
   });
 
   it("navigates to step 2 when clicking '下一步'", async () => {
     render(<GenerateWizard {...defaultProps} />);
+    // Type requirement text to pass validation
+    await userEvent.type(
+      screen.getByPlaceholderText("将需求描述、用户故事或功能说明粘贴到此处..."),
+      "测试需求内容"
+    );
     const nextBtn = screen.getByText("下一步：选择平台能力");
     await userEvent.click(nextBtn);
     // Step 2 content should be visible
@@ -66,6 +71,11 @@ describe("GenerateWizard", () => {
 
   it("can go back from step 2 to step 1", async () => {
     render(<GenerateWizard {...defaultProps} />);
+    // Type requirement text to pass validation
+    await userEvent.type(
+      screen.getByPlaceholderText("将需求描述、用户故事或功能说明粘贴到此处..."),
+      "测试需求内容"
+    );
     // Go to step 2
     await userEvent.click(screen.getByText("下一步：选择平台能力"));
     // Go back to step 1
@@ -75,6 +85,11 @@ describe("GenerateWizard", () => {
 
   it("shows generate button in step 2", async () => {
     render(<GenerateWizard {...defaultProps} />);
+    // Type requirement text to pass validation
+    await userEvent.type(
+      screen.getByPlaceholderText("将需求描述、用户故事或功能说明粘贴到此处..."),
+      "测试需求内容"
+    );
     await userEvent.click(screen.getByText("下一步：选择平台能力"));
     expect(screen.getByText("开始生成")).toBeDefined();
   });

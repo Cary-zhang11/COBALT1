@@ -44,12 +44,12 @@ describe("ExecutionPanel", () => {
         configSummary={defaultConfig}
       />
     );
-    // Workflow nodes should be visible
+    // Workflow nodes (5 core steps)
     expect(screen.getByText("文档解析")).toBeDefined();
-    expect(screen.getByText("知识检索")).toBeDefined();
-    expect(screen.getByText("LLM 生成")).toBeDefined();
+    expect(screen.getByText("需求分析")).toBeDefined();
+    expect(screen.getByText("用例生成")).toBeDefined();
     expect(screen.getByText("质量校验")).toBeDefined();
-    expect(screen.getByText("导出格式化")).toBeDefined();
+    expect(screen.getByText("导出格式")).toBeDefined();
   });
 
   it("shows completion message when task completed", async () => {

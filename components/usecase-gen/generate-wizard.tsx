@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask } from "@/hooks/use-tasks";
 import { ExecutionPanel } from "./shared/execution-panel";
-import { parseUsecaseOutput } from "./shared/parse-usecase-output";
 import {
   mockRecentReqs, mockFewShotExamples, mockCapabilities,
   mockDimensions, mockQuickActions,
@@ -24,6 +23,11 @@ interface GenerateWizardProps {
   onNavigateToTab?: (tabIndex: number) => void;
 }
 
+interface UploadedFile {
+  name: string;
+  path: string;
+}
+
 const STEPS = ["输入物料", "选择平台能力", "生成并预览"];
 
 export function GenerateWizard({
@@ -36,9 +40,10 @@ export function GenerateWizard({
 
   // Wizard
   const [wizStep, setWizStep] = useState(0);
-  const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [requirementText, setRequirementText] = useState("");
   const [selectedReq, setSelectedReq] = useState<number | null>(null);
+  const [validationMsg, setValidationMsg] = useState("");
 
   // Mutable refs for mutable mock arrays
   const fewShotRef = useRef(mockFewShotExamples.map((f) => ({ ...f })));
@@ -60,26 +65,43 @@ export function GenerateWizard({
 
   // Upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (res.ok) setUploadedFile(file.name);
-    } catch {}
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        if (res.ok) {
+          const data = await res.json();
+          setUploadedFiles((prev) => [...prev, { name: file.name, path: data.filePath }]);
+        }
+      } catch {}
+    }
+  };
+
+  const removeFile = (name: string) => {
+    setUploadedFiles((prev) => prev.filter((f) => f.name !== name));
   };
 
   // Start Generate
   const startGenerate = async () => {
     if (!skillId) return;
     let input = requirementText.trim();
-    if (uploadedFile) input = input ? `${input}\n\n[附件: ${uploadedFile}]` : `上传文件: ${uploadedFile}`;
+    if (uploadedFiles.length > 0) {
+      const names = uploadedFiles.map((f) => f.name).join(", ");
+      input = input ? `${input}\n\n[附件: ${names}]` : `上传文件: ${names}`;
+    }
     setWizStep(2);
     setGenerating(true);
     setGenStatus("正在解析需求文档...");
     try {
-      const { taskId: newTaskId } = await createTask.mutateAsync({ skillId, input });
+      const { taskId: newTaskId } = await createTask.mutateAsync({
+        skillId,
+        input,
+        uploadedFiles: uploadedFiles.map((f) => f.path),
+      });
       setTaskId(newTaskId);
       await executeTask.mutateAsync(newTaskId);
     } catch {
@@ -92,21 +114,19 @@ export function GenerateWizard({
   const onExecutionComplete = useCallback(async (status: string) => {
     if (status !== "completed" || !taskId) return;
     try {
-      const res = await fetch(`/api/tasks/${taskId}`);
+      const res = await fetch(`/api/tasks/${taskId}/report`);
       const data = await res.json();
-      const output = data.task?.output || "";
-      const parsed = parseUsecaseOutput(output);
-      if (parsed.tree) {
-        onComplete(parsed.tree, parsed.summary);
-        if (parsed.summary) {
-          setGenStats({
-            totalCases: parsed.summary.totalCases,
-            qualityScore: parsed.summary.qualityScore,
-            modules: parsed.summary.modules,
-            duration: data.task?.duration ? Math.round(data.task.duration / 1000 * 10) / 10 : 0,
-          });
-        }
-      } else onComplete([]);
+      if (data.tree) {
+        onComplete(data.tree, data.summary);
+        setGenStats({
+          totalCases: data.summary?.totalCases || 0,
+          qualityScore: data.summary?.qualityScore || 0,
+          modules: data.summary?.modules || 0,
+          duration: data.duration ? Math.round(data.duration / 1000 * 10) / 10 : 0,
+        });
+      } else {
+        onComplete([]);
+      }
     } catch {}
     setGenerating(false);
   }, [taskId, onComplete]);
@@ -153,34 +173,35 @@ export function GenerateWizard({
         {wizStep === 0 && (
           <div className="space-y-4">
             <div className="bg-card rounded-xl shadow-sm p-5">
-              <h3 className="font-semibold mb-4 flex items-center gap-2"><Upload className="w-4 h-4 text-primary" />上传需求文档</h3>
+              <h3 className="font-semibold mb-3 flex items-center gap-2"><Upload className="w-4 h-4 text-primary" />上传需求文档</h3>
               <div
-                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-                  uploadedFile
-                    ? "border-primary/50 bg-primary/5"
-                    : "border-border hover:border-primary/30 hover:bg-primary/5"
-                }`}
+                className="border-2 border-dashed rounded-lg py-3 px-4 text-center cursor-pointer transition-all border-border hover:border-primary/30 hover:bg-primary/5"
                 onClick={() => document.getElementById("wizard-file-input")?.click()}
               >
-                {uploadedFile ? (
-                  <>
-                    <CheckCircle2 className="w-10 h-10 text-primary mx-auto mb-2" />
-                    <p className="text-sm font-medium text-foreground">{uploadedFile}</p>
-                    <p className="text-xs text-muted-foreground mt-1">上传成功，点击更换文件</p>
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-40" />
-                    <p className="text-sm text-muted-foreground">拖拽上传 PRD / Word / PDF，或 <span className="text-primary font-medium">点击选择</span></p>
-                    <p className="text-xs text-muted-foreground mt-1">支持 .docx .pdf .md .txt</p>
-                  </>
-                )}
-                <input id="wizard-file-input" type="file" className="hidden" onChange={handleFileUpload} />
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-primary font-medium">点击上传</span> 或拖拽文件到此处 · 支持 .docx .pdf .md .txt
+                </p>
+                <input id="wizard-file-input" type="file" className="hidden" multiple onChange={handleFileUpload} />
               </div>
+              {uploadedFiles.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {uploadedFiles.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2 text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                        <span className="truncate">{f.name}</span>
+                      </div>
+                      <button onClick={(ev) => { ev.stopPropagation(); removeFile(f.name); }} className="text-muted-foreground hover:text-red-500 flex-shrink-0 ml-2">
+                        <span className="text-sm">✕</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="bg-card rounded-xl shadow-sm p-5">
-              <h3 className="font-semibold mb-3 flex items-center gap-2"><Wand2 className="w-4 h-4 text-primary" />或直接粘贴需求文本</h3>
+              <h3 className="font-semibold mb-3 flex items-center gap-2"><Wand2 className="w-4 h-4 text-primary" />或直接粘贴需求文本/链接</h3>
               <textarea
                 value={requirementText}
                 onChange={(e) => setRequirementText(e.target.value)}
@@ -228,8 +249,21 @@ export function GenerateWizard({
               </div>
             </div>
 
+            {/* Validation message */}
+            {validationMsg && (
+              <p className="text-sm text-red-500 font-medium flex items-center gap-1.5 animate-in fade-in">
+                <span>⚠️</span> {validationMsg}
+              </p>
+            )}
             <div className="flex justify-end">
-              <button onClick={() => setWizStep(1)}
+              <button onClick={() => {
+                if (!uploadedFiles.length && !requirementText.trim()) {
+                  setValidationMsg("请至少上传一个需求文档，或粘贴需求文本");
+                  return;
+                }
+                setValidationMsg("");
+                setWizStep(1);
+              }}
                 className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2">
                 下一步：选择平台能力<ChevronRight className="w-4 h-4" />
               </button>
@@ -443,7 +477,7 @@ export function GenerateWizard({
           taskId={taskId}
           generating={generating}
           configSummary={{
-            source: uploadedFile || (selectedReq ? "最近需求" : (requirementText ? "文本输入" : "未选择")),
+            source: uploadedFiles.length > 0 ? uploadedFiles.map((f) => f.name).join(", ") : (selectedReq ? "最近需求" : (requirementText ? "文本输入" : "未选择")),
             capabilities: `${capabilities.filter((c) => c.selected).length} / ${capabilities.length}`,
             dimensions: `${dimensions.filter((d) => d.active).length} 个`,
             fewShot: `${fewShot.filter((f) => f.selected).length} 份`,
