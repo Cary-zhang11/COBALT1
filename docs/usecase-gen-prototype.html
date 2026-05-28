@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>用例生成平台 · 原型</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: { DEFAULT:'#1E3A8A', light:'#2563EB', pale:'#EFF6FF' },
+        accent:  { DEFAULT:'#06B6D4', light:'#67E8F9', pale:'#ECFEFF' },
+        bg:      '#F8FAFC',
+      }
+    }
+  }
+}
+</script>
+<style>
+  [x-cloak]{display:none!important}
+  body{font-family:'PingFang SC','Segoe UI',system-ui,sans-serif}
+  /* Tree lines */
+  .tree-root{position:relative;padding-left:0}
+  .tree-node{position:relative;padding-left:1.5rem;margin:2px 0}
+  .tree-node::before{content:'';position:absolute;left:.5rem;top:0;bottom:0;width:1px;background:#CBD5E1}
+  .tree-node:last-child::before{height:1rem}
+  .tree-node::after{content:'';position:absolute;left:.5rem;top:.9rem;width:.75rem;height:1px;background:#CBD5E1}
+  .tree-node:first-child::before{top:.9rem}
+  /* Workflow node */
+  .wf-node{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:72px}
+  .wf-arrow{width:32px;height:2px;background:#CBD5E1;position:relative;flex-shrink:0}
+  .wf-arrow::after{content:'';position:absolute;right:-4px;top:-4px;border:5px solid transparent;border-left-color:#CBD5E1}
+  .wf-node-box{width:72px;height:48px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;border:2px solid;transition:all .4s}
+  .wf-active .wf-node-box{box-shadow:0 0 0 3px rgba(6,182,212,.4)}
+  .wf-done .wf-node-box{border-color:#10B981!important;background:#ECFDF5!important;color:#059669!important}
+  .wf-running .wf-node-box{border-color:#06B6D4!important;background:#ECFEFF!important;color:#0891B2!important;animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+  /* Diff highlight */
+  .diff-del{background:#FEE2E2;text-decoration:line-through;color:#DC2626}
+  .diff-add{background:#DCFCE7;color:#16A34A}
+  /* Drag zone */
+  .drag-zone{border:2px dashed #CBD5E1;transition:all .2s}
+  .drag-zone.drag-over,.drag-zone:hover{border-color:#06B6D4;background:#ECFEFF}
+  /* Count up animation */
+  @keyframes countUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .count-anim{animation:countUp .6s ease both}
+  /* Scrollbar */
+  ::-webkit-scrollbar{width:5px;height:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:9px}
+  /* Log stream */
+  .log-line{font-family:monospace;font-size:12px;line-height:1.6;border-left:3px solid transparent;padding-left:6px;margin:2px 0}
+  .log-line.info{border-color:#06B6D4;color:#0E7490}
+  .log-line.success{border-color:#10B981;color:#047857}
+  .log-line.warn{border-color:#F59E0B;color:#B45309}
+  /* Skeleton shimmer */
+  @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+  .skeleton{background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:800px 100%;animation:shimmer 1.4s infinite}
+  /* Page transition */
+  .page-enter{animation:pageIn .25s ease both}
+  @keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  /* Chart container */
+  .chart-box{position:relative;width:100%}
+</style>
+</head>
+<body class="bg-bg min-h-screen" x-data="app()" x-init="init()">
+
+<!-- ══════ TOP NAV ══════ -->
+<nav class="sticky top-0 z-50 bg-primary shadow-md">
+  <div class="max-w-screen-xl mx-auto flex items-center justify-between px-6 h-14">
+    <!-- Logo -->
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      </div>
+      <span class="text-white font-bold text-lg tracking-tight">用例生成平台</span>
+    </div>
+    <!-- Tabs -->
+    <div class="flex items-center gap-1">
+      <template x-for="(tab,i) in tabs" :key="i">
+        <button @click="page=i"
+          :class="page===i ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white hover:bg-white/10'"
+          class="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+          x-text="tab"></button>
+      </template>
+    </div>
+    <!-- Scheme switcher -->
+    <div class="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5">
+      <span class="text-white/60 text-xs">方案</span>
+      <button @click="scheme='A'"
+        :class="scheme==='A' ? 'bg-accent text-white' : 'text-white/60 hover:text-white'"
+        class="px-3 py-1 rounded-lg text-xs font-bold transition-all">A · 单Prompt</button>
+      <button @click="scheme='B'"
+        :class="scheme==='B' ? 'bg-accent text-white' : 'text-white/60 hover:text-white'"
+        class="px-3 py-1 rounded-lg text-xs font-bold transition-all">B · 工作流</button>
+    </div>
+  </div>
+</nav>
+
+<!-- Scheme badge -->
+<div class="max-w-screen-xl mx-auto px-6 pt-3">
+  <div x-show="scheme==='A'" class="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-3 py-1 text-xs font-medium">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    当前：方案 A — 单 Prompt + 脚本（适合 1-2 人天快速落地）
+  </div>
+  <div x-show="scheme==='B'" class="inline-flex items-center gap-2 bg-cyan-50 border border-cyan-200 text-cyan-700 rounded-lg px-3 py-1 text-xs font-medium">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+    当前：方案 B — Dify/Coze 工作流（推荐小团队，3-5 人天）
+  </div>
+</div>
+
+<!-- ══════ PAGE 1: 生成向导 ══════ -->
+<div x-show="page===0" x-cloak class="max-w-screen-xl mx-auto px-6 py-6 page-enter">
+  <div class="flex gap-6">
+    <!-- Left: Wizard -->
+    <div class="flex-1 min-w-0">
+      <!-- Step bar -->
+      <div class="flex items-center gap-0 mb-6 bg-white rounded-xl shadow-sm p-4">
+        <template x-for="(s,i) in steps" :key="i">
+          <div class="flex items-center gap-0 flex-1">
+            <div class="flex items-center gap-2 flex-1">
+              <div :class="wizStep>i ? 'bg-accent text-white' : wizStep===i ? 'bg-primary text-white' : 'bg-slate-100 text-slate-400'"
+                   class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-all">
+                <template x-if="wizStep>i">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                </template>
+                <template x-if="wizStep<=i">
+                  <span x-text="i+1"></span>
+                </template>
+              </div>
+              <span :class="wizStep>=i ? 'text-primary font-medium' : 'text-slate-400'" class="text-sm" x-text="s"></span>
+            </div>
+            <template x-if="i<steps.length-1">
+              <div :class="wizStep>i ? 'bg-accent' : 'bg-slate-200'" class="h-0.5 w-8 mx-2 flex-shrink-0 transition-all"></div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <!-- Step 1: 输入物料 -->
+      <div x-show="wizStep===0" class="space-y-4">
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            上传需求文档
+          </h3>
+          <div @dragover.prevent="dragOver=true" @dragleave="dragOver=false" @drop.prevent="dragOver=false;handleDrop($event)"
+               :class="dragOver?'drag-over':''" class="drag-zone rounded-xl p-8 text-center cursor-pointer" @click="$refs.fileInput.click()">
+            <svg class="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <p class="text-slate-500 text-sm">拖拽上传 PRD / Word / PDF，或 <span class="text-accent font-medium">点击选择</span></p>
+            <p class="text-slate-400 text-xs mt-1">支持 .docx .pdf .md .txt，最大 10MB</p>
+            <input type="file" x-ref="fileInput" class="hidden" @change="handleFile($event)"/>
+          </div>
+          <template x-if="uploadedFile">
+            <div class="mt-3 flex items-center gap-3 bg-accent/10 rounded-lg px-3 py-2">
+              <svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <span class="text-sm text-slate-700 flex-1" x-text="uploadedFile"></span>
+              <button @click="uploadedFile=null" class="text-slate-400 hover:text-red-500">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </template>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <h3 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            或直接粘贴需求文本
+          </h3>
+          <textarea x-model="requirementText" rows="5" placeholder="将需求描述、用户故事或功能说明粘贴到此处..."
+            class="w-full border border-slate-200 rounded-lg p-3 text-sm text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"></textarea>
+          <p class="text-right text-xs mt-1" :class="requirementText.length>2000?'text-red-400':'text-slate-300'">
+            <span x-text="requirementText.length"></span> / 2000 字
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-white rounded-xl shadow-sm p-5">
+            <h3 class="font-semibold text-slate-700 mb-3 text-sm flex items-center gap-2">
+              <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              最近需求（快速复用）
+            </h3>
+            <div class="space-y-2">
+              <template x-for="(req,i) in recentReqs" :key="i">
+                <div @click="selectReq(req)"
+                     :class="selectedReq===req.id ? 'border-accent bg-accent/5' : 'border-slate-200 hover:border-slate-300'"
+                     class="border rounded-lg px-3 py-2 cursor-pointer transition-all">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-slate-700" x-text="req.name"></span>
+                    <template x-if="selectedReq===req.id">
+                      <svg class="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                    </template>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-0.5" x-text="req.date + ' · ' + req.count + '个用例'"></p>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-sm p-5">
+            <h3 class="font-semibold text-slate-700 mb-3 text-sm flex items-center gap-2">
+              <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+              复用历史用例作 few-shot
+            </h3>
+            <p class="text-xs text-slate-400 mb-3">选择相似场景用例作为生成参考，提升对齐度</p>
+            <div class="space-y-2">
+              <template x-for="(ex,i) in fewShotExamples" :key="i">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" x-model="ex.selected" class="accent-accent w-3.5 h-3.5"/>
+                  <div>
+                    <span class="text-sm text-slate-700" x-text="ex.name"></span>
+                    <span class="text-xs text-slate-400 ml-1" x-text="'(' + ex.count + '条)'"></span>
+                  </div>
+                </label>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <button @click="wizStep=1" class="bg-primary hover:bg-primary-light text-white px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2">
+            下一步：选择平台能力
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: 选择平台能力 -->
+      <div x-show="wizStep===1" class="space-y-4">
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <h3 class="font-semibold text-slate-700 mb-4">知识库与规范增强</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <template x-for="(cap,i) in capabilities" :key="i">
+              <label :class="cap.selected ? 'border-accent bg-accent/5' : 'border-slate-200 hover:border-slate-300'"
+                     class="flex items-start gap-3 border rounded-xl p-4 cursor-pointer transition-all">
+                <input type="checkbox" x-model="cap.selected" class="accent-accent mt-0.5"/>
+                <div>
+                  <p class="text-sm font-medium text-slate-700" x-text="cap.name"></p>
+                  <p class="text-xs text-slate-400 mt-0.5" x-text="cap.desc"></p>
+                </div>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <h3 class="font-semibold text-slate-700 mb-4">覆盖维度配置</h3>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="(dim,i) in dimensions" :key="i">
+              <button @click="dim.active=!dim.active"
+                :class="dim.active ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'"
+                class="px-3 py-1.5 rounded-lg text-sm border font-medium transition-all" x-text="dim.name"></button>
+            </template>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <h3 class="font-semibold text-slate-700 mb-4">生成参数</h3>
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="text-xs text-slate-500 block mb-1">输出格式</label>
+              <select x-model="genFormat" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40">
+                <option>XMind + Excel</option>
+                <option>仅 XMind</option>
+                <option>仅 Excel</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-slate-500 block mb-1">用例粒度</label>
+              <select x-model="genGranularity" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40">
+                <option>标准（推荐）</option>
+                <option>精细（步骤详细）</option>
+                <option>概要（快速扫描）</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-slate-500 block mb-1">优先级策略</label>
+              <select class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40">
+                <option>P0/P1/P2 三级</option>
+                <option>高/中/低</option>
+                <option>MoSCoW</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between">
+          <button @click="wizStep=0" class="border border-slate-200 text-slate-600 px-5 py-2.5 rounded-xl text-sm font-medium hover:border-slate-400 transition-all">
+            ← 上一步
+          </button>
+          <button @click="startGenerate()" class="bg-accent hover:bg-cyan-500 text-white px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            开始生成
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: 生成结果 -->
+      <div x-show="wizStep===2" class="space-y-4">
+        <div x-show="generating" class="bg-white rounded-xl shadow-sm p-6">
+          <div class="flex flex-col items-center gap-3 mb-5">
+            <div class="w-12 h-12 border-4 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+            <p class="text-slate-600 font-medium" x-text="genStatus"></p>
+            <p class="text-slate-400 text-xs" x-text="scheme==='A' ? '方案A：大模型直接生成中...' : '方案B：工作流节点执行中...'"></p>
+          </div>
+          <!-- Inject instruction mid-generation -->
+          <div class="border-t border-slate-100 pt-4">
+            <p class="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              追加指令（生成过程中注入）
+            </p>
+            <p class="text-xs text-slate-400 mb-2" x-show="!injectSent">发现遗漏场景？可立即补充，指令将注入当前执行上下文</p>
+            <template x-if="!injectSent">
+              <div class="flex gap-2">
+                <input x-model="injectInput" type="text"
+                  placeholder="例：需要增加短信验证码登录场景"
+                  class="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"/>
+                <button @click="sendInject()"
+                  :disabled="!injectInput.trim()"
+                  class="bg-accent disabled:opacity-40 text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-cyan-500 transition-all flex-shrink-0">注入</button>
+              </div>
+            </template>
+            <template x-if="injectSent">
+              <div class="flex items-center gap-2 bg-accent/10 rounded-lg px-3 py-2 text-xs text-cyan-700">
+                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                指令已注入："<span x-text="injectInput"></span>" · 生成引擎已感知，正在调整...
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div x-show="!generating" class="bg-white rounded-xl shadow-sm p-5">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+              <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-800">生成完成！</p>
+              <p class="text-sm text-slate-400">共生成 <span class="text-accent font-bold">48</span> 个用例，覆盖 6 个功能模块，质量评分 <span class="text-green-600 font-bold">92分</span></p>
+            </div>
+          </div>
+          <div class="grid grid-cols-4 gap-3 mb-4">
+            <div class="bg-slate-50 rounded-lg p-3 text-center">
+              <p class="text-2xl font-bold text-primary">48</p><p class="text-xs text-slate-500 mt-0.5">总用例数</p>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3 text-center">
+              <p class="text-2xl font-bold text-green-600">92</p><p class="text-xs text-slate-500 mt-0.5">质量评分</p>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3 text-center">
+              <p class="text-2xl font-bold text-accent">6</p><p class="text-xs text-slate-500 mt-0.5">功能模块</p>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3 text-center">
+              <p class="text-2xl font-bold text-amber-500">3.2s</p><p class="text-xs text-slate-500 mt-0.5">耗时</p>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <button class="flex-1 flex items-center justify-center gap-2 border border-primary text-primary hover:bg-primary/5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              导出 XMind
+            </button>
+            <button class="flex-1 flex items-center justify-center gap-2 border border-green-600 text-green-600 hover:bg-green-50 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              导出 Excel
+            </button>
+            <button @click="page=1" class="flex-1 flex items-center justify-center gap-2 bg-primary text-white hover:bg-primary-light px-4 py-2.5 rounded-xl text-sm font-medium transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              进入编辑
+            </button>
+          </div>
+        </div>
+
+        <!-- Tweak & Re-generate panel -->
+        <div x-show="!generating" class="bg-white rounded-xl shadow-sm p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-semibold text-slate-700 text-sm flex items-center gap-2">
+              <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+              对结果不满意？微调并重新生成
+            </h4>
+            <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full" x-text="'第 ' + iterationCount + ' 次生成'"></span>
+          </div>
+
+          <!-- Quick chips -->
+          <div class="flex flex-wrap gap-2 mb-3">
+            <template x-for="chip in ['补充边界场景','增加异常覆盖','精简步骤描述','提升P0覆盖率','补充兼容测试','增加安全场景']" :key="chip">
+              <button @click="tweakInput = chip"
+                :class="tweakInput===chip ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-200 hover:border-accent hover:text-accent'"
+                class="px-2.5 py-1 rounded-lg text-xs border font-medium transition-all" x-text="chip"></button>
+            </template>
+          </div>
+
+          <!-- Scope + instruction -->
+          <div class="flex gap-2 mb-3">
+            <select x-model="tweakScope" class="border border-slate-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent/40 flex-shrink-0">
+              <option value="all">全部重新生成</option>
+              <option value="missing">仅补充缺失</option>
+              <option value="module">指定模块</option>
+            </select>
+            <input x-model="tweakInput" type="text"
+              placeholder="或输入自然语言指令，如：登录模块缺少第三方OAuth场景"
+              class="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"/>
+          </div>
+          <div x-show="tweakScope==='module'" class="flex flex-wrap gap-2 mb-3">
+            <template x-for="m in ['登录模块','注册模块','权限控制','Token处理']" :key="m">
+              <button class="px-2.5 py-1 rounded-lg text-xs border border-accent/40 bg-accent/5 text-accent font-medium" x-text="m"></button>
+            </template>
+          </div>
+
+          <div class="flex gap-2">
+            <button @click="startTweak()" :disabled="tweakRunning || !tweakInput.trim()"
+              class="flex-1 flex items-center justify-center gap-2 bg-accent disabled:opacity-40 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-cyan-500 transition-all">
+              <template x-if="tweakRunning">
+                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              </template>
+              <template x-if="!tweakRunning">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </template>
+              <span x-text="tweakRunning ? '微调生成中...' : '执行微调'"></span>
+            </button>
+          </div>
+
+          <!-- Tweak done result -->
+          <div x-show="tweakDone" x-transition class="mt-3 flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            微调完成：<strong x-text="tweakHistory[0] && tweakHistory[0].delta"></strong>，进入编辑页查看变更
+          </div>
+
+          <!-- Iteration history -->
+          <div x-show="tweakHistory.length > 0" class="mt-4 pt-3 border-t border-slate-100">
+            <p class="text-xs font-semibold text-slate-500 mb-2">迭代历史</p>
+            <div class="space-y-2">
+              <template x-for="(h,i) in tweakHistory" :key="i">
+                <div class="flex items-center gap-3 text-xs">
+                  <span class="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold flex-shrink-0" x-text="'v' + h.round"></span>
+                  <span class="flex-1 text-slate-600 truncate" x-text="h.instruction"></span>
+                  <span class="text-green-600 font-medium flex-shrink-0" x-text="h.delta"></span>
+                  <span class="text-slate-400 flex-shrink-0" x-text="h.time"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-start">
+          <button @click="wizStep=0;generating=false;injectSent=false;injectInput=''" class="border border-slate-200 text-slate-600 px-5 py-2.5 rounded-xl text-sm font-medium hover:border-slate-400 transition-all">
+            ← 重新配置
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Execution Panel -->
+    <div class="w-80 flex-shrink-0">
+      <div class="bg-white rounded-xl shadow-sm p-4 sticky top-20">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="font-semibold text-slate-700 text-sm flex items-center gap-2">
+            <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            执行轨迹
+          </h4>
+          <span :class="scheme==='A' ? 'bg-amber-100 text-amber-700' : 'bg-cyan-100 text-cyan-700'"
+                class="text-xs px-2 py-0.5 rounded-full font-medium" x-text="'方案' + scheme"></span>
+        </div>
+
+        <!-- Scheme A: Linear logs -->
+        <div x-show="scheme==='A'">
+          <div class="space-y-2">
+            <template x-for="(step,i) in logStepsA" :key="i">
+              <div :class="step.state==='done'?'opacity-100':step.state==='running'?'opacity-100':'opacity-30'"
+                   class="flex items-start gap-2 transition-all duration-500">
+                <div :class="step.state==='done'?'bg-green-500':step.state==='running'?'bg-accent animate-pulse':'bg-slate-200'"
+                     class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 transition-all"></div>
+                <div class="flex-1">
+                  <p class="text-xs font-medium text-slate-700" x-text="step.name"></p>
+                  <p class="text-xs text-slate-400" x-text="step.detail"></p>
+                  <template x-if="step.state==='done' && step.logs">
+                    <div class="mt-1 bg-slate-50 rounded p-2 space-y-0.5">
+                      <template x-for="log in step.logs" :key="log">
+                        <p class="log-line info" x-text="log"></p>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Scheme B: Workflow graph -->
+        <div x-show="scheme==='B'">
+          <div class="space-y-2">
+            <template x-for="(node,i) in wfNodesB" :key="i">
+              <div :class="node.state==='done'?'opacity-100':node.state==='running'?'opacity-100':'opacity-30'"
+                   class="flex items-center gap-3 transition-all duration-500">
+                <div :class="{
+                       'bg-green-100 border-green-400 text-green-700': node.state==='done',
+                       'bg-cyan-100 border-cyan-400 text-cyan-700 animate-pulse': node.state==='running',
+                       'bg-slate-100 border-slate-200 text-slate-400': node.state==='wait'
+                     }"
+                     class="flex-shrink-0 border rounded-lg px-2 py-1 text-xs font-medium w-20 text-center transition-all">
+                  <span x-text="node.name"></span>
+                </div>
+                <div class="flex-1">
+                  <p class="text-xs text-slate-500" x-text="node.desc"></p>
+                  <template x-if="node.state==='done'">
+                    <p class="text-xs text-green-600 font-medium" x-text="node.result"></p>
+                  </template>
+                  <template x-if="node.state==='running'">
+                    <div class="w-full bg-slate-100 rounded h-1 mt-1">
+                      <div class="bg-accent h-1 rounded" :style="'width:' + node.progress + '%'" style="transition:width 0.5s"></div>
+                    </div>
+                  </template>
+                </div>
+                <template x-if="node.state==='done'">
+                  <svg class="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div x-show="!generating && wizStep===2" class="mt-4 pt-3 border-t border-slate-100">
+          <p class="text-xs text-slate-500 flex items-center gap-1">
+            <svg class="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"/></svg>
+            Token 消耗：<strong>4,238</strong> · 约 ¥0.08
+          </p>
+        </div>
+
+        <!-- Config summary (before generation) -->
+        <div x-show="wizStep < 2" class="mt-4 bg-slate-50 rounded-lg p-3 space-y-2">
+          <p class="text-xs font-semibold text-slate-600 mb-1">当前配置预览</p>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">物料来源</span>
+            <span class="text-slate-600 font-medium" x-text="uploadedFile ? uploadedFile : (selectedReq ? '最近需求' : (requirementText ? '文本输入' : '未选择'))"></span>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">已选能力</span>
+            <span class="text-slate-600 font-medium" x-text="capabilities.filter(c=>c.selected).length + ' / ' + capabilities.length"></span>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">覆盖维度</span>
+            <span class="text-slate-600 font-medium" x-text="dimensions.filter(d=>d.active).length + ' 个'"></span>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">few-shot</span>
+            <span class="text-slate-600 font-medium" x-text="fewShotExamples.filter(f=>f.selected).length + ' 份'"></span>
+          </div>
+          <div class="pt-1 border-t border-slate-200 mt-1">
+            <p class="text-xs text-slate-400 leading-relaxed" x-show="scheme==='A'">方案A：一次大模型调用，适合快速验证，建议先跑查看质量</p>
+            <p class="text-xs text-slate-400 leading-relaxed" x-show="scheme==='B'">方案B：5节点工作流，自动RAG检索，覆盖更全面，节点可独立调试</p>
+          </div>
+        </div>
+
+        <!-- Tips panel (after generation) -->
+        <div x-show="wizStep === 2 && !generating" class="mt-4 bg-green-50 border border-green-100 rounded-lg p-3">
+          <p class="text-xs font-semibold text-green-700 mb-1">✓ 执行完成</p>
+          <ul class="text-xs text-green-600 space-y-0.5">
+            <li>· 所有节点通过质量校验</li>
+            <li>· 文件已就绪可直接下载</li>
+            <li x-show="scheme==='B'">· 本次运行日志已保存至 Dify 后台</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ PAGE 2: 用例预览编辑 ══════ -->
+<div x-show="page===1" x-cloak class="max-w-screen-xl mx-auto px-6 py-6 page-enter">
+  <!-- Toolbar -->
+  <div class="bg-white rounded-xl shadow-sm px-4 py-3 flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2">
+      <button @click="showDiff=!showDiff"
+        :class="showDiff ? 'bg-amber-100 text-amber-700 border-amber-300' : 'border-slate-200 text-slate-600 hover:border-slate-400'"
+        class="flex items-center gap-1.5 border px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        版本对比 (v1 vs v2)
+      </button>
+      <button class="flex items-center gap-1.5 border border-slate-200 text-slate-600 hover:border-slate-400 px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        导出 XMind
+      </button>
+      <button class="flex items-center gap-1.5 border border-slate-200 text-slate-600 hover:border-slate-400 px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        导出 Excel
+      </button>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-slate-400">共 48 个用例</span>
+      <button @click="aiOptimize()" class="flex items-center gap-1.5 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        AI 优化选中节点
+      </button>
+    </div>
+  </div>
+
+  <div class="flex gap-4">
+    <!-- Left: Tree -->
+    <div class="w-72 flex-shrink-0 bg-white rounded-xl shadow-sm p-4 overflow-y-auto" style="max-height:calc(100vh - 180px)">
+      <div class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">用例树结构</div>
+      <!-- Priority mini stats -->
+      <div class="flex gap-2 mb-3 text-xs">
+        <span class="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full">
+          <span class="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>P0 · 3
+        </span>
+        <span class="flex items-center gap-1 bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">
+          <span class="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block"></span>P1 · 21
+        </span>
+        <span class="flex items-center gap-1 bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block"></span>P2 · 24
+        </span>
+      </div>
+      <div class="tree-root">
+        <template x-for="(module,mi) in usecaseTree" :key="mi">
+          <div class="mb-1">
+            <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer group">
+              <svg @click="module.open=!module.open" :class="module.open?'rotate-90':''" class="w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              <span @click="module.open=!module.open" class="text-sm font-medium text-slate-700 flex-1" x-text="module.name"></span>
+              <!-- Module regen button -->
+              <template x-if="moduleRegen === module.name">
+                <svg class="w-3.5 h-3.5 text-accent animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              </template>
+              <template x-if="moduleRegen !== module.name">
+                <button @click.stop="regenModule(module.name)"
+                  title="重新生成此模块"
+                  class="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-accent p-0.5 rounded">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
+              </template>
+              <span class="text-xs bg-slate-100 text-slate-500 px-1.5 rounded" x-text="module.cases.length"></span>
+            </div>
+            <div x-show="module.open" class="tree-node ml-2">
+              <template x-for="(c,ci) in module.cases" :key="ci">
+                <div @click="selectCase(module,c)"
+                     :class="selectedCase && selectedCase.id===c.id ? 'bg-primary/10 border-primary/30 text-primary' : 'hover:bg-slate-50 border-transparent text-slate-600'"
+                     class="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer border transition-all text-sm tree-node">
+                  <span :class="{'bg-red-500':c.priority==='P0','bg-orange-400':c.priority==='P1','bg-slate-300':c.priority==='P2'}"
+                        class="w-1.5 h-1.5 rounded-full flex-shrink-0"></span>
+                  <span class="truncate" x-text="c.title"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Center: Preview / Diff -->
+    <div class="flex-1 min-w-0" @click.away="ctxMenu=null">
+      <!-- Diff view -->
+      <div x-show="showDiff" class="bg-white rounded-xl shadow-sm p-5 mb-4">
+        <h4 class="font-semibold text-slate-700 mb-3 flex items-center gap-2 text-sm">
+          <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-xs">v1</span>
+          →
+          <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">v2</span>
+          版本对比
+        </h4>
+        <div class="space-y-2 text-sm text-slate-600">
+          <p>步骤 3：<span class="diff-del">输入正确用户名和密码</span> <span class="diff-add">输入正确用户名、密码，并完成短信验证码验证</span></p>
+          <p>预期结果：<span class="diff-del">登录成功跳转首页</span> <span class="diff-add">登录成功，跳转首页，且 Token 有效期为 7 天</span></p>
+        </div>
+      </div>
+
+      <!-- Case detail / AI Tune tabs -->
+      <div class="bg-white rounded-xl shadow-sm">
+        <!-- Tab header -->
+        <div class="flex items-center border-b border-slate-100 px-4 pt-3 gap-1">
+          <button @click="caseTab='detail'"
+            :class="caseTab==='detail' ? 'border-b-2 border-primary text-primary' : 'text-slate-400 hover:text-slate-600'"
+            class="px-3 pb-2.5 text-sm font-medium transition-all flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            用例详情
+          </button>
+          <button @click="caseTab='tune'"
+            :class="caseTab==='tune' ? 'border-b-2 border-accent text-accent' : 'text-slate-400 hover:text-slate-600'"
+            class="px-3 pb-2.5 text-sm font-medium transition-all flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+            AI 微调
+            <span x-show="tweakHistory.length>0" class="w-4 h-4 bg-accent text-white text-xs rounded-full flex items-center justify-center" x-text="tweakHistory.length + iterationCount - 1"></span>
+          </button>
+        </div>
+
+        <!-- Tab: 用例详情 -->
+        <div x-show="caseTab==='detail'" class="p-5">
+          <template x-if="selectedCase">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-slate-800" x-text="selectedCase.title"></h3>
+                <div class="flex items-center gap-2">
+                  <button @click="caseTab='tune'" class="text-xs text-accent hover:underline flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    AI微调此用例
+                  </button>
+                  <span :class="{'bg-red-100 text-red-600 border-red-200':selectedCase.priority==='P0','bg-orange-100 text-orange-600 border-orange-200':selectedCase.priority==='P1','bg-slate-100 text-slate-500 border-slate-200':selectedCase.priority==='P2'}"
+                        class="text-xs border px-2 py-0.5 rounded-full font-medium" x-text="selectedCase.priority"></span>
+                </div>
+              </div>
+              <div class="space-y-4">
+                <div>
+                  <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">前置条件</label>
+                  <textarea x-model="selectedCase.precondition" rows="2" class="w-full border border-slate-200 rounded-lg p-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent resize-none"></textarea>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">测试步骤</label>
+                  <textarea x-model="selectedCase.steps" rows="5" class="w-full border border-slate-200 rounded-lg p-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent resize-none"></textarea>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">预期结果</label>
+                  <textarea x-model="selectedCase.expected" rows="3" class="w-full border border-slate-200 rounded-lg p-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent resize-none"></textarea>
+                </div>
+                <div class="flex gap-3">
+                  <div class="flex-1">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">优先级</label>
+                    <select x-model="selectedCase.priority" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40">
+                      <option>P0</option><option>P1</option><option>P2</option>
+                    </select>
+                  </div>
+                  <div class="flex-1">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">标签</label>
+                    <input x-model="selectedCase.tags" type="text" placeholder="功能, 冒烟" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"/>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template x-if="!selectedCase">
+            <div class="text-center text-slate-400 py-16">
+              <svg class="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
+              <p class="text-sm">← 点击左侧用例查看详情</p>
+            </div>
+          </template>
+        </div>
+
+        <!-- Tab: AI 微调 -->
+        <div x-show="caseTab==='tune'" class="p-5 space-y-4">
+          <!-- Scope selector -->
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">微调范围</p>
+            <div class="flex gap-2">
+              <template x-for="(sc,label) in {'case':'当前用例','module':'当前模块','all':'全部用例'}" :key="sc">
+                <button @click="tweakScope=sc"
+                  :class="tweakScope===sc ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'"
+                  class="flex-1 py-1.5 rounded-lg text-xs border font-medium transition-all" x-text="label"></button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Quick actions -->
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">快捷操作</p>
+            <div class="grid grid-cols-2 gap-2">
+              <template x-for="action in quickActions" :key="action.label">
+                <button @click="tweakInput=action.label"
+                  :class="tweakInput===action.label ? 'border-accent bg-accent/5 text-accent' : 'border-slate-200 text-slate-600 hover:border-accent/50'"
+                  class="flex items-center gap-2 border rounded-lg px-3 py-2 text-xs transition-all text-left">
+                  <span x-text="action.icon" class="text-base leading-none"></span>
+                  <span x-text="action.label"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Custom instruction -->
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">自定义指令</p>
+            <textarea x-model="tweakInput" rows="3"
+              placeholder="用自然语言描述要怎么改，例：步骤太简略，补充每步的验证点和截图说明"
+              class="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-accent/40 resize-none"></textarea>
+          </div>
+
+          <button @click="startTweak()" :disabled="tweakRunning || !tweakInput.trim()"
+            class="w-full flex items-center justify-center gap-2 bg-accent disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-cyan-500 transition-all">
+            <template x-if="tweakRunning">
+              <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+            </template>
+            <template x-if="!tweakRunning">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </template>
+            <span x-text="tweakRunning ? '微调执行中...' : '执行微调'"></span>
+          </button>
+
+          <!-- Tweak done -->
+          <div x-show="tweakDone" x-transition class="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            微调完成：<strong x-text="tweakHistory[0] && tweakHistory[0].delta"></strong>，切换「用例详情」查看变更
+          </div>
+
+          <!-- Iteration timeline -->
+          <div x-show="tweakHistory.length > 0" class="pt-3 border-t border-slate-100">
+            <p class="text-xs font-semibold text-slate-500 mb-3">迭代轨迹</p>
+            <div class="relative pl-4">
+              <!-- Timeline line -->
+              <div class="absolute left-1.5 top-0 bottom-0 w-px bg-slate-200"></div>
+              <!-- v1 base -->
+              <div class="relative mb-3">
+                <div class="absolute -left-2.5 top-1 w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
+                <div class="bg-slate-50 rounded-lg px-3 py-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-primary">v1 · 初始生成</span>
+                    <span class="text-xs text-slate-400">48 个用例 · 质量92</span>
+                  </div>
+                </div>
+              </div>
+              <template x-for="(h,i) in [...tweakHistory].reverse()" :key="i">
+                <div class="relative mb-3">
+                  <div class="absolute -left-2.5 top-1 w-2 h-2 rounded-full bg-accent"></div>
+                  <div class="bg-cyan-50/50 border border-cyan-100 rounded-lg px-3 py-2">
+                    <div class="flex items-center justify-between mb-0.5">
+                      <span class="text-xs font-bold text-accent" x-text="'v' + h.round + ' · 微调'"></span>
+                      <span class="text-xs text-slate-400" x-text="h.time"></span>
+                    </div>
+                    <p class="text-xs text-slate-600" x-text="h.instruction"></p>
+                    <p class="text-xs text-green-600 font-medium mt-0.5" x-text="'结果：' + h.delta"></p>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom save bar -->
+  <div class="mt-4 bg-white rounded-xl shadow-sm px-5 py-3 flex items-center justify-between">
+    <p class="text-xs text-slate-500 flex items-center gap-1.5">
+      <svg class="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+      你的编辑修改会作为 few-shot 样例反哺到知识库，持续改善生成质量
+    </p>
+    <div class="flex gap-2">
+      <button class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:border-slate-400 transition-all">放弃修改</button>
+      <button @click="showSaveTip=true;setTimeout(()=>showSaveTip=false,2000)"
+        class="bg-primary text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-primary-light transition-all flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        保存修改
+      </button>
+    </div>
+  </div>
+
+  <!-- Save toast -->
+  <div x-show="showSaveTip" x-transition class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-green-600 text-white px-5 py-2.5 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 z-50">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+    保存成功，已同步至 few-shot 知识库
+  </div>
+</div>
+
+<!-- ══════ PAGE 3: 数据看板 ══════ -->
+<div x-show="page===2" x-cloak class="max-w-screen-xl mx-auto px-6 py-6 page-enter">
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-4 gap-4 mb-6">
+    <template x-for="(kpi,i) in kpiCards" :key="i">
+      <div class="bg-white rounded-xl shadow-sm p-5 count-anim" :style="'animation-delay:' + (i*0.1) + 's'">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs text-slate-500 font-medium" x-text="kpi.label"></p>
+            <p class="text-3xl font-bold mt-1" :class="kpi.color" x-text="kpi.value"></p>
+            <p class="text-xs mt-1 flex items-center gap-1"
+               :class="kpi.reverse ? (kpi.trend<0 ? 'text-green-600' : 'text-red-500') : (kpi.trend>0 ? 'text-green-600' : 'text-red-500')">
+              <span x-text="kpi.trend>0 ? '↑' : '↓'"></span>
+              <span x-text="Math.abs(kpi.trend) + '% 较上月'"></span>
+            </p>
+          </div>
+          <div :class="kpi.bg" class="w-10 h-10 rounded-xl flex items-center justify-center" x-html="kpi.icon"></div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Charts row 1 -->
+  <div class="grid grid-cols-3 gap-4 mb-4">
+    <div class="col-span-2 bg-white rounded-xl shadow-sm p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h4 class="font-semibold text-slate-700 text-sm">每日生成量 & 质量分趋势</h4>
+        <div class="flex gap-3 text-xs text-slate-400">
+          <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-primary inline-block"></span>生成量</span>
+          <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-accent inline-block"></span>质量分</span>
+        </div>
+      </div>
+      <div class="chart-box" style="height:180px;position:relative"><canvas id="lineChart" style="display:block"></canvas></div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5">
+      <h4 class="font-semibold text-slate-700 text-sm mb-4">需求类型分布</h4>
+      <div class="chart-box" style="height:180px;position:relative"><canvas id="pieChart" style="display:block"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Charts row 2 -->
+  <div class="grid grid-cols-3 gap-4 mb-4">
+    <div class="bg-white rounded-xl shadow-sm p-5">
+      <h4 class="font-semibold text-slate-700 text-sm mb-4">覆盖维度分布</h4>
+      <div class="chart-box" style="height:180px;position:relative"><canvas id="dimChart" style="display:block"></canvas></div>
+    </div>
+    <div class="col-span-2 bg-white rounded-xl shadow-sm p-5">
+      <h4 class="font-semibold text-slate-700 text-sm mb-4">人员使用 Top 10</h4>
+      <div class="chart-box" style="height:180px;position:relative"><canvas id="barChart" style="display:block"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Scheme A vs B comparison -->
+  <div class="grid grid-cols-2 gap-4 mb-4">
+    <div class="bg-white rounded-xl shadow-sm p-5 border-l-4 border-amber-400">
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="font-semibold text-slate-700 text-sm">方案 A · 单 Prompt</h4>
+        <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">本月 187 次</span>
+      </div>
+      <div class="grid grid-cols-3 gap-3 text-center">
+        <div><p class="text-xl font-bold text-amber-600">85.2</p><p class="text-xs text-slate-400 mt-0.5">平均质量分</p></div>
+        <div><p class="text-xl font-bold text-amber-600">3.1s</p><p class="text-xs text-slate-400 mt-0.5">平均耗时</p></div>
+        <div><p class="text-xl font-bold text-amber-600">3.2K</p><p class="text-xs text-slate-400 mt-0.5">均Token</p></div>
+      </div>
+      <div class="mt-3 pt-3 border-t border-slate-100">
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <span>用例编辑率</span><span class="font-medium text-amber-600">38%</span>
+        </div>
+        <div class="mt-1 bg-slate-100 rounded h-1.5"><div class="bg-amber-400 h-1.5 rounded" style="width:38%"></div></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border-l-4 border-cyan-400">
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="font-semibold text-slate-700 text-sm">方案 B · 工作流</h4>
+        <span class="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-medium">本月 312 次</span>
+      </div>
+      <div class="grid grid-cols-3 gap-3 text-center">
+        <div><p class="text-xl font-bold text-cyan-600">91.7</p><p class="text-xs text-slate-400 mt-0.5">平均质量分</p></div>
+        <div><p class="text-xl font-bold text-cyan-600">5.3s</p><p class="text-xs text-slate-400 mt-0.5">平均耗时</p></div>
+        <div><p class="text-xl font-bold text-cyan-600">4.8K</p><p class="text-xs text-slate-400 mt-0.5">均Token</p></div>
+      </div>
+      <div class="mt-3 pt-3 border-t border-slate-100">
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <span>用例编辑率</span><span class="font-medium text-cyan-600">22%</span>
+        </div>
+        <div class="mt-1 bg-slate-100 rounded h-1.5"><div class="bg-cyan-400 h-1.5 rounded" style="width:22%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Records table -->
+  <div class="bg-white rounded-xl shadow-sm p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h4 class="font-semibold text-slate-700 text-sm">最近生成记录</h4>
+      <input type="text" placeholder="搜索..." class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent/40 w-40"/>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs text-left">
+        <thead>
+          <tr class="border-b border-slate-100">
+            <th class="pb-2 pr-3 text-slate-400 font-medium">时间</th>
+            <th class="pb-2 pr-3 text-slate-400 font-medium">用户</th>
+            <th class="pb-2 pr-3 text-slate-400 font-medium">需求名</th>
+            <th class="pb-2 pr-3 text-slate-400 font-medium">用例数</th>
+            <th class="pb-2 pr-3 text-slate-400 font-medium">质量分</th>
+            <th class="pb-2 pr-3 text-slate-400 font-medium">Token</th>
+            <th class="pb-2 pr-3 text-slate-400 font-medium">方案</th>
+            <th class="pb-2 text-slate-400 font-medium">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(row,i) in records" :key="i">
+            <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+              <td class="py-2.5 pr-3 text-slate-400" x-text="row.time"></td>
+              <td class="py-2.5 pr-3">
+                <div class="flex items-center gap-1.5">
+                  <div class="w-5 h-5 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-xs font-bold" x-text="row.user[0]"></div>
+                  <span class="text-slate-700" x-text="row.user"></span>
+                </div>
+              </td>
+              <td class="py-2.5 pr-3 text-slate-700 max-w-32 truncate" x-text="row.req"></td>
+              <td class="py-2.5 pr-3 text-slate-700 font-medium" x-text="row.count"></td>
+              <td class="py-2.5 pr-3">
+                <span :class="row.score>=90?'text-green-600 bg-green-50':row.score>=75?'text-amber-600 bg-amber-50':'text-red-600 bg-red-50'"
+                      class="px-1.5 py-0.5 rounded font-medium" x-text="row.score"></span>
+              </td>
+              <td class="py-2.5 pr-3 text-slate-500" x-text="row.tokens.toLocaleString()"></td>
+              <td class="py-2.5 pr-3">
+                <span :class="row.scheme==='A'?'bg-amber-100 text-amber-700':'bg-cyan-100 text-cyan-700'"
+                      class="px-1.5 py-0.5 rounded text-xs" x-text="'方案' + row.scheme"></span>
+              </td>
+              <td class="py-2.5">
+                <button @click="page=1" class="text-primary hover:underline text-xs">查看</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ PAGE 4: 知识库管理 ══════ -->
+<div x-show="page===3" x-cloak class="max-w-screen-xl mx-auto px-6 py-6 page-enter">
+  <!-- Tab bar -->
+  <div class="bg-white rounded-xl shadow-sm p-1 flex gap-1 mb-4 w-fit">
+    <template x-for="(t,i) in kbTabs" :key="i">
+      <button @click="kbTab=i"
+        :class="kbTab===i ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+        class="px-4 py-2 rounded-lg text-sm font-medium transition-all" x-text="t"></button>
+    </template>
+  </div>
+
+  <div class="flex gap-4">
+    <!-- Filters -->
+    <div class="w-48 flex-shrink-0 space-y-3">
+      <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">搜索</p>
+        <input type="text" placeholder="关键词..." class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent/40"/>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">标签筛选</p>
+        <div class="space-y-1">
+          <template x-for="(tag,i) in kbTags" :key="i">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" class="accent-accent w-3 h-3"/>
+              <span class="text-xs text-slate-600" x-text="tag"></span>
+            </label>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- KB List -->
+    <div class="flex-1 min-w-0">
+      <!-- Business KB / History Cases / Standards tabs content -->
+      <div x-show="kbTab < 3">
+        <div class="space-y-2">
+          <template x-for="(item,i) in kbItems[kbTab]" :key="i">
+            <div class="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4 hover:shadow-md transition-shadow">
+              <div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-700" x-text="item.name"></p>
+                <div class="flex items-center gap-3 mt-0.5">
+                  <span class="text-xs text-slate-400" x-text="item.date"></span>
+                  <div class="flex gap-1">
+                    <template x-for="tag in item.tags" :key="tag">
+                      <span class="text-xs bg-slate-100 text-slate-500 px-1.5 rounded" x-text="tag"></span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+              <div class="text-center flex-shrink-0">
+                <p class="text-lg font-bold text-accent" x-text="item.refs"></p>
+                <p class="text-xs text-slate-400">引用次数</p>
+              </div>
+              <div class="flex gap-2">
+                <button class="text-xs border border-slate-200 px-2.5 py-1 rounded-lg hover:border-slate-400 text-slate-600 transition-all">预览</button>
+                <button class="text-xs border border-red-200 text-red-500 px-2.5 py-1 rounded-lg hover:bg-red-50 transition-all">删除</button>
+              </div>
+            </div>
+          </template>
+        </div>
+        <button class="mt-4 w-full border-2 border-dashed border-slate-200 rounded-xl py-3 text-sm text-slate-400 hover:border-accent hover:text-accent transition-all flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          添加新条目
+        </button>
+      </div>
+
+      <!-- Prompt Templates tab -->
+      <div x-show="kbTab===3">
+        <div class="space-y-3">
+          <template x-for="(pt,i) in promptTemplates" :key="i">
+            <div class="bg-white rounded-xl shadow-sm p-4">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-semibold text-slate-700" x-text="pt.name"></span>
+                  <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded" x-text="pt.version"></span>
+                  <span x-show="pt.active" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">线上</span>
+                  <span x-show="!pt.active" class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">草稿</span>
+                </div>
+                <div class="flex gap-2">
+                  <button x-show="!pt.active" class="text-xs bg-primary text-white px-3 py-1 rounded-lg hover:bg-primary-light transition-all">上线</button>
+                  <button x-show="pt.active" class="text-xs border border-amber-300 text-amber-600 px-3 py-1 rounded-lg hover:bg-amber-50 transition-all">回滚至上版本</button>
+                  <button class="text-xs border border-slate-200 text-slate-600 px-3 py-1 rounded-lg hover:border-slate-400 transition-all">编辑</button>
+                  <button class="text-xs border border-slate-200 text-slate-600 px-3 py-1 rounded-lg hover:border-slate-400 transition-all">复制</button>
+                </div>
+              </div>
+              <div class="bg-slate-50 rounded-lg p-3 font-mono text-xs text-slate-600 leading-relaxed max-h-24 overflow-hidden relative">
+                <span x-text="pt.content"></span>
+                <div class="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-50 to-transparent"></div>
+              </div>
+              <div class="flex items-center justify-between mt-2">
+                <div class="flex gap-3 text-xs text-slate-400">
+                  <span x-text="'被使用 ' + pt.usage + ' 次'"></span>
+                  <span x-text="'平均质量分 ' + pt.avgScore"></span>
+                  <span x-text="'更新于 ' + pt.date"></span>
+                </div>
+                <span :class="pt.active ? 'text-green-600' : 'text-slate-400'" class="text-xs" x-text="pt.active ? '✓ 当前线上版本' : '历史版本'"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ FOOTER ══════ -->
+<footer class="max-w-screen-xl mx-auto px-6 py-6 mt-4">
+  <div class="bg-gradient-to-r from-primary/5 to-accent/5 border border-slate-200 rounded-2xl px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 text-sm text-slate-600">
+        <svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span class="font-medium">反馈闭环：</span>你的每次编辑都在改善平台 · 本周已累计收录 <span class="text-accent font-bold">23</span> 条高质量 diff
+      </div>
+      <div class="h-4 w-px bg-slate-200"></div>
+      <div class="text-xs text-slate-400 flex items-center gap-3">
+        <span>当前 Prompt 版本 <span class="font-medium text-slate-600">v2.3</span></span>
+        <span>·</span>
+        <span>知识库 <span class="font-medium text-slate-600">387</span> 条</span>
+        <span>·</span>
+        <span x-text="'当前方案：' + (scheme==='A' ? '单Prompt' : 'Dify工作流')" class="font-medium text-slate-600"></span>
+      </div>
+    </div>
+    <button @click="page=0;wizStep=0" class="bg-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary-light transition-all flex items-center gap-2 flex-shrink-0">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      新建生成
+    </button>
+  </div>
+</footer>
+
+<!-- ══════ SCRIPTS ══════ -->
+<script>
+// ── Mock Data ──────────────────────────────────────────────
+const MOCK = {
+  recentReqs: [
+    { id:1, name:'用户登录与权限管理 v2.3', date:'2026-05-24', count:48 },
+    { id:2, name:'商品详情页改版需求', date:'2026-05-22', count:32 },
+    { id:3, name:'订单取消与退款流程', date:'2026-05-20', count:27 },
+    { id:4, name:'消息推送中心重构', date:'2026-05-18', count:19 },
+  ],
+  fewShotExamples: [
+    { name:'登录鉴权用例集', count:24, selected:false },
+    { name:'表单验证通用用例', count:18, selected:true },
+    { name:'异常处理边界用例', count:31, selected:false },
+  ],
+  capabilities: [
+    { name:'业务域知识库', desc:'自动检索业务规则和历史文档', selected:true },
+    { name:'用例规范库', desc:'遵循团队用例编写规范', selected:true },
+    { name:'优先级模型', desc:'基于需求风险评估自动定级', selected:false },
+    { name:'相似用例推荐', desc:'复用历史高分用例作参考', selected:true },
+  ],
+  dimensions: [
+    {name:'功能测试',active:true},{name:'异常测试',active:true},
+    {name:'边界测试',active:true},{name:'兼容测试',active:false},
+    {name:'性能测试',active:false},{name:'安全测试',active:false},
+  ],
+  usecaseTree: [
+    { name:'1. 登录模块', open:true, cases:[
+      { id:'c1', title:'正常登录（手机号+密码）', priority:'P0', precondition:'用户已注册，账号状态正常', steps:'1. 打开登录页\n2. 输入正确手机号\n3. 输入正确密码\n4. 点击登录', expected:'登录成功，跳转首页，Toast提示"登录成功"', tags:'功能,冒烟' },
+      { id:'c2', title:'密码错误超过5次锁定', priority:'P0', precondition:'用户已注册', steps:'1. 连续输入5次错误密码\n2. 第6次尝试登录', expected:'第5次失败后账号锁定30分钟，显示锁定提示', tags:'安全,边界' },
+      { id:'c3', title:'手机号未注册提示', priority:'P1', precondition:'无', steps:'1. 输入未注册手机号\n2. 输入任意密码\n3. 点击登录', expected:'提示"手机号未注册，请先注册"', tags:'功能' },
+    ]},
+    { name:'2. 注册模块', open:false, cases:[
+      { id:'c4', title:'正常注册流程', priority:'P0', precondition:'手机号未注册', steps:'1. 点击注册\n2. 输入手机号\n3. 获取验证码\n4. 填写密码', expected:'注册成功，自动登录跳转首页', tags:'功能,冒烟' },
+      { id:'c5', title:'已注册手机号不可重复注册', priority:'P1', precondition:'手机号已注册', steps:'1. 输入已注册手机号\n2. 点击获取验证码', expected:'提示"该手机号已注册"', tags:'功能,边界' },
+    ]},
+    { name:'3. 权限控制', open:false, cases:[
+      { id:'c6', title:'无权限页面访问拦截', priority:'P0', precondition:'用户无管理员权限', steps:'1. 直接访问/admin路由', expected:'跳转403页面', tags:'安全' },
+    ]},
+    { name:'4. Token过期处理', open:false, cases:[
+      { id:'c7', title:'Token过期自动刷新', priority:'P1', precondition:'用户已登录，Token即将过期', steps:'1. 发起任意API请求\n2. 服务端返回401', expected:'自动刷新Token，请求重试成功，用户无感知', tags:'功能' },
+    ]},
+  ],
+  kpiCards: [
+    { label:'累计生成用例数', value:'12,847', trend:23, color:'text-primary', bg:'bg-primary/10', icon:'<svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>' },
+    { label:'本月活跃用户', value:'34', trend:12, color:'text-accent', bg:'bg-accent/10', icon:'<svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' },
+    { label:'平均质量分', value:'88.6', trend:5, color:'text-green-600', bg:'bg-green-50', icon:'<svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>' },
+    { label:'平均生成耗时', value:'4.2s', trend:-8, color:'text-amber-600', bg:'bg-amber-50', reverse:true, icon:'<svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' },
+  ],
+  records: [
+    { time:'05-25 14:32', user:'张小明', req:'用户登录与权限管理', count:48, score:92, tokens:4238, scheme:'B' },
+    { time:'05-25 11:18', user:'李雅婷', req:'商品详情页改版', count:32, score:85, tokens:3102, scheme:'A' },
+    { time:'05-25 09:45', user:'王建国', req:'订单取消退款流程', count:27, score:78, tokens:2890, scheme:'B' },
+    { time:'05-24 17:22', user:'刘晓红', req:'消息推送中心重构', count:19, score:91, tokens:1856, scheme:'B' },
+    { time:'05-24 15:30', user:'陈志远', req:'搜索功能优化', count:41, score:87, tokens:3780, scheme:'A' },
+    { time:'05-24 10:15', user:'赵慧敏', req:'购物车合并逻辑', count:23, score:94, tokens:2100, scheme:'B' },
+    { time:'05-23 16:48', user:'孙明阳', req:'用户画像标签系统', count:56, score:83, tokens:5120, scheme:'B' },
+    { time:'05-23 14:00', user:'张小明', req:'评论审核管理后台', count:31, score:88, tokens:2980, scheme:'A' },
+  ],
+  kbItems: [
+    // 业务知识
+    [
+      { name:'用户身份认证业务规则 v2.1', date:'2026-05-20', tags:['认证','安全'], refs:47 },
+      { name:'订单状态流转规则手册', date:'2026-05-15', tags:['订单','流程'], refs:38 },
+      { name:'商品上下架逻辑说明', date:'2026-05-10', tags:['商品','运营'], refs:22 },
+      { name:'支付通道路由策略文档', date:'2026-04-28', tags:['支付'], refs:15 },
+    ],
+    // 历史用例
+    [
+      { name:'登录鉴权测试用例集 v3', date:'2026-05-22', tags:['登录','冒烟'], refs:63 },
+      { name:'商品购买全链路用例', date:'2026-05-18', tags:['电商','E2E'], refs:41 },
+      { name:'表单验证通用用例库', date:'2026-05-12', tags:['通用','表单'], refs:55 },
+    ],
+    // 用例规范
+    [
+      { name:'测试用例编写规范 v4.0', date:'2026-04-01', tags:['规范'], refs:89 },
+      { name:'P0用例评审标准', date:'2026-03-15', tags:['评审','P0'], refs:34 },
+      { name:'异常测试设计指南', date:'2026-03-01', tags:['异常'], refs:27 },
+    ],
+  ],
+  promptTemplates: [
+    {
+      name:'标准用例生成 Prompt', version:'v2.3', active:true, usage:412, avgScore:89, date:'2026-05-20',
+      content:`你是一个专业的软件测试工程师。请根据以下需求文档，生成规范的测试用例。
+要求：
+1. 覆盖正常、异常、边界三类场景
+2. 每个用例包含：标题、前置条件、测试步骤、预期结果、优先级
+3. 优先级按 P0/P1/P2 分级，P0 为核心主流程...`
+    },
+    {
+      name:'简洁概要用例 Prompt', version:'v1.1', active:false, usage:87, avgScore:82, date:'2026-05-01',
+      content:`你是测试工程师，请生成简洁的测试用例概要。
+格式：[功能点] - [场景] - [预期]
+只需覆盖主流程和关键异常场景，不要过于详细...`
+    },
+    {
+      name:'API接口测试用例 Prompt', version:'v1.0', active:false, usage:156, avgScore:91, date:'2026-04-15',
+      content:`请根据接口文档生成 API 测试用例，包括：
+- 正常请求（各参数组合）
+- 参数缺失/错误
+- 权限验证
+- 边界值（最大/最小/空值）...`
+    },
+  ],
+  quickActions: [
+    { icon:'🔍', label:'补充边界场景' },
+    { icon:'⚠️', label:'增加异常覆盖' },
+    { icon:'✂️', label:'精简步骤描述' },
+    { icon:'🔼', label:'提升P0覆盖率' },
+    { icon:'🔒', label:'增加安全场景' },
+    { icon:'📱', label:'补充兼容测试' },
+  ],
+  kbTabs: ['业务知识','历史用例','用例规范','Prompt 模板'],
+  kbTags: ['认证','支付','订单','商品','通用','冒烟','安全','性能'],
+};
+
+// ── Steps & Logs ────────────────────────────────────────────
+const LOG_STEPS_A = [
+  { name:'① 文档解析', detail:'提取结构化需求文本', state:'wait', logs:['[解析] 识别到 3 个功能模块','[解析] 提取需求点 12 条','[解析] Token 计数 2,184'] },
+  { name:'② LLM 生成', detail:'发送 Prompt 调用大模型', state:'wait', logs:['[LLM] 模型: GPT-4o','[LLM] 输入 tokens: 3,210','[LLM] 输出 tokens: 1,028','[LLM] 耗时: 2.8s'] },
+  { name:'③ 结构化输出', detail:'解析 JSON，校验格式', state:'wait', logs:['[校验] 通过率 100%','[输出] 用例数: 48','[输出] 质量评分: 92'] },
+];
+const WF_NODES_B = [
+  { name:'文档解析', desc:'OCR + 结构提取', state:'wait', progress:0, result:'✓ 12 条需求点' },
+  { name:'知识检索', desc:'RAG 召回相关规范', state:'wait', progress:0, result:'✓ 召回 8 条规范' },
+  { name:'LLM 生成', desc:'工作流大模型节点', state:'wait', progress:0, result:'✓ 48 个用例草稿' },
+  { name:'质量校验', desc:'格式 + 覆盖度检查', state:'wait', progress:0, result:'✓ 评分 92 / 100' },
+  { name:'导出格式化', desc:'生成 XMind + Excel', state:'wait', progress:0, result:'✓ 文件就绪' },
+];
+
+// ── Alpine App ──────────────────────────────────────────────
+function app() {
+  return {
+    // Nav
+    page: 0,
+    tabs: ['生成向导','用例预览编辑','数据看板','知识库管理'],
+    scheme: 'B',
+    // Wizard
+    wizStep: 0,
+    steps: ['输入物料','选择平台能力','生成并预览'],
+    dragOver: false,
+    uploadedFile: null,
+    requirementText: '',
+    selectedReq: null,
+    genFormat: 'XMind + Excel',
+    genGranularity: '标准（推荐）',
+    generating: false,
+    genStatus: '正在解析需求文档...',
+    // Mock data refs
+    recentReqs: MOCK.recentReqs,
+    fewShotExamples: MOCK.fewShotExamples,
+    capabilities: MOCK.capabilities,
+    dimensions: MOCK.dimensions,
+    // Execution logs
+    logStepsA: JSON.parse(JSON.stringify(LOG_STEPS_A)),
+    wfNodesB: JSON.parse(JSON.stringify(WF_NODES_B)),
+    // Editor
+    usecaseTree: MOCK.usecaseTree,
+    selectedCase: null,
+    showDiff: false,
+    showSaveTip: false,
+    // Micro-adjust state
+    tweakInput: '',
+    tweakScope: 'all',
+    tweakRunning: false,
+    tweakDone: false,
+    tweakHistory: [],
+    iterationCount: 1,
+    injectInput: '',
+    injectSent: false,
+    showTweakPanel: true,
+    caseTab: 'detail',
+    ctxMenu: null,        // { mi, name, x, y }
+    moduleRegen: null,    // which module is regenerating
+    // Dashboard
+    kpiCards: MOCK.kpiCards,
+    records: MOCK.records,
+    // KB
+    kbTab: 0,
+    kbTabs: MOCK.kbTabs,
+    kbTags: MOCK.kbTags,
+    kbItems: MOCK.kbItems,
+    promptTemplates: MOCK.promptTemplates,
+
+    init() {
+      this.$watch('page', (v) => {
+        if (v === 2) setTimeout(() => this.initCharts(), 80);
+      });
+    },
+
+    handleDrop(e) {
+      const f = e.dataTransfer.files[0];
+      if (f) this.uploadedFile = f.name;
+    },
+    handleFile(e) {
+      const f = e.target.files[0];
+      if (f) this.uploadedFile = f.name;
+    },
+    selectReq(req) {
+      this.selectedReq = this.selectedReq === req.id ? null : req.id;
+    },
+    selectCase(module, c) {
+      this.selectedCase = { ...c };
+    },
+    aiOptimize() {
+      if (!this.selectedCase) return;
+      const original = this.selectedCase.steps;
+      this.selectedCase.steps = original + '\n[AI优化] 补充：验证响应时间 < 500ms，检查日志记录';
+    },
+
+    startGenerate() {
+      this.wizStep = 2;
+      this.generating = true;
+      this.logStepsA = JSON.parse(JSON.stringify(LOG_STEPS_A));
+      this.wfNodesB = JSON.parse(JSON.stringify(WF_NODES_B));
+
+      if (this.scheme === 'A') {
+        const statuses = ['正在解析需求文档...', '调用大模型生成用例...', '结构化处理输出结果...'];
+        let idx = 0;
+        const next = () => {
+          if (idx < this.logStepsA.length) {
+            if (idx > 0) this.logStepsA[idx-1].state = 'done';
+            this.logStepsA[idx].state = 'running';
+            this.genStatus = statuses[idx] || '处理中...';
+            idx++;
+            setTimeout(next, 1200);
+          } else {
+            this.logStepsA[this.logStepsA.length-1].state = 'done';
+            this.generating = false;
+          }
+        };
+        setTimeout(next, 400);
+      } else {
+        const nodeStatuses = [
+          '正在解析需求文档...',
+          '检索知识库相关内容...',
+          '大模型生成用例中...',
+          '质量校验与过滤...',
+          '格式化导出文件...',
+        ];
+        let idx = 0;
+        const progressInterval = {};
+        const next = () => {
+          if (idx < this.wfNodesB.length) {
+            if (idx > 0) {
+              clearInterval(progressInterval[idx-1]);
+              this.wfNodesB[idx-1].state = 'done';
+              this.wfNodesB[idx-1].progress = 100;
+            }
+            this.wfNodesB[idx].state = 'running';
+            this.wfNodesB[idx].progress = 0;
+            this.genStatus = nodeStatuses[idx];
+            let p = 0;
+            progressInterval[idx] = setInterval(() => {
+              p = Math.min(p + Math.random()*15, 95);
+              this.wfNodesB[idx].progress = Math.round(p);
+            }, 150);
+            idx++;
+            setTimeout(next, 1000);
+          } else {
+            clearInterval(progressInterval[idx-1]);
+            this.wfNodesB[this.wfNodesB.length-1].state = 'done';
+            this.wfNodesB[this.wfNodesB.length-1].progress = 100;
+            this.generating = false;
+          }
+        };
+        setTimeout(next, 300);
+      }
+    },
+
+    sendInject() {
+      if (!this.injectInput.trim()) return;
+      this.injectSent = true;
+      // simulate injected context being processed
+      setTimeout(() => {
+        this.genStatus = '已注入追加指令，重新规划用例范围...';
+      }, 400);
+    },
+
+    startTweak() {
+      if (!this.tweakInput.trim()) return;
+      this.tweakRunning = true;
+      this.tweakDone = false;
+      const entry = { round: this.iterationCount + 1, instruction: this.tweakInput, time: new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}), delta: null };
+      setTimeout(() => {
+        this.tweakRunning = false;
+        this.tweakDone = true;
+        this.iterationCount++;
+        entry.delta = '+5 个用例，质量分 94';
+        this.tweakHistory.unshift(entry);
+        this.tweakInput = '';
+      }, 2800);
+    },
+
+    regenModule(moduleName) {
+      this.moduleRegen = moduleName;
+      setTimeout(() => { this.moduleRegen = null; }, 2200);
+    },
+
+    initCharts() {
+      // Line chart
+      const lc = document.getElementById('lineChart');
+      if (lc) {
+        if (lc._chart) lc._chart.destroy();
+        const labels = ['5/19','5/20','5/21','5/22','5/23','5/24','5/25'];
+        lc._chart = new Chart(lc, {
+          type:'line',
+          data:{
+            labels,
+            datasets:[
+              { label:'生成量', data:[42,58,35,71,88,65,92], borderColor:'#1E3A8A', backgroundColor:'rgba(30,58,138,0.08)', tension:0.4, yAxisID:'y' },
+              { label:'质量分', data:[82,85,79,88,91,87,93], borderColor:'#06B6D4', backgroundColor:'rgba(6,182,212,0.08)', tension:0.4, yAxisID:'y1' },
+            ]
+          },
+          options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{ display:false } },
+            scales:{
+              y:{ type:'linear', position:'left', grid:{ color:'#F1F5F9' }, ticks:{ font:{size:11} } },
+              y1:{ type:'linear', position:'right', min:60, max:100, grid:{ drawOnChartArea:false }, ticks:{ font:{size:11} } },
+              x:{ grid:{ color:'#F1F5F9' }, ticks:{ font:{size:11} } }
+            }
+          }
+        });
+      }
+
+      // Pie chart
+      const pc = document.getElementById('pieChart');
+      if (pc) {
+        if (pc._chart) pc._chart.destroy();
+        pc._chart = new Chart(pc, {
+          type:'doughnut',
+          data:{
+            labels:['功能需求','接口需求','性能需求','安全需求'],
+            datasets:[{ data:[48,28,14,10], backgroundColor:['#1E3A8A','#06B6D4','#F59E0B','#10B981'], borderWidth:0 }]
+          },
+          options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{size:10}, padding:8 } } } }
+        });
+      }
+
+      // Dimension pie
+      const dc = document.getElementById('dimChart');
+      if (dc) {
+        if (dc._chart) dc._chart.destroy();
+        dc._chart = new Chart(dc, {
+          type:'doughnut',
+          data:{
+            labels:['功能','异常','边界','兼容','性能','安全'],
+            datasets:[{ data:[38,25,20,8,6,3], backgroundColor:['#1E3A8A','#2563EB','#06B6D4','#67E8F9','#F59E0B','#10B981'], borderWidth:0 }]
+          },
+          options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{size:10}, padding:6 } } } }
+        });
+      }
+
+      // Bar chart
+      const bc = document.getElementById('barChart');
+      if (bc) {
+        if (bc._chart) bc._chart.destroy();
+        bc._chart = new Chart(bc, {
+          type:'bar',
+          data:{
+            labels:['张小明','李雅婷','王建国','刘晓红','陈志远','赵慧敏','孙明阳','吴桂花','周大力','郑思远'],
+            datasets:[{ label:'生成次数', data:[47,38,31,28,25,22,19,17,14,11], backgroundColor:'#1E3A8A', borderRadius:6 }]
+          },
+          options:{
+            responsive:true, maintainAspectRatio:false, indexAxis:'y',
+            plugins:{ legend:{ display:false } },
+            scales:{
+              x:{ grid:{ color:'#F1F5F9' }, ticks:{ font:{size:11} } },
+              y:{ grid:{ display:false }, ticks:{ font:{size:11} } }
+            }
+          }
+        });
+      }
+    }
+  };
+}
+</script>
+</body>
+</html>

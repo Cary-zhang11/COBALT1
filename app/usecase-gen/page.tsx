@@ -36,7 +36,7 @@ export default function UsecaseGenPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden p-6">
+      <div className="flex-1 overflow-auto p-6">
         {activeTab === 0 && (
           <GenerateWizard
             onComplete={(tree) => setUsecaseTree(tree)}
@@ -44,6 +44,7 @@ export default function UsecaseGenPage() {
             onTweakHistoryUpdate={setTweakHistory}
             usecaseTree={usecaseTree}
             skillId={skillId}
+            onNavigateToTab={setActiveTab}
           />
         )}
         {activeTab === 1 && <CaseEditor usecaseTree={usecaseTree} tweakHistory={tweakHistory} />}
