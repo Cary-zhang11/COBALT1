@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { useCreateTask, useExecuteTask, useResumeTask } from "@/hooks/use-tasks";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
+import { useOutputScanner } from "@/hooks/use-output-scanner";
 import { ExecutionPanel } from "./shared/execution-panel";
 import {
   mockRecentReqs, mockFewShotExamples, mockCapabilities,
@@ -21,6 +22,13 @@ interface GenerateWizardProps {
   usecaseTree: UsecaseModule[] | null;
   skillId: string | undefined;
   onNavigateToTab?: (tabIndex: number) => void;
+  preloadedResult?: {
+    tree: UsecaseModule[];
+    stats: { totalCases: number; qualityScore: number; modules: number };
+  } | null;
+  onClearPreloaded?: () => void;
+  resumeTaskId?: string | null;
+  onClearResume?: () => void;
 }
 
 interface UploadedFile {
@@ -32,12 +40,11 @@ const STEPS = ["输入物料", "选择平台能力", "生成并预览"];
 
 export function GenerateWizard({
   onComplete, tweakHistory, onTweakHistoryUpdate, usecaseTree, skillId,
-  onNavigateToTab,
+  onNavigateToTab, preloadedResult, onClearPreloaded, resumeTaskId, onClearResume,
 }: GenerateWizardProps) {
   const createTask = useCreateTask();
   const executeTask = useExecuteTask();
   const resumeTask = useResumeTask();
-
   // Wizard
   const [wizStep, setWizStep] = useState(0);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -62,6 +69,58 @@ export function GenerateWizard({
   const [injectSent, setInjectSent] = useState(false);
   const [tweakInput, setTweakInput] = useState("");
   const [iterationCount, setIterationCount] = useState(1);
+
+  const cancelTask = useCancelTask();
+
+  // Output scanner — replaces SSE onComplete callback
+  const scanner = useOutputScanner({
+    taskId: taskId || "",
+    enabled: generating && !!taskId,
+    onResult: (data) => {
+      const tree = data.tree as UsecaseModule[];
+      const summary = data.summary;
+      onComplete(tree, summary);
+      setGenStats({
+        totalCases: summary?.totalCases || 0,
+        qualityScore: summary?.qualityScore || 0,
+        modules: summary?.modules || 0,
+        duration: 0,
+      });
+      setGenerating(false);
+    },
+    onError: (msg) => {
+      setGenStatus(msg);
+      setGenerating(false);
+    },
+  });
+
+  // Handle preloaded result from history
+  useEffect(() => {
+    if (preloadedResult) {
+      setWizStep(2);
+      setGenStats({
+        totalCases: preloadedResult.stats.totalCases,
+        qualityScore: preloadedResult.stats.qualityScore,
+        modules: preloadedResult.stats.modules,
+        duration: 0,
+      });
+      setGenerating(false);
+      setGenStatus("");
+      onComplete(preloadedResult.tree, preloadedResult.stats);
+      onClearPreloaded?.();
+    }
+  }, [preloadedResult, onComplete, onClearPreloaded]);
+
+  // Handle resume task from history
+  useEffect(() => {
+    if (resumeTaskId) {
+      setTaskId(resumeTaskId);
+      setGenerating(true);
+      setGenStatus("正在恢复执行进度...");
+      setWizStep(2);
+      onClearResume?.();
+    }
+  }, [resumeTaskId, onClearResume]);
 
   // Upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,26 +169,7 @@ export function GenerateWizard({
     }
   };
 
-  // Called by ExecutionPanel when SSE reports completion
-  const onExecutionComplete = useCallback(async (status: string) => {
-    if (status !== "completed" || !taskId) return;
-    try {
-      const res = await fetch(`/api/tasks/${taskId}/report`);
-      const data = await res.json();
-      if (data.tree) {
-        onComplete(data.tree, data.summary);
-        setGenStats({
-          totalCases: data.summary?.totalCases || 0,
-          qualityScore: data.summary?.qualityScore || 0,
-          modules: data.summary?.modules || 0,
-          duration: data.duration ? Math.round(data.duration / 1000 * 10) / 10 : 0,
-        });
-      } else {
-        onComplete([]);
-      }
-    } catch {}
-    setGenerating(false);
-  }, [taskId, onComplete]);
+  // (onExecutionComplete removed — replaced by useOutputScanner)
 
   if (!skillId) {
     return (
@@ -326,7 +366,23 @@ export function GenerateWizard({
                 </div>
                 <h3 className="font-semibold text-lg mb-2">AI 正在生成测试用例</h3>
                 <p className="text-sm text-muted-foreground">{genStatus || "正在解析需求文档..."}</p>
-                <p className="text-xs text-muted-foreground mt-3">请稍候，您可在右侧面板查看执行进度</p>
+                <p className="text-xs text-muted-foreground mt-3">正在扫描输出文件，请稍候...</p>
+                <button
+                  onClick={() => {
+                    cancelTask.mutate(taskId!);
+                    scanner.stop();
+                    setGenerating(false);
+                    setGenStatus("");
+                  }}
+                  disabled={cancelTask.isPending}
+                  className="mt-4 border border-red-200 text-red-500 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-40"
+                >
+                  {cancelTask.isPending ? (
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin inline mr-1" />取消中...</>
+                  ) : (
+                    "取消生成"
+                  )}
+                </button>
               </div>
             )}
 
@@ -445,7 +501,7 @@ export function GenerateWizard({
                     className="border border-border text-muted-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:border-muted-foreground/40 flex items-center gap-2 transition-colors">
                     <ArrowLeft className="w-4 h-4" />重新配置
                   </button>
-                  <button onClick={() => onNavigateToTab?.(1)}
+                  <button onClick={() => onNavigateToTab?.(2)}
                     className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm flex items-center gap-2 transition-all hover:bg-primary/90">
                     <Edit3 className="w-4 h-4" />去编辑用例<ArrowRight className="w-4 h-4" />
                   </button>
@@ -482,7 +538,6 @@ export function GenerateWizard({
             dimensions: `${dimensions.filter((d) => d.active).length} 个`,
             fewShot: `${fewShot.filter((f) => f.selected).length} 份`,
           }}
-          onComplete={onExecutionComplete}
         />
       </div>
     </div>

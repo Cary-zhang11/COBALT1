@@ -5,15 +5,36 @@ import { GenerateWizard } from "@/components/usecase-gen/generate-wizard";
 import { CaseEditor } from "@/components/usecase-gen/case-editor";
 import { Dashboard } from "@/components/usecase-gen/dashboard";
 import { KnowledgeBase } from "@/components/usecase-gen/knowledge-base";
+import { HistoryList } from "@/components/usecase-gen/history-list";
 import type { UsecaseModule, TweakEntry } from "@/components/usecase-gen/shared/types";
 
-const TABS = ["生成向导", "用例预览编辑", "数据看板", "知识库管理"];
+const TABS = ["生成向导", "历史记录", "用例预览编辑", "数据看板", "知识库管理"];
 
 export default function UsecaseGenPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [usecaseTree, setUsecaseTree] = useState<UsecaseModule[] | null>(null);
   const [tweakHistory, setTweakHistory] = useState<TweakEntry[]>([]);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [preloadedResult, setPreloadedResult] = useState<{
+    tree: UsecaseModule[];
+    stats: { totalCases: number; qualityScore: number; modules: number };
+  } | null>(null);
+
   const skillId = process.env.NEXT_PUBLIC_USECASE_SKILL_ID;
+
+  const handleLoadResult = (result: {
+    tree: UsecaseModule[];
+    stats: { totalCases: number; qualityScore: number; modules: number };
+  }) => {
+    setUsecaseTree(result.tree);
+    setPreloadedResult(result);
+    setActiveTab(0);
+  };
+
+  const handleResumeTask = (taskId: string) => {
+    setCurrentTaskId(taskId);
+    setActiveTab(0);
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -26,7 +47,9 @@ export default function UsecaseGenPage() {
                 key={i}
                 onClick={() => setActiveTab(i)}
                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  activeTab === i ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  activeTab === i
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {tab}
@@ -45,11 +68,24 @@ export default function UsecaseGenPage() {
             usecaseTree={usecaseTree}
             skillId={skillId}
             onNavigateToTab={setActiveTab}
+            preloadedResult={preloadedResult}
+            onClearPreloaded={() => setPreloadedResult(null)}
+            resumeTaskId={currentTaskId}
+            onClearResume={() => setCurrentTaskId(null)}
           />
         )}
-        {activeTab === 1 && <CaseEditor usecaseTree={usecaseTree} tweakHistory={tweakHistory} />}
-        {activeTab === 2 && <Dashboard />}
-        {activeTab === 3 && <KnowledgeBase />}
+        {activeTab === 1 && (
+          <HistoryList
+            skillId={skillId}
+            onLoadResult={handleLoadResult}
+            onResumeTask={handleResumeTask}
+          />
+        )}
+        {activeTab === 2 && (
+          <CaseEditor usecaseTree={usecaseTree} tweakHistory={tweakHistory} />
+        )}
+        {activeTab === 3 && <Dashboard />}
+        {activeTab === 4 && <KnowledgeBase />}
       </div>
     </div>
   );
