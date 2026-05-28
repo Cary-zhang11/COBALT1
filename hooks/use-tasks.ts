@@ -12,12 +12,15 @@ interface Task {
   skill: { name: string; description: string };
 }
 
-export function useTasks(status?: string) {
+export function useTasks(status?: string, skillId?: string) {
   return useQuery<{ tasks: Task[] }>({
-    queryKey: ["tasks", status],
+    queryKey: ["tasks", status, skillId],
     queryFn: async () => {
-      const params = status ? `?status=${status}` : "";
-      const res = await fetch(`/api/tasks${params}`);
+      const params = new URLSearchParams();
+      if (status) params.set("status", status);
+      if (skillId) params.set("skillId", skillId);
+      const qs = params.toString();
+      const res = await fetch(`/api/tasks${qs ? `?${qs}` : ""}`);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
     },

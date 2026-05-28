@@ -9,8 +9,11 @@ export async function GET(req: NextRequest) {
     const { userId } = await getAuthUser(token);
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
+    const skillId = searchParams.get("skillId");
 
-    const where = { userId, ...(status ? { status } : {}) };
+    const where: Record<string, unknown> = { userId };
+    if (status) where.status = status;
+    if (skillId) where.skillId = skillId;
 
     const tasks = await prisma.task.findMany({
       where,
