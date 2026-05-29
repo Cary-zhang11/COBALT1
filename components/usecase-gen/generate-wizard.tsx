@@ -522,10 +522,17 @@ export function GenerateWizard({
                   </div>
                 </div>
 
-                {/* Output files */}
+                {/* Output files — deduplicated by relativePath */}
                 <OutputFiles
                   taskId={taskId}
-                  files={[...scanner.foundFiles, ...loadedFiles]}
+                  files={(() => {
+                    const seen = new Set<string>();
+                    return [...scanner.foundFiles, ...loadedFiles].filter((f) => {
+                      if (seen.has(f.relativePath)) return false;
+                      seen.add(f.relativePath);
+                      return true;
+                    });
+                  })()}
                 />
 
                 {/* AI Tweak */}
@@ -534,6 +541,7 @@ export function GenerateWizard({
                   generating={generating}
                   modules={usecaseTree.map((m) => m.name)}
                   onTweakStarted={() => {
+                    setLoadedFiles([]);
                     setGenerating(true);
                     setGenStatus("正在微调用例...");
                   }}
@@ -609,7 +617,14 @@ export function GenerateWizard({
           dimensions: `${dimensions.filter((d) => d.active).length} 个`,
           fewShot: `${fewShot.filter((f) => f.selected).length} 份`,
         }}
-        foundFiles={[...scanner.foundFiles, ...loadedFiles]}
+        foundFiles={(() => {
+          const seen = new Set<string>();
+          return [...scanner.foundFiles, ...loadedFiles].filter((f) => {
+            if (seen.has(f.relativePath)) return false;
+            seen.add(f.relativePath);
+            return true;
+          });
+        })()}
         onDownloadFile={(file) => {
           if (!taskId) return;
           const url = `/api/tasks/${taskId}/download?file=${encodeURIComponent(file.relativePath)}`;
