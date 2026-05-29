@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 const mockCreateMutateAsync = vi.fn();
 const mockExecuteMutateAsync = vi.fn();
 const mockResumeMutateAsync = vi.fn();
+const mockCancelMutate = vi.fn();
 
 vi.mock("@/hooks/use-tasks", () => ({
   useCreateTask: () => ({
@@ -18,6 +19,10 @@ vi.mock("@/hooks/use-tasks", () => ({
   }),
   useResumeTask: () => ({
     mutateAsync: mockResumeMutateAsync,
+    isPending: false,
+  }),
+  useCancelTask: () => ({
+    mutate: mockCancelMutate,
     isPending: false,
   }),
 }));
