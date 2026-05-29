@@ -55,18 +55,18 @@ export async function POST(
       ? `以下是已生成的测试用例：\n\n${existingOutput}\n\n---\n\n用户微调指令：${instruction}${scopeDirective}\n\n请在已有测试用例基础上进行修改，保持格式一致，只修改涉及的部分，不要重新生成全部内容。`
       : `${instruction}${scopeDirective}`;
 
-    // Rename existing files with version suffix so tweaked files coexist
+    // Move existing files to archive/ so tweaked output is clean
     const tweakRound = (task.tweakCount || 0) + 1;
+    const archiveDir = path.join(outputDir, "archive", `v${tweakRound}`);
     try {
-      const entries = await fs.readdir(outputDir);
+      await fs.mkdir(archiveDir, { recursive: true });
+      const entries = await fs.readdir(outputDir, { withFileTypes: true });
       for (const entry of entries) {
-        const oldPath = path.join(outputDir, entry);
-        const stat = await fs.stat(oldPath);
-        if (stat.isFile()) {
-          const ext = path.extname(entry);
-          const base = path.basename(entry, ext);
-          const newName = `${base}_v${tweakRound}${ext}`;
-          await fs.rename(oldPath, path.join(outputDir, newName));
+        if (entry.isFile()) {
+          await fs.rename(
+            path.join(outputDir, entry.name),
+            path.join(archiveDir, entry.name)
+          );
         }
       }
     } catch {

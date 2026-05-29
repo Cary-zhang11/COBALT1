@@ -27,6 +27,7 @@ async function collectOutputFiles(outputDir: string, taskId: string): Promise<{
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
+        if (entry.name === "archive") continue; // skip archived versions
         await walk(fullPath);
       } else {
         const relativePath = path.relative(outputDir, fullPath);
