@@ -55,16 +55,6 @@ export async function POST(
       ? `以下是已生成的测试用例：\n\n${existingOutput}\n\n---\n\n用户微调指令：${instruction}${scopeDirective}\n\n请在已有测试用例基础上进行修改，保持格式一致，只修改涉及的部分，不要重新生成全部内容。`
       : `${instruction}${scopeDirective}`;
 
-    // Clean output directory so old files don't coexist with new ones
-    try {
-      const entries = await fs.readdir(outputDir);
-      for (const entry of entries) {
-        await fs.rm(path.join(outputDir, entry), { recursive: true, force: true });
-      }
-    } catch {
-      // dir may not exist
-    }
-
     // Update task input, increment tweak count, and set to running for re-execution
     await prisma.task.update({
       where: { id: taskId },
