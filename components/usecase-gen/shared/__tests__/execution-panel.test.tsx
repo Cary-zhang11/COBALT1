@@ -1,19 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { ExecutionPanel } from "../execution-panel";
-
-// Mock useTaskEvents
-let mockStatus = "connected";
-vi.mock("@/hooks/use-task-events", () => ({
-  useTaskEvents: ({ enabled }: { taskId: string; enabled?: boolean; onComplete?: (status: string) => void }) => {
-    return {
-      logs: enabled ? [{ sequence: 1, type: "log", output: "hello", input: null, createdAt: "2026-01-01" }] : [],
-      status: enabled ? mockStatus : "idle",
-      pausedData: null,
-      disconnect: () => {},
-    };
-  },
-}));
 
 const defaultConfig = {
   source: "文本输入",
@@ -22,45 +9,136 @@ const defaultConfig = {
   fewShot: "1 份",
 };
 
+const noop = () => {};
+
 describe("ExecutionPanel", () => {
-  it("renders config summary when not generating", () => {
-    render(
-      <ExecutionPanel
-        taskId={null}
-        generating={false}
-        configSummary={defaultConfig}
-      />
-    );
-    expect(screen.getByText("当前配置预览")).toBeDefined();
-    expect(screen.getByText("文本输入")).toBeDefined();
-    expect(screen.getByText("3/4")).toBeDefined();
+  describe("Mode 1: Config Preview (wizStep < 2)", () => {
+    it("renders config summary on Step 0", () => {
+      render(
+        <ExecutionPanel
+          taskId={null} generating={false} wizStep={0} hasResult={false}
+          configSummary={defaultConfig} foundFiles={[]}
+          onDownloadFile={noop} onScrollToAITweak={noop}
+          onScrollToRating={noop} onNavigateToEditor={noop}
+          onReconfigure={noop}
+        />
+      );
+      expect(screen.getByText("当前配置预览")).toBeDefined();
+      expect(screen.getByText("文本输入")).toBeDefined();
+      expect(screen.getByText("3/4")).toBeDefined();
+    });
+
+    it("renders config summary on Step 1", () => {
+      render(
+        <ExecutionPanel
+          taskId={null} generating={false} wizStep={1} hasResult={false}
+          configSummary={defaultConfig} foundFiles={[]}
+          onDownloadFile={noop} onScrollToAITweak={noop}
+          onScrollToRating={noop} onNavigateToEditor={noop}
+          onReconfigure={noop}
+        />
+      );
+      expect(screen.getByText("当前配置预览")).toBeDefined();
+    });
   });
 
-  it("renders workflow nodes when generating", () => {
-    render(
-      <ExecutionPanel
-        taskId="test-id"
-        generating={true}
-        configSummary={defaultConfig}
-      />
-    );
-    // Workflow nodes (5 core steps)
-    expect(screen.getByText("文档解析")).toBeDefined();
-    expect(screen.getByText("需求分析")).toBeDefined();
-    expect(screen.getByText("用例生成")).toBeDefined();
-    expect(screen.getByText("质量校验")).toBeDefined();
-    expect(screen.getByText("导出格式")).toBeDefined();
+  describe("Mode 2: Progress Dots (wizStep 2 + generating)", () => {
+    it("renders 5 workflow nodes as progress dots", () => {
+      render(
+        <ExecutionPanel
+          taskId="test-id" generating={true} wizStep={2} hasResult={false}
+          configSummary={defaultConfig} foundFiles={[]}
+          onDownloadFile={noop} onScrollToAITweak={noop}
+          onScrollToRating={noop} onNavigateToEditor={noop}
+          onReconfigure={noop}
+        />
+      );
+      expect(screen.getByText("生成中")).toBeDefined();
+      expect(screen.getByText("文档解析")).toBeDefined();
+      expect(screen.getByText("LLM 生成")).toBeDefined();
+      expect(screen.getByText("导出格式化")).toBeDefined();
+    });
+
+    it("marks nodes as done based on foundFiles", () => {
+      render(
+        <ExecutionPanel
+          taskId="test-id" generating={true} wizStep={2} hasResult={false}
+          configSummary={defaultConfig} foundFiles={["_source.md"]}
+          onDownloadFile={noop} onScrollToAITweak={noop}
+          onScrollToRating={noop} onNavigateToEditor={noop}
+          onReconfigure={noop}
+        />
+      );
+      const docParse = screen.getByText("文档解析");
+      expect(docParse.className).toContain("text-green-700");
+    });
   });
 
-  it("shows completion message when task completed", async () => {
-    mockStatus = "completed";
-    render(
-      <ExecutionPanel
-        taskId="test-id"
-        generating={true}
-        configSummary={defaultConfig}
-      />
-    );
-    expect(screen.getByText("工作流执行完成，用例文件已就绪")).toBeDefined();
+  describe("Mode 3: Quick Actions (wizStep 2 + !generating + has result)", () => {
+    const foundFiles = ["测试用例.md", "测试用例.xmind"];
+
+    it("renders quick action buttons when files exist", () => {
+      render(
+        <ExecutionPanel
+          taskId="test-id" generating={false} wizStep={2} hasResult={true}
+          configSummary={defaultConfig} foundFiles={foundFiles}
+          onDownloadFile={noop} onScrollToAITweak={noop}
+          onScrollToRating={noop} onNavigateToEditor={noop}
+          onReconfigure={noop}
+        />
+      );
+      expect(screen.getByText("快捷操作")).toBeDefined();
+      expect(screen.getByText("下载 Markdown")).toBeDefined();
+      expect(screen.getByText("下载 XMind")).toBeDefined();
+      expect(screen.getByText("AI 微调")).toBeDefined();
+      expect(screen.getByText("评价")).toBeDefined();
+      expect(screen.getByText("去编辑用例")).toBeDefined();
+      expect(screen.getByText("重新配置")).toBeDefined();
+    });
+
+    it("calls onDownloadFile when download button clicked", () => {
+      const onDownload = vi.fn();
+      render(
+        <ExecutionPanel
+          taskId="test-id" generating={false} wizStep={2} hasResult={true}
+          configSummary={defaultConfig} foundFiles={foundFiles}
+          onDownloadFile={onDownload} onScrollToAITweak={noop}
+          onScrollToRating={noop} onNavigateToEditor={noop}
+          onReconfigure={noop}
+        />
+      );
+      fireEvent.click(screen.getByText("下载 Markdown"));
+      expect(onDownload).toHaveBeenCalledWith("测试用例.md");
+    });
+
+    it("calls onReconfigure when clicked", () => {
+      const onReconfig = vi.fn();
+      render(
+        <ExecutionPanel
+          taskId="test-id" generating={false} wizStep={2} hasResult={true}
+          configSummary={defaultConfig} foundFiles={foundFiles}
+          onDownloadFile={noop} onScrollToAITweak={noop}
+          onScrollToRating={noop} onNavigateToEditor={noop}
+          onReconfigure={onReconfig}
+        />
+      );
+      fireEvent.click(screen.getByText("重新配置"));
+      expect(onReconfig).toHaveBeenCalled();
+    });
+
+    it("shows empty wrapper when no files and no result", () => {
+      const { container } = render(
+        <ExecutionPanel
+          taskId="test-id" generating={false} wizStep={2} hasResult={false}
+          configSummary={defaultConfig} foundFiles={[]}
+          onDownloadFile={noop} onScrollToAITweak={noop}
+          onScrollToRating={noop} onNavigateToEditor={noop}
+          onReconfigure={noop}
+        />
+      );
+      expect(screen.queryByText("快捷操作")).toBeNull();
+      expect(screen.queryByText("当前配置预览")).toBeNull();
+      expect(screen.queryByText("生成中")).toBeNull();
+    });
   });
 });
