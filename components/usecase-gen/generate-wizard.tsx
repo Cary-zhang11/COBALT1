@@ -540,10 +540,14 @@ export function GenerateWizard({
                   taskId={taskId}
                   generating={generating}
                   modules={usecaseTree.map((m) => m.name)}
+                  tweakHistory={tweakHistory}
                   onTweakStarted={() => {
                     setLoadedFiles([]);
                     setGenerating(true);
                     setGenStatus("正在微调用例...");
+                  }}
+                  onRecordTweak={(entry) => {
+                    onTweakHistoryUpdate([...tweakHistory, entry]);
                   }}
                 />
 

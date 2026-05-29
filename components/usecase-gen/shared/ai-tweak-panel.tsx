@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, History } from "lucide-react";
+import type { TweakEntry } from "./types";
 
 interface ChatLine {
   role: "user" | "ai";
@@ -12,7 +13,9 @@ interface AITweakPanelProps {
   taskId: string | null;
   generating: boolean;
   modules: string[];
+  tweakHistory: TweakEntry[];
   onTweakStarted: () => void;
+  onRecordTweak: (entry: TweakEntry) => void;
 }
 
 const QUICK_CHIPS = [
@@ -28,7 +31,9 @@ export function AITweakPanel({
   taskId,
   generating,
   modules,
+  tweakHistory,
   onTweakStarted,
+  onRecordTweak,
 }: AITweakPanelProps) {
   const [input, setInput] = useState("");
   const [scope, setScope] = useState("all");
@@ -69,6 +74,15 @@ export function AITweakPanel({
           ...prev,
           { role: "ai", text: "正在基于已有用例进行修改..." },
         ]);
+
+        // Record tweak history
+        onRecordTweak({
+          round: tweakHistory.length + 1,
+          instruction: text,
+          time: new Date().toLocaleString("zh-CN"),
+          delta: scope !== "all" ? `模块: ${scope}` : "全部模块",
+        });
+
         onTweakStarted();
       }
     } catch {
@@ -161,6 +175,39 @@ export function AITweakPanel({
               <span className="text-muted-foreground">{line.text}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Tweak history records */}
+      {tweakHistory.length > 0 && (
+        <div className="mt-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <History className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground">
+              微调记录 ({tweakHistory.length})
+            </span>
+          </div>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            {tweakHistory.map((entry, i) => (
+              <div
+                key={i}
+                className="bg-muted/40 rounded-lg px-3 py-2 text-xs"
+              >
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="font-medium text-foreground">
+                    第 {entry.round} 轮
+                  </span>
+                  <span className="text-muted-foreground">{entry.time}</span>
+                </div>
+                <p className="text-muted-foreground">{entry.instruction}</p>
+                {entry.delta && (
+                  <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary">
+                    {entry.delta}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
