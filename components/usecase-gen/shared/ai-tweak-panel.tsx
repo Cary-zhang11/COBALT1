@@ -1,13 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Loader2, History, XCircle } from "lucide-react";
+import { Send, Loader2, History, XCircle, CheckCircle2, AlertCircle } from "lucide-react";
 import type { TweakEntry } from "./types";
-
-interface ChatLine {
-  role: "user" | "ai";
-  text: string;
-}
 
 interface AITweakPanelProps {
   taskId: string | null;
@@ -39,7 +34,6 @@ export function AITweakPanel({
 }: AITweakPanelProps) {
   const [input, setInput] = useState("");
   const [scope, setScope] = useState("all");
-  const [chatLines, setChatLines] = useState<ChatLine[]>([]);
   const [sending, setSending] = useState(false);
 
   const handleSend = async () => {
@@ -49,49 +43,33 @@ export function AITweakPanel({
     const instruction =
       scope !== "all" && scope ? `${text}（仅针对"${scope}"模块）` : text;
 
-    setChatLines((prev) => [...prev, { role: "user", text }]);
     setInput("");
     setSending(true);
 
     try {
       if (generating) {
-        // Inject into running session
         await fetch(`/api/tasks/${taskId}/inject`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ instruction, scope: scope !== "all" ? scope : undefined }),
         });
-        setChatLines((prev) => [
-          ...prev,
-          { role: "ai", text: "指令已注入，AI 正在调整生成方向..." },
-        ]);
       } else {
-        // Conversational tweak on existing result
         await fetch(`/api/tasks/${taskId}/tweak`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ instruction, scope: scope !== "all" ? scope : undefined }),
         });
-        setChatLines((prev) => [
-          ...prev,
-          { role: "ai", text: "正在基于已有用例进行修改..." },
-        ]);
 
-        // Record tweak history
         onRecordTweak({
           round: tweakHistory.length + 1,
           instruction: text,
           time: new Date().toLocaleString("zh-CN"),
           delta: scope !== "all" ? `模块: ${scope}` : "全部模块",
+          status: "running",
         });
 
         onTweakStarted();
       }
-    } catch {
-      setChatLines((prev) => [
-        ...prev,
-        { role: "ai", text: "发送失败，请重试" },
-      ]);
     } finally {
       setSending(false);
     }
@@ -101,13 +79,13 @@ export function AITweakPanel({
     <div className="bg-card rounded-xl shadow-sm p-5" data-ai-tweak>
       <h3 className="font-semibold text-sm mb-3">AI 微调</h3>
 
-      {/* Tweak in progress */}
+      {/* Tweak in progress banner */}
       {generating && (
         <div className="mb-3 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5 flex items-center gap-2.5">
           <Loader2 className="w-4 h-4 text-primary animate-spin flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-foreground">微调中...</p>
-            <p className="text-xs text-muted-foreground">AI 正在基于已有用例进行修改，新文件生成后将自动更新</p>
+            <p className="text-xs text-muted-foreground">新文件生成后将自动更新，无需刷新</p>
           </div>
           <button
             onClick={onCancelTweak}
@@ -180,25 +158,7 @@ export function AITweakPanel({
         </button>
       </div>
 
-      {/* Chat history */}
-      {chatLines.length > 0 && (
-        <div className="mt-3 bg-muted/40 rounded-lg p-3 max-h-32 overflow-y-auto space-y-2">
-          {chatLines.map((line, i) => (
-            <div key={i} className="text-xs">
-              <span
-                className={`font-medium ${
-                  line.role === "user" ? "text-primary" : "text-emerald-600"
-                }`}
-              >
-                {line.role === "user" ? "You: " : "AI: "}
-              </span>
-              <span className="text-muted-foreground">{line.text}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Tweak history records */}
+      {/* Tweak history as unified timeline */}
       {tweakHistory.length > 0 && (
         <div className="mt-3">
           <div className="flex items-center gap-1.5 mb-2">
@@ -207,24 +167,38 @@ export function AITweakPanel({
               微调记录 ({tweakHistory.length})
             </span>
           </div>
-          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+          <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {tweakHistory.map((entry, i) => (
               <div
                 key={i}
                 className="bg-muted/40 rounded-lg px-3 py-2 text-xs"
               >
                 <div className="flex items-center justify-between mb-0.5">
-                  <span className="font-medium text-foreground">
-                    第 {entry.round} 轮
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {entry.status === "running" ? (
+                      <Loader2 className="w-3 h-3 text-primary animate-spin" />
+                    ) : entry.status === "failed" ? (
+                      <AlertCircle className="w-3 h-3 text-red-500" />
+                    ) : (
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                    )}
+                    <span className="font-medium text-foreground">
+                      第 {entry.round} 轮
+                    </span>
+                  </div>
                   <span className="text-muted-foreground">{entry.time}</span>
                 </div>
                 <p className="text-muted-foreground">{entry.instruction}</p>
-                {entry.delta && (
-                  <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary">
-                    {entry.delta}
-                  </span>
-                )}
+                <div className="flex items-center gap-2 mt-1">
+                  {entry.delta && (
+                    <span className="inline-block px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary">
+                      {entry.delta}
+                    </span>
+                  )}
+                  {entry.summary && (
+                    <span className="text-xs text-emerald-600">{entry.summary}</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>

@@ -78,6 +78,16 @@ export default function UsecaseGenPage() {
             onClearPreloaded={() => setPreloadedResult(null)}
             resumeTaskId={currentTaskId}
             onClearResume={() => setCurrentTaskId(null)}
+            onUpdateTweakEntry={(taskId, round, updates) => {
+              setTweakHistoryMap((prev) => {
+                const entries = [...(prev[taskId] || [])];
+                const idx = entries.findIndex((e) => e.round === round);
+                if (idx >= 0) {
+                  entries[idx] = { ...entries[idx], ...updates };
+                }
+                return { ...prev, [taskId]: entries };
+              });
+            }}
           />
         )}
         {activeTab === 1 && (

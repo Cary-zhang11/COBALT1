@@ -19,4 +19,6 @@ export interface TweakEntry {
   instruction: string;
   time: string;
   delta: string;
+  status: "running" | "done" | "failed";
+  summary?: string;
 }

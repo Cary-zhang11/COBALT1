@@ -29,17 +29,25 @@ export async function POST(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // Read existing test case markdown output
+    // Read LATEST test case markdown (pick _v{N} max) as context
     const outputDir = getOutputPath(taskId);
     let existingOutput = "";
+    const tweakRound = (task.tweakCount || 0) + 1;
     try {
       const files = await fs.readdir(outputDir);
-      const mdFile = files.find(
-        (f) => f.includes("测试用例") && f.endsWith(".md")
-      );
-      if (mdFile) {
+      // Pick all matching md files, select the one with highest _v{N}
+      let bestMd: string | null = null;
+      let bestVersion = -1;
+      for (const f of files) {
+        if (f.includes("测试用例") && f.endsWith(".md")) {
+          const m = f.match(/_v(\d+)\.md$/);
+          const v = m ? parseInt(m[1], 10) : 0;
+          if (v > bestVersion) { bestVersion = v; bestMd = f; }
+        }
+      }
+      if (bestMd) {
         existingOutput = await fs.readFile(
-          path.join(outputDir, mdFile),
+          path.join(outputDir, bestMd),
           "utf-8"
         );
       }
@@ -51,27 +59,11 @@ export async function POST(
       ? `\n\n修改范围：仅针对"${scope}"模块`
       : "";
 
-    const tweakInput = existingOutput
-      ? `以下是已生成的测试用例：\n\n${existingOutput}\n\n---\n\n用户微调指令：${instruction}${scopeDirective}\n\n请在已有测试用例基础上进行修改，保持格式一致，只修改涉及的部分，不要重新生成全部内容。`
-      : `${instruction}${scopeDirective}`;
+    const namingDirective = `\n\n输出文件名必须使用: *_v${tweakRound}.md 和 *_v${tweakRound}.xmind（不要用原名覆盖已有文件）`;
 
-    // Move existing files to archive/ so tweaked output is clean
-    const tweakRound = (task.tweakCount || 0) + 1;
-    const archiveDir = path.join(outputDir, "archive", `v${tweakRound}`);
-    try {
-      await fs.mkdir(archiveDir, { recursive: true });
-      const entries = await fs.readdir(outputDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isFile()) {
-          await fs.rename(
-            path.join(outputDir, entry.name),
-            path.join(archiveDir, entry.name)
-          );
-        }
-      }
-    } catch {
-      // output dir may not exist yet
-    }
+    const tweakInput = existingOutput
+      ? `以下是已生成的测试用例：\n\n${existingOutput}\n\n---\n\n用户微调指令：${instruction}${scopeDirective}${namingDirective}\n\n请在已有测试用例基础上进行修改，保持格式一致，只修改涉及的部分，不要重新生成全部内容。`
+      : `${instruction}${scopeDirective}${namingDirective}`;
 
     // Update task input, increment tweak count, and set to running for re-execution
     await prisma.task.update({

@@ -35,6 +35,7 @@ interface GenerateWizardProps {
   onClearPreloaded?: () => void;
   resumeTaskId?: string | null;
   onClearResume?: () => void;
+  onUpdateTweakEntry?: (taskId: string, round: number, updates: Partial<TweakEntry>) => void;
 }
 
 interface UploadedFile {
@@ -47,6 +48,7 @@ const STEPS = ["输入物料", "选择平台能力", "生成并预览"];
 export function GenerateWizard({
   onComplete, tweakHistoryMap, onTweakHistoryUpdate, usecaseTree, skillId,
   onNavigateToTab, preloadedResult, onClearPreloaded, resumeTaskId, onClearResume,
+  onUpdateTweakEntry,
 }: GenerateWizardProps) {
   const createTask = useCreateTask();
   const executeTask = useExecuteTask();
@@ -74,6 +76,7 @@ export function GenerateWizard({
   const [loadedFiles, setLoadedFiles] = useState<FileInfo[]>([]);
 
   const cancelTask = useCancelTask();
+  const preTweakTreeRef = useRef<UsecaseModule[] | null>(null);
 
   // Output scanner — replaces SSE onComplete callback
   const scanner = useOutputScanner({
@@ -90,10 +93,30 @@ export function GenerateWizard({
         duration: 0,
       });
       setGenerating(false);
+
+      // Compute tweak delta if we had a pre-existing tree
+      if (preTweakTreeRef.current && taskId && onUpdateTweakEntry) {
+        const oldCases = preTweakTreeRef.current.flatMap((m) => m.cases.map((c) => c.id));
+        const newCases = tree.flatMap((m) => m.cases.map((c) => c.id));
+        const oldSet = new Set(oldCases);
+        const newSet = new Set(newCases);
+        const added = newCases.filter((id) => !oldSet.has(id)).length;
+        const removed = oldCases.filter((id) => !newSet.has(id)).length;
+        const modified = oldCases.filter((id) => newSet.has(id)).length;
+        const summaryText = `+${added} · 修改 ${modified} · -${removed}`;
+        const round = (tweakHistoryMap[taskId] || []).length;
+        onUpdateTweakEntry(taskId, round, { status: "done", summary: summaryText });
+        preTweakTreeRef.current = null;
+      }
     },
     onError: (msg) => {
       setGenStatus(msg);
       setGenerating(false);
+      // Mark last tweak entry as failed
+      if (taskId && onUpdateTweakEntry) {
+        const round = (tweakHistoryMap[taskId] || []).length;
+        onUpdateTweakEntry(taskId, round, { status: "failed" });
+      }
     },
   });
 
@@ -521,6 +544,7 @@ export function GenerateWizard({
                   modules={usecaseTree.map((m) => m.name)}
                   tweakHistory={taskId ? tweakHistoryMap[taskId] || [] : []}
                   onTweakStarted={() => {
+                    preTweakTreeRef.current = usecaseTree;
                     setLoadedFiles([]);
                     setGenerating(true);
                     setGenStatus("正在微调用例...");

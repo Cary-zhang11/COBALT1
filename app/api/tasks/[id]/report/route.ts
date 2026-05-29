@@ -14,8 +14,7 @@ async function collectOutputFiles(outputDir: string, taskId: string): Promise<{
   mdMtime: number;
 }> {
   const files: { name: string; path: string }[] = [];
-  let mdPath: string | null = null;
-  let mdMtime = 0;
+  const mdCandidates: { path: string; version: number; mtime: number }[] = [];
 
   async function walk(dir: string) {
     let entries;
@@ -27,7 +26,7 @@ async function collectOutputFiles(outputDir: string, taskId: string): Promise<{
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === "archive") continue; // skip archived versions
+        if (entry.name === "archive") continue;
         await walk(fullPath);
       } else {
         const relativePath = path.relative(outputDir, fullPath);
@@ -35,12 +34,15 @@ async function collectOutputFiles(outputDir: string, taskId: string): Promise<{
           name: entry.name,
           path: `/api/tasks/${taskId}/download?file=${encodeURIComponent(relativePath)}`,
         });
-        // Find test case markdown during the same walk
-        if (!mdPath && entry.name.includes("测试用例") && entry.name.endsWith(".md")) {
+        if (entry.name.includes("测试用例") && entry.name.endsWith(".md")) {
           try {
             const stat = await fs.stat(fullPath);
-            mdPath = fullPath;
-            mdMtime = stat.mtimeMs;
+            const m = entry.name.match(/_v(\d+)\.md$/);
+            mdCandidates.push({
+              path: fullPath,
+              version: m ? parseInt(m[1], 10) : 0,
+              mtime: stat.mtimeMs,
+            });
           } catch { /* skip */ }
         }
       }
@@ -48,7 +50,9 @@ async function collectOutputFiles(outputDir: string, taskId: string): Promise<{
   }
 
   await walk(outputDir);
-  return { files, mdPath, mdMtime };
+  mdCandidates.sort((a, b) => b.version - a.version);
+  const best = mdCandidates[0];
+  return { files, mdPath: best?.path ?? null, mdMtime: best?.mtime ?? 0 };
 }
 
 async function readCache(cachePath: string, mdMtime: number): Promise<unknown | null> {

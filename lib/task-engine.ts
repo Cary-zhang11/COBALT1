@@ -46,6 +46,19 @@ export async function startTaskExecution(taskId: string): Promise<void> {
   if (task.status !== "running")
     throw new Error("Task not in running state (execute route should set it first)");
 
+  const isTweak = (task.tweakCount || 0) > 0;
+  const tweakRound = task.tweakCount || 0;
+
+  // Snapshot pre-existing files for tweak fallback rename
+  let preFileNames: Set<string> | undefined;
+  if (isTweak) {
+    try {
+      const outputDir = getOutputPath(taskId);
+      const entries = await fs.readdir(outputDir);
+      preFileNames = new Set(entries);
+    } catch { /* dir may not exist */ }
+  }
+
   try {
     let workspaceFiles: string[] = [];
     if (task.inputFiles && task.inputFiles.length > 0) {
@@ -90,6 +103,27 @@ export async function startTaskExecution(taskId: string): Promise<void> {
       }
 
       if (event.type === "pause") {
+        // On output_complete for tweaks: rename AI-generated files that lack _v{N}
+        if (event.pauseReason === "output_complete" && isTweak && preFileNames) {
+          try {
+            const outputDir = getOutputPath(taskId);
+            const entries = await fs.readdir(outputDir, { withFileTypes: true });
+            for (const entry of entries) {
+              if (!entry.isFile()) continue;
+              if (preFileNames.has(entry.name)) continue;
+              const ext = path.extname(entry.name);
+              const base = path.basename(entry.name, ext);
+              if (!/_v\d+$/.test(base)) {
+                await fs.rename(
+                  path.join(outputDir, entry.name),
+                  path.join(outputDir, `${base}_v${tweakRound}${ext}`)
+                );
+              }
+            }
+          } catch { /* non-critical */ }
+          await collectOutputFiles(taskId);
+        }
+
         await prisma.task.update({
           where: { id: taskId },
           data: {
@@ -100,7 +134,7 @@ export async function startTaskExecution(taskId: string): Promise<void> {
             duration: Date.now() - startTime,
           },
         });
-        return; // Stop the stream; CLI process will be killed in finally
+        return;
       }
 
       if (event.type === "error") {
@@ -116,12 +150,12 @@ export async function startTaskExecution(taskId: string): Promise<void> {
       }
     }
 
-    // Stream ended normally
+    // Stream ended normally (should not happen, but handle anyway)
     await collectOutputFiles(taskId);
     await prisma.task.update({
       where: { id: taskId },
       data: {
-        status: "completed",
+        status: "paused",
         output,
         duration: Date.now() - startTime,
       },
