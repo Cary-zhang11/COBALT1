@@ -6,27 +6,65 @@ import { parseTestcaseMarkdown } from "@/lib/parse-testcase-md";
 import fs from "fs/promises";
 import path from "path";
 
-async function collectOutputFiles(outputDir: string, taskId: string): Promise<{ name: string; path: string }[]> {
-  const results: { name: string; path: string }[] = [];
-  try {
-    const entries = await fs.readdir(outputDir, { withFileTypes: true });
+const CACHE_FILE = ".report_cache.json";
+
+async function collectOutputFiles(outputDir: string, taskId: string): Promise<{
+  files: { name: string; path: string }[];
+  mdPath: string | null;
+  mdMtime: number;
+}> {
+  const files: { name: string; path: string }[] = [];
+  let mdPath: string | null = null;
+  let mdMtime = 0;
+
+  async function walk(dir: string) {
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const entry of entries) {
-      const fullPath = path.join(outputDir, entry.name);
+      const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        const subFiles = await collectOutputFiles(fullPath, taskId);
-        results.push(...subFiles);
+        await walk(fullPath);
       } else {
         const relativePath = path.relative(outputDir, fullPath);
-        results.push({
+        files.push({
           name: entry.name,
           path: `/api/tasks/${taskId}/download?file=${encodeURIComponent(relativePath)}`,
         });
+        // Find test case markdown during the same walk
+        if (!mdPath && entry.name.includes("测试用例") && entry.name.endsWith(".md")) {
+          try {
+            const stat = await fs.stat(fullPath);
+            mdPath = fullPath;
+            mdMtime = stat.mtimeMs;
+          } catch { /* skip */ }
+        }
       }
     }
-  } catch {
-    // output dir may not exist
   }
-  return results;
+
+  await walk(outputDir);
+  return { files, mdPath, mdMtime };
+}
+
+async function readCache(cachePath: string, mdMtime: number): Promise<unknown | null> {
+  try {
+    const stat = await fs.stat(cachePath);
+    if (stat.mtimeMs >= mdMtime) {
+      const raw = await fs.readFile(cachePath, "utf-8");
+      return JSON.parse(raw);
+    }
+  } catch { /* cache miss */ }
+  return null;
+}
+
+async function writeCache(cachePath: string, data: unknown): Promise<void> {
+  try {
+    await fs.writeFile(cachePath, JSON.stringify(data), "utf-8");
+  } catch { /* non-critical */ }
 }
 
 export async function GET(
@@ -37,7 +75,6 @@ export async function GET(
     const token = req.cookies.get("token")?.value;
     const { userId } = await getAuthUser(token);
 
-    // Verify task ownership
     const task = await prisma.task.findFirst({
       where: { id: params.id, userId },
     });
@@ -48,38 +85,21 @@ export async function GET(
 
     const outputDir = getOutputPath(params.id);
 
-    // Collect output file list for download URLs
-    const outputFiles = await collectOutputFiles(outputDir, params.id);
+    // Single pass: collect files + find test case .md
+    const { files: outputFiles, mdPath, mdMtime } = await collectOutputFiles(outputDir, params.id);
 
-    // Find and read the test case .md file
-    let mdContent = "";
-    try {
-      const entries = await fs.readdir(outputDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isFile() && entry.name.includes("测试用例") && entry.name.endsWith(".md")) {
-          mdContent = await fs.readFile(path.join(outputDir, entry.name), "utf-8");
-          break;
-        }
-        // Also check one level of subdirs
-        if (entry.isDirectory()) {
-          const subDir = path.join(outputDir, entry.name);
-          try {
-            const subEntries = await fs.readdir(subDir, { withFileTypes: true });
-            for (const sub of subEntries) {
-              if (sub.isFile() && sub.name.includes("测试用例") && sub.name.endsWith(".md")) {
-                mdContent = await fs.readFile(path.join(subDir, sub.name), "utf-8");
-                break;
-              }
-            }
-          } catch { /* skip unreadable subdir */ }
-          if (mdContent) break;
-        }
+    // Try file-based cache (persists across restarts, invalidated by md mtime)
+    if (mdPath) {
+      const cachePath = path.join(path.dirname(mdPath), CACHE_FILE);
+      const cached = await readCache(cachePath, mdMtime);
+      if (cached) {
+        const data = cached as Record<string, unknown>;
+        // Recompute outputFiles each time (download URLs may change)
+        return NextResponse.json({ ...data, outputFiles });
       }
-    } catch {
-      // output dir may not exist
     }
 
-    if (!mdContent) {
+    if (!mdPath) {
       return NextResponse.json({
         tree: null,
         summary: { totalCases: 0, qualityScore: 0, modules: 0 },
@@ -89,16 +109,24 @@ export async function GET(
       });
     }
 
+    // Cold path: read and parse the markdown
+    const mdContent = await fs.readFile(mdPath, "utf-8");
     const parsed = parseTestcaseMarkdown(mdContent);
 
-    return NextResponse.json({
+    const data = {
       tree: parsed.tree,
       summary: parsed.summary,
       rawMarkdown: mdContent,
       outputFiles,
       meta: parsed.meta,
       duration: task.duration,
-    });
+    };
+
+    // Persist cache for next request
+    const cachePath = path.join(path.dirname(mdPath), CACHE_FILE);
+    await writeCache(cachePath, data);
+
+    return NextResponse.json(data);
   } catch (error) {
     console.error("Report error:", error);
     return NextResponse.json(

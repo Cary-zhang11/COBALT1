@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { CheckCircle2, Download, MessageSquare, Star, Edit3, RefreshCw } from "lucide-react";
+import type { FileInfo } from "@/hooks/use-output-scanner";
 
 const WORKFLOW_NODES: { name: string; key: string }[] = [
   { name: "文档解析", key: "source" },
@@ -22,8 +23,8 @@ interface ExecutionPanelProps {
     dimensions: string;
     fewShot: string;
   };
-  foundFiles: string[];
-  onDownloadFile: (fileName: string) => void;
+  foundFiles: FileInfo[];
+  onDownloadFile: (file: FileInfo) => void;
   onScrollToAITweak: () => void;
   onScrollToRating: () => void;
   onNavigateToEditor: () => void;
@@ -31,14 +32,14 @@ interface ExecutionPanelProps {
 }
 
 function deriveNodeStates(
-  foundFiles: string[],
+  foundFiles: FileInfo[],
   generating: boolean
 ): { name: string; state: "wait" | "running" | "done" }[] {
-  const hasSourceMd = foundFiles.some((f) => f.includes("_source"));
+  const hasSourceMd = foundFiles.some((f) => f.name.includes("_source"));
   const hasTestcaseMd = foundFiles.some(
-    (f) => f.includes("测试用例") && f.endsWith(".md")
+    (f) => f.name.includes("测试用例") && f.name.endsWith(".md")
   );
-  const hasXmind = foundFiles.some((f) => f.endsWith(".xmind"));
+  const hasXmind = foundFiles.some((f) => f.name.endsWith(".xmind"));
 
   return WORKFLOW_NODES.map((node, i) => {
     let state: "wait" | "running" | "done";
@@ -84,9 +85,9 @@ export function ExecutionPanel({
   );
 
   const mdFile = foundFiles.find(
-    (f) => f.includes("测试用例") && f.endsWith(".md")
+    (f) => f.name.includes("测试用例") && f.name.endsWith(".md")
   );
-  const xmindFile = foundFiles.find((f) => f.endsWith(".xmind"));
+  const xmindFile = foundFiles.find((f) => f.name.endsWith(".xmind"));
 
   // Mode 1: Config Preview (wizStep < 2)
   if (wizStep < 2) {

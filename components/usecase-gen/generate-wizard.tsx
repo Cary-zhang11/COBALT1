@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
-import { useOutputScanner } from "@/hooks/use-output-scanner";
+import { useOutputScanner, type FileInfo } from "@/hooks/use-output-scanner";
 import { ExecutionPanel } from "./shared/execution-panel";
 import { OutputFiles } from "./shared/output-files";
 import { AITweakPanel } from "./shared/ai-tweak-panel";
@@ -70,7 +70,7 @@ export function GenerateWizard({
   const [genStatus, setGenStatus] = useState("");
   const [taskId, setTaskId] = useState<string | null>(null);
   const [genStats, setGenStats] = useState<{ totalCases: number; qualityScore: number; modules: number; duration: number } | null>(null);
-  const [loadedFiles, setLoadedFiles] = useState<string[]>([]);
+  const [loadedFiles, setLoadedFiles] = useState<FileInfo[]>([]);
 
   const cancelTask = useCancelTask();
 
@@ -109,7 +109,9 @@ export function GenerateWizard({
       setGenerating(false);
       setGenStatus("");
       if (preloadedResult.outputFiles) {
-        setLoadedFiles(preloadedResult.outputFiles);
+        setLoadedFiles(
+          preloadedResult.outputFiles.map((f) => ({ name: f, relativePath: f }))
+        );
       }
       onComplete(preloadedResult.tree, preloadedResult.stats);
       onClearPreloaded?.();
@@ -131,7 +133,17 @@ export function GenerateWizard({
             if (cancelled) return;
             const tree = report.tree as UsecaseModule[];
             const summary = report.summary;
-            const fileNames: string[] = report.outputFiles.map((f: { name: string }) => f.name);
+            const fileInfos: FileInfo[] = report.outputFiles.map(
+              (f: { name: string; path: string }) => {
+                let relativePath = f.name;
+                try {
+                  const url = new URL(f.path, "http://x");
+                  const fileParam = url.searchParams.get("file");
+                  if (fileParam) relativePath = decodeURIComponent(fileParam);
+                } catch { /* fallback */ }
+                return { name: f.name, relativePath };
+              }
+            );
             onComplete(tree, summary);
             setTaskId(resumeTaskId);
             setWizStep(2);
@@ -143,7 +155,7 @@ export function GenerateWizard({
             });
             setGenerating(false);
             setGenStatus("");
-            setLoadedFiles(fileNames);
+            setLoadedFiles(fileInfos);
             onClearResume?.();
             return;
           }
@@ -513,7 +525,7 @@ export function GenerateWizard({
                 {/* Output files */}
                 <OutputFiles
                   taskId={taskId}
-                  files={Array.from(new Set([...scanner.foundFiles, ...loadedFiles]))}
+                  files={[...scanner.foundFiles, ...loadedFiles]}
                 />
 
                 {/* AI Tweak */}
@@ -597,10 +609,16 @@ export function GenerateWizard({
           dimensions: `${dimensions.filter((d) => d.active).length} 个`,
           fewShot: `${fewShot.filter((f) => f.selected).length} 份`,
         }}
-        foundFiles={Array.from(new Set([...scanner.foundFiles, ...loadedFiles]))}
-        onDownloadFile={(fileName) => {
+        foundFiles={[...scanner.foundFiles, ...loadedFiles]}
+        onDownloadFile={(file) => {
           if (!taskId) return;
-          window.open(`/api/tasks/${taskId}/download?file=${encodeURIComponent(fileName)}`);
+          const url = `/api/tasks/${taskId}/download?file=${encodeURIComponent(file.relativePath)}`;
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = file.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
         }}
         onScrollToAITweak={() => {
           document.querySelector("[data-ai-tweak]")?.scrollIntoView({ behavior: "smooth" });

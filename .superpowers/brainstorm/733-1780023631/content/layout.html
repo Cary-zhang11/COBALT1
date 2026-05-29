@@ -1,0 +1,214 @@
+<h2>Step 3 布局方案 — 右侧轻量进度 + 主区全内容</h2>
+<p class="subtitle">右侧保留，但缩小为轻量进度指示器（wizard 路径）或快捷操作（历史路径）</p>
+
+<div class="section">
+  <h3>方案：右侧轻量 sidebar + 主区单列</h3>
+
+  <div class="mockup">
+    <div class="mockup-header">Step 3 — 生成中（wizard 路径进入）</div>
+    <div class="mockup-body" style="padding:16px;display:flex;gap:16px;">
+      <!-- Main area -->
+      <div style="flex:1;min-width:0;">
+        <!-- KPI row -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#94a3b8;">生成模块</div><div style="font-size:22px;font-weight:700;color:#6366f1;">3</div></div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#94a3b8;">用例总数</div><div style="font-size:22px;font-weight:700;" id="kpi-cases">18</div></div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#94a3b8;">质量评分</div><div style="font-size:22px;font-weight:700;color:#22c55e;">—</div></div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#94a3b8;">生成耗时</div><div style="font-size:22px;font-weight:700;" id="kpi-time">8s</div></div>
+        </div>
+
+        <!-- Output files -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
+          <span style="font-size:12px;font-weight:600;color:#334155;">输出文件</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;">📄 测试用例.md <span style="color:#6366f1;cursor:pointer;margin-left:4px;">⬇</span></span>
+          <span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;">🧠 测试用例.xmind <span style="color:#6366f1;cursor:pointer;margin-left:4px;" id="xmind-dl">⬇</span></span>
+          <span style="font-size:10px;color:#94a3b8;margin-left:auto;" id="file-pending">生成中…</span>
+        </div>
+
+        <!-- AI Tweak -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:8px;">AI 微调</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            <span style="font-size:10px;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:12px;cursor:pointer;">🔍 补充边界场景</span>
+            <span style="font-size:10px;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:12px;cursor:pointer;">⚠️ 增加异常覆盖</span>
+            <span style="font-size:10px;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:12px;cursor:pointer;">✂️ 精简步骤描述</span>
+            <span style="font-size:10px;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:12px;cursor:pointer;">🔒 增加安全场景</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="font-size:10px;color:#64748b;">范围:</span>
+            <select style="font-size:10px;border:1px solid #e2e8f0;border-radius:4px;padding:2px 6px;">
+              <option>全部模块</option>
+              <option>登录模块</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input class="mock-input" style="flex:1;" placeholder="输入调整指令…">
+            <button class="mock-button" style="background:#6366f1;color:#fff;">发送</button>
+          </div>
+          <div style="background:#f8fafc;border-radius:6px;padding:8px;font-size:11px;color:#64748b;max-height:80px;overflow-y:auto;margin-top:8px;">
+            <div style="margin-bottom:4px;"><span style="color:#6366f1;">You:</span> 给登录模块补充异常场景</div>
+            <div style="color:#22c55e;">AI 已为「登录」模块新增 3 条 P1 用例</div>
+          </div>
+        </div>
+
+        <!-- Rating -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:8px;">评价</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:11px;color:#64748b;">整体质量</span>
+            <span style="font-size:18px;color:#fbbf24;">★★★★☆</span>
+            <button class="mock-button" style="font-size:11px;">提交评价</button>
+          </div>
+        </div>
+
+        <!-- Module table collapsed -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+          <div style="padding:10px 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+            <span style="font-size:12px;font-weight:600;">模块用例概览 <span style="color:#94a3b8;font-weight:400;">(8 模块 · 42 用例)</span></span>
+            <span style="font-size:10px;color:#6366f1;">展开 ▼</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right sidebar — slim progress indicator (wizard path) -->
+      <div style="width:200px;flex-shrink:0;">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;position:sticky;top:20px;">
+          <div style="font-size:11px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#6366f1;display:inline-block;animation:pulse 1.5s infinite;"></span>
+            生成中
+          </div>
+          <!-- Slim node list — just dots + name, no descriptions, no log area -->
+          <div style="display:flex;flex-direction:column;gap:0;">
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0;opacity:1;">
+              <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
+              <span style="font-size:10px;color:#334155;">文档解析</span>
+            </div>
+            <div style="width:0;height:6px;border-left:1px dashed #e2e8f0;margin-left:2.5px;"></div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0;opacity:1;">
+              <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
+              <span style="font-size:10px;color:#334155;">知识检索</span>
+            </div>
+            <div style="width:0;height:6px;border-left:1px dashed #e2e8f0;margin-left:2.5px;"></div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0;opacity:1;">
+              <span style="width:6px;height:6px;border-radius:50%;background:#6366f1;flex-shrink:0;box-shadow:0 0 0 2px #c7d2fe;"></span>
+              <span style="font-size:10px;color:#6366f1;font-weight:500;">LLM 生成</span>
+            </div>
+            <div style="width:0;height:6px;border-left:1px dashed #e2e8f0;margin-left:2.5px;"></div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0;opacity:0.4;">
+              <span style="width:6px;height:6px;border-radius:50%;background:#cbd5e1;flex-shrink:0;"></span>
+              <span style="font-size:10px;color:#94a3b8;">质量校验</span>
+            </div>
+            <div style="width:0;height:6px;border-left:1px dashed #e2e8f0;margin-left:2.5px;"></div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0;opacity:0.4;">
+              <span style="width:6px;height:6px;border-radius:50%;background:#cbd5e1;flex-shrink:0;"></span>
+              <span style="font-size:10px;color:#94a3b8;">导出格式化</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup" style="margin-top:16px;">
+    <div class="mockup-header">Step 3 — 历史记录进入（无进度，右侧放快捷操作）</div>
+    <div class="mockup-body" style="padding:16px;display:flex;gap:16px;">
+      <!-- Main area — same as above, but KPI values filled -->
+      <div style="flex:1;min-width:0;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#94a3b8;">生成模块</div><div style="font-size:22px;font-weight:700;color:#6366f1;">8</div></div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#94a3b8;">用例总数</div><div style="font-size:22px;font-weight:700;">42</div></div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#94a3b8;">质量评分</div><div style="font-size:22px;font-weight:700;color:#22c55e;">85</div></div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#94a3b8;">生成耗时</div><div style="font-size:22px;font-weight:700;">12s</div></div>
+        </div>
+
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
+          <span style="font-size:12px;font-weight:600;color:#334155;">输出文件</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;">📄 测试用例.md <span style="color:#6366f1;cursor:pointer;margin-left:4px;">⬇</span></span>
+          <span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;">🧠 测试用例.xmind <span style="color:#6366f1;cursor:pointer;margin-left:4px;">⬇</span></span>
+        </div>
+
+        <!-- AI Tweak -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:8px;">AI 微调</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            <span style="font-size:10px;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:12px;cursor:pointer;">🔍 补充边界场景</span>
+            <span style="font-size:10px;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:12px;cursor:pointer;">⚠️ 增加异常覆盖</span>
+            <span style="font-size:10px;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:12px;cursor:pointer;">✂️ 精简步骤描述</span>
+            <span style="font-size:10px;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:12px;cursor:pointer;">🔒 增加安全场景</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="font-size:10px;color:#64748b;">范围:</span>
+            <select style="font-size:10px;border:1px solid #e2e8f0;border-radius:4px;padding:2px 6px;">
+              <option>全部模块</option><option>登录模块</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input class="mock-input" style="flex:1;" placeholder="输入调整指令…">
+            <button class="mock-button" style="background:#6366f1;color:#fff;">发送</button>
+          </div>
+          <div style="background:#f8fafc;border-radius:6px;padding:8px;font-size:11px;color:#64748b;max-height:80px;overflow-y:auto;margin-top:8px;">
+            <div style="margin-bottom:4px;"><span style="color:#6366f1;">You:</span> 给登录模块补充异常场景</div>
+            <div style="color:#22c55e;">AI 已为「登录」模块新增 3 条 P1 用例</div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:8px;">评价</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:11px;color:#64748b;">整体质量</span>
+            <span style="font-size:18px;color:#fbbf24;">★★★★☆</span>
+            <button class="mock-button" style="font-size:11px;">提交评价</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right sidebar — quick actions (history path, no progress) -->
+      <div style="width:200px;flex-shrink:0;">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;position:sticky;top:20px;">
+          <div style="font-size:11px;font-weight:600;margin-bottom:8px;color:#334155;">快捷操作</div>
+          <button class="mock-button" style="width:100%;margin-bottom:6px;font-size:11px;justify-content:flex-start;display:flex;align-items:center;gap:6px;">⬇ 下载 Markdown</button>
+          <button class="mock-button" style="width:100%;margin-bottom:6px;font-size:11px;justify-content:flex-start;display:flex;align-items:center;gap:6px;">⬇ 下载 XMind</button>
+          <button class="mock-button" style="width:100%;margin-bottom:6px;font-size:11px;justify-content:flex-start;display:flex;align-items:center;gap:6px;">🤖 AI 微调</button>
+          <button class="mock-button" style="width:100%;margin-bottom:6px;font-size:11px;justify-content:flex-start;display:flex;align-items:center;gap:6px;">⭐ 评价</button>
+          <button class="mock-button" style="width:100%;margin-bottom:6px;font-size:11px;justify-content:flex-start;display:flex;align-items:center;gap:6px;">✏️ 去编辑用例</button>
+          <button class="mock-button" style="width:100%;margin-bottom:0;font-size:11px;justify-content:flex-start;display:flex;align-items:center;gap:6px;">🔧 重新配置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup" style="margin-top:16px;">
+    <div class="mockup-header">Step 0 / Step 1 — 右侧保持「当前配置预览」（不变）</div>
+    <div class="mockup-body" style="padding:16px;display:flex;gap:16px;">
+      <div style="flex:1;background:#f8fafc;border:1px dashed #e2e8f0;border-radius:8px;padding:24px;text-align:center;font-size:12px;color:#94a3b8;">主区：物料输入 / 能力选择</div>
+      <div style="width:200px;flex-shrink:0;">
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;">
+          <div style="font-size:11px;font-weight:600;margin-bottom:6px;">当前配置预览</div>
+          <div style="font-size:10px;display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">物料来源</span><span>需求文档</span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">已选能力</span><span>3 项</span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">覆盖维度</span><span>功能/异常</span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">few-shot</span><span>2 个</span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">输出格式</span><span>XMind+MD</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>右侧 sidebar 三种内容（按入口 + 步骤切换）</h3>
+  <table style="width:100%;border-collapse:collapse;">
+    <tr style="background:#f8fafc;"><th style="padding:8px 12px;text-align:left;font-size:11px;border:1px solid #e2e8f0;">入口</th><th style="padding:8px 12px;text-align:left;font-size:11px;border:1px solid #e2e8f0;">Step 0/1</th><th style="padding:8px 12px;text-align:left;font-size:11px;border:1px solid #e2e8f0;">Step 3 生成中</th><th style="padding:8px 12px;text-align:left;font-size:11px;border:1px solid #e2e8f0;">Step 3 完成后</th></tr>
+    <tr><td style="padding:8px 12px;font-size:11px;border:1px solid #e2e8f0;">生成向导</td><td style="padding:8px 12px;font-size:11px;border:1px solid #e2e8f0;">配置预览</td><td style="padding:8px 12px;font-size:11px;border:1px solid #e2e8f0;">轻量进度（5 节点）</td><td style="padding:8px 12px;font-size:11px;border:1px solid #e2e8f0;">快捷操作面板</td></tr>
+    <tr><td style="padding:8px 12px;font-size:11px;border:1px solid #e2e8f0;">历史记录</td><td style="padding:8px 12px;font-size:11px;border:1px solid #e2e8f0;" colspan="2">—（直接进入 Step 3）</td><td style="padding:8px 12px;font-size:11px;border:1px solid #e2e8f0;">快捷操作面板</td></tr>
+  </table>
+</div>
+
+<style>
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+</style>

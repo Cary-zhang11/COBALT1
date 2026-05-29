@@ -12,6 +12,7 @@ interface HistoryListProps {
   onLoadResult: (result: {
     tree: UsecaseModule[];
     stats: { totalCases: number; qualityScore: number; modules: number };
+    outputFiles?: string[];
   }) => void;
   onResumeTask: (taskId: string) => void;
 }
@@ -45,11 +46,38 @@ export function HistoryList({ skillId, onLoadResult, onResumeTask }: HistoryList
   const tasks = data?.tasks || [];
 
   const handleClickCompleted = async (task: { id: string; output: string | null }) => {
+    // Try client-side parse first — instant, no network
+    if (task.output) {
+      try {
+        const { parseUsecaseOutput } = await import(
+          "./shared/parse-usecase-output"
+        );
+        const parsed = parseUsecaseOutput(task.output);
+        if (parsed.tree) {
+          onLoadResult({
+            tree: parsed.tree,
+            stats: parsed.summary || {
+              totalCases: parsed.tree.reduce(
+                (s, m) => s + m.cases.length, 0
+              ),
+              qualityScore: 0,
+              modules: parsed.tree.length,
+            },
+          });
+          return;
+        }
+      } catch { /* fall through to report API */ }
+    }
+
+    // Fallback: fetch report API (server-cached for completed tasks)
     try {
       const res = await fetch(`/api/tasks/${task.id}/report`);
       if (!res.ok) throw new Error("Failed to load report");
       const report = await res.json();
       if (report.tree) {
+        const fileNames: string[] = (report.outputFiles || []).map(
+          (f: { name: string }) => f.name
+        );
         onLoadResult({
           tree: report.tree,
           stats: report.summary || {
@@ -59,32 +87,11 @@ export function HistoryList({ skillId, onLoadResult, onResumeTask }: HistoryList
             qualityScore: 0,
             modules: report.tree.length,
           },
+          outputFiles: fileNames,
         });
       }
     } catch {
-      // Fallback: parse from task.output
-      try {
-        if (task.output) {
-          const { parseUsecaseOutput } = await import(
-            "./shared/parse-usecase-output"
-          );
-          const parsed = parseUsecaseOutput(task.output);
-          if (parsed.tree) {
-            onLoadResult({
-              tree: parsed.tree,
-              stats: parsed.summary || {
-                totalCases: parsed.tree.reduce(
-                  (s, m) => s + m.cases.length, 0
-                ),
-                qualityScore: 0,
-                modules: parsed.tree.length,
-              },
-            });
-          }
-        }
-      } catch {
-        // silently fail
-      }
+      // silently fail
     }
   };
 

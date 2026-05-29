@@ -18,6 +18,7 @@ export default function UsecaseGenPage() {
   const [preloadedResult, setPreloadedResult] = useState<{
     tree: UsecaseModule[];
     stats: { totalCases: number; qualityScore: number; modules: number };
+    outputFiles?: string[];
   } | null>(null);
 
   const skillId = process.env.NEXT_PUBLIC_USECASE_SKILL_ID;
@@ -25,6 +26,7 @@ export default function UsecaseGenPage() {
   const handleLoadResult = (result: {
     tree: UsecaseModule[];
     stats: { totalCases: number; qualityScore: number; modules: number };
+    outputFiles?: string[];
   }) => {
     setUsecaseTree(result.tree);
     setPreloadedResult(result);

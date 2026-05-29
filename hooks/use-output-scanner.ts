@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
+export interface FileInfo {
+  name: string;
+  relativePath: string;
+}
+
 interface UseOutputScannerOptions {
   taskId: string;
   interval?: number;
@@ -26,7 +31,7 @@ export function useOutputScanner({
   enabled = true,
 }: UseOutputScannerOptions) {
   const [isScanning, setIsScanning] = useState(false);
-  const [foundFiles, setFoundFiles] = useState<string[]>([]);
+  const [foundFiles, setFoundFiles] = useState<FileInfo[]>([]);
   const [, setPollCount] = useState(0);
   const fileSizesRef = useRef<FileSizeMap>({});
   const stopRef = useRef(false);
@@ -86,8 +91,19 @@ export function useOutputScanner({
 
         // 3. Check if output files exist
         const files = report.outputFiles || [];
-        const newFoundFiles: string[] = files.map(
-          (f: { name: string }) => f.name
+        const newFoundFiles: FileInfo[] = files.map(
+          (f: { name: string; path: string }) => {
+            // Extract relativePath from the download URL in `path`
+            let relativePath = f.name;
+            try {
+              const url = new URL(f.path, "http://x");
+              const fileParam = url.searchParams.get("file");
+              if (fileParam) relativePath = decodeURIComponent(fileParam);
+            } catch {
+              // fallback to basename
+            }
+            return { name: f.name, relativePath };
+          }
         );
         if (newFoundFiles.length > 0) {
           setFoundFiles(newFoundFiles);
@@ -97,9 +113,8 @@ export function useOutputScanner({
         if (report.tree && newFoundFiles.length > 0) {
           const currentCases = report.summary?.totalCases || 0;
 
-          // Find the md file name for this report
-          const mdFiles = newFoundFiles.filter((name: string) =>
-            name.includes("测试用例")
+          const mdFiles = newFoundFiles.filter((f: FileInfo) =>
+            f.name.includes("测试用例")
           );
 
           if (mdFiles.length > 0 && currentCases > 0) {

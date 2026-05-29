@@ -63,7 +63,7 @@ describe("ExecutionPanel", () => {
       render(
         <ExecutionPanel
           taskId="test-id" generating={true} wizStep={2} hasResult={false}
-          configSummary={defaultConfig} foundFiles={["_source.md"]}
+          configSummary={defaultConfig} foundFiles={[{ name: "_source.md", relativePath: "_source.md" }]}
           onDownloadFile={noop} onScrollToAITweak={noop}
           onScrollToRating={noop} onNavigateToEditor={noop}
           onReconfigure={noop}
@@ -75,7 +75,10 @@ describe("ExecutionPanel", () => {
   });
 
   describe("Mode 3: Quick Actions (wizStep 2 + !generating + has result)", () => {
-    const foundFiles = ["测试用例.md", "测试用例.xmind"];
+    const foundFiles = [
+      { name: "测试用例.md", relativePath: "测试用例.md" },
+      { name: "测试用例.xmind", relativePath: "测试用例.xmind" },
+    ];
 
     it("renders quick action buttons when files exist", () => {
       render(
@@ -108,7 +111,7 @@ describe("ExecutionPanel", () => {
         />
       );
       fireEvent.click(screen.getByText("下载 Markdown"));
-      expect(onDownload).toHaveBeenCalledWith("测试用例.md");
+      expect(onDownload).toHaveBeenCalledWith(foundFiles[0]);
     });
 
     it("calls onReconfigure when clicked", () => {

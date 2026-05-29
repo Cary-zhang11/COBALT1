@@ -1,10 +1,11 @@
 "use client";
 
 import { FileText, Download, Loader2 } from "lucide-react";
+import type { FileInfo } from "@/hooks/use-output-scanner";
 
 interface OutputFilesProps {
   taskId: string | null;
-  files: string[];
+  files: FileInfo[];
 }
 
 function isDisplayable(name: string): boolean {
@@ -12,8 +13,18 @@ function isDisplayable(name: string): boolean {
   return name.includes("测试用例") && (name.endsWith(".md") || name.endsWith(".xmind"));
 }
 
+function downloadFile(taskId: string, file: FileInfo) {
+  const url = `/api/tasks/${taskId}/download?file=${encodeURIComponent(file.relativePath)}`;
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 export function OutputFiles({ taskId, files }: OutputFilesProps) {
-  const displayable = files.filter(isDisplayable);
+  const displayable = files.filter((f) => isDisplayable(f.name));
 
   return (
     <div className="bg-card rounded-xl shadow-sm p-5">
@@ -35,14 +46,12 @@ export function OutputFiles({ taskId, files }: OutputFilesProps) {
             >
               <div className="flex items-center gap-2 min-w-0">
                 <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                <span className="truncate">{f}</span>
+                <span className="truncate">{f.name}</span>
               </div>
               <button
                 onClick={() => {
                   if (!taskId) return;
-                  window.open(
-                    `/api/tasks/${taskId}/download?file=${encodeURIComponent(f)}`
-                  );
+                  downloadFile(taskId, f);
                 }}
                 disabled={!taskId}
                 className="text-primary hover:text-primary/70 disabled:opacity-40 flex-shrink-0 ml-2"
