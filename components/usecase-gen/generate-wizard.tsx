@@ -1,17 +1,21 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
 import { useOutputScanner } from "@/hooks/use-output-scanner";
 import { ExecutionPanel } from "./shared/execution-panel";
+import { OutputFiles } from "./shared/output-files";
+import { AITweakPanel } from "./shared/ai-tweak-panel";
+import { RatingPanel } from "./shared/rating-panel";
+import { ModuleOverviewTable } from "./shared/module-overview-table";
 import {
   mockRecentReqs, mockFewShotExamples, mockCapabilities,
   mockDimensions, mockQuickActions,
 } from "./shared/mock-data";
 import type { UsecaseModule, TweakEntry } from "./shared/types";
 import {
-  Upload, Loader2, Send, FileText, CheckCircle2, ArrowLeft, ChevronRight,
-  Wand2, Download, AlertTriangle, RefreshCw, Edit3, BarChart3,
+  Upload, Loader2, FileText, CheckCircle2, ArrowLeft, ChevronRight,
+  Wand2, AlertTriangle, RefreshCw, Edit3, BarChart3,
   Clock, Target, FileCheck, ArrowRight,
 } from "lucide-react";
 
@@ -25,6 +29,7 @@ interface GenerateWizardProps {
   preloadedResult?: {
     tree: UsecaseModule[];
     stats: { totalCases: number; qualityScore: number; modules: number };
+    outputFiles?: string[];
   } | null;
   onClearPreloaded?: () => void;
   resumeTaskId?: string | null;
@@ -65,10 +70,7 @@ export function GenerateWizard({
   const [genStatus, setGenStatus] = useState("");
   const [taskId, setTaskId] = useState<string | null>(null);
   const [genStats, setGenStats] = useState<{ totalCases: number; qualityScore: number; modules: number; duration: number } | null>(null);
-  const [injectInput, setInjectInput] = useState("");
-  const [injectSent, setInjectSent] = useState(false);
-  const [tweakInput, setTweakInput] = useState("");
-  const [iterationCount, setIterationCount] = useState(1);
+  const [loadedFiles, setLoadedFiles] = useState<string[]>([]);
 
   const cancelTask = useCancelTask();
 
@@ -106,21 +108,59 @@ export function GenerateWizard({
       });
       setGenerating(false);
       setGenStatus("");
+      if (preloadedResult.outputFiles) {
+        setLoadedFiles(preloadedResult.outputFiles);
+      }
       onComplete(preloadedResult.tree, preloadedResult.stats);
       onClearPreloaded?.();
     }
   }, [preloadedResult, onComplete, onClearPreloaded]);
 
-  // Handle resume task from history
+  // Handle resume task from history — try direct fetch first, fall back to scanner
   useEffect(() => {
-    if (resumeTaskId) {
+    if (!resumeTaskId) return;
+
+    let cancelled = false;
+    (async () => {
+      // Try direct report fetch — if files already exist, render immediately
+      try {
+        const reportRes = await fetch(`/api/tasks/${resumeTaskId}/report`);
+        if (reportRes.ok) {
+          const report = await reportRes.json();
+          if (report.tree && report.outputFiles?.length > 0) {
+            if (cancelled) return;
+            const tree = report.tree as UsecaseModule[];
+            const summary = report.summary;
+            const fileNames: string[] = report.outputFiles.map((f: { name: string }) => f.name);
+            onComplete(tree, summary);
+            setTaskId(resumeTaskId);
+            setWizStep(2);
+            setGenStats({
+              totalCases: summary?.totalCases || 0,
+              qualityScore: summary?.qualityScore || 0,
+              modules: summary?.modules || 0,
+              duration: 0,
+            });
+            setGenerating(false);
+            setGenStatus("");
+            setLoadedFiles(fileNames);
+            onClearResume?.();
+            return;
+          }
+        }
+      } catch { /* fall through to scanner */ }
+
+      if (cancelled) return;
+      // Files not ready yet — start scanner polling
       setTaskId(resumeTaskId);
       setGenerating(true);
       setGenStatus("正在恢复执行进度...");
       setWizStep(2);
       onClearResume?.();
-    }
-  }, [resumeTaskId, onClearResume]);
+    })();
+
+    return () => { cancelled = true; };
+  }, [resumeTaskId, onClearResume, onComplete]);
 
   // Upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,6 +195,7 @@ export function GenerateWizard({
     setWizStep(2);
     setGenerating(true);
     setGenStatus("正在解析需求文档...");
+    setLoadedFiles([]);
     try {
       const { taskId: newTaskId } = await createTask.mutateAsync({
         skillId,
@@ -358,8 +399,8 @@ export function GenerateWizard({
         {/* Step 3：生成结果 */}
         {wizStep === 2 && (
           <div className="space-y-5">
-            {/* Generating state */}
-            {generating && (
+            {/* Generating state — first generation, no tree yet */}
+            {generating && !usecaseTree && (
               <div className="bg-card rounded-xl shadow-sm p-10 text-center">
                 <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-primary/10 flex items-center justify-center">
                   <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -382,6 +423,29 @@ export function GenerateWizard({
                   ) : (
                     "取消生成"
                   )}
+                </button>
+              </div>
+            )}
+
+            {/* Generating state — tree already exists (tweak in progress) */}
+            {generating && usecaseTree && usecaseTree.length > 0 && (
+              <div className="bg-card rounded-xl shadow-sm p-4 mb-4 flex items-center gap-3 border border-primary/20">
+                <Loader2 className="w-4 h-4 text-primary animate-spin flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">微调中...</p>
+                  <p className="text-xs text-muted-foreground">{genStatus || "AI 正在基于已有用例进行修改"}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    cancelTask.mutate(taskId!);
+                    scanner.stop();
+                    setGenerating(false);
+                    setGenStatus("");
+                  }}
+                  disabled={cancelTask.isPending}
+                  className="ml-auto border border-red-200 text-red-500 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-50 disabled:opacity-40"
+                >
+                  取消微调
                 </button>
               </div>
             )}
@@ -446,64 +510,52 @@ export function GenerateWizard({
                   </div>
                 </div>
 
-                {/* Module Overview Table */}
-                <div className="bg-card rounded-xl shadow-sm overflow-hidden">
-                  <div className="px-5 py-3 border-b flex items-center justify-between">
-                    <h3 className="font-semibold text-sm">模块用例概览</h3>
-                    <span className="text-xs text-muted-foreground">
-                      共 {usecaseTree.reduce((s, m) => s + m.cases.length, 0)} 条用例
-                    </span>
-                  </div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/30">
-                        <th className="text-left px-5 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">模块</th>
-                        <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">用例数</th>
-                        <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">P0 / P1 / P2</th>
-                        <th className="text-right px-5 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">覆盖率</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {usecaseTree.map((mod, mi) => {
-                        const p0 = mod.cases.filter((c) => c.priority === "P0").length;
-                        const p1 = mod.cases.filter((c) => c.priority === "P1").length;
-                        const p2 = mod.cases.filter((c) => c.priority === "P2").length;
-                        const cov = Math.min(100, Math.round(mod.cases.length / Math.max(1, (genStats?.totalCases || usecaseTree.reduce((s, m) => s + m.cases.length, 0)) / usecaseTree.length) * 40 + 60));
-                        return (
-                          <tr key={mi} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                            <td className="px-5 py-3 font-medium">{mod.name}</td>
-                            <td className="text-center px-4 py-3">{mod.cases.length}</td>
-                            <td className="text-center px-4 py-3">
-                              <span className="inline-flex gap-1">
-                                <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">{p0}</span>
-                                <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">{p1}</span>
-                                <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">{p2}</span>
-                              </span>
-                            </td>
-                            <td className="text-right px-5 py-3">
-                              <div className="flex items-center justify-end gap-2">
-                                <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                                  <div className={`h-full rounded-full ${cov >= 80 ? "bg-emerald-500" : cov >= 60 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${cov}%` }} />
-                                </div>
-                                <span className="text-xs text-muted-foreground">{cov}%</span>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                {/* Output files */}
+                <OutputFiles
+                  taskId={taskId}
+                  files={Array.from(new Set([...scanner.foundFiles, ...loadedFiles]))}
+                />
 
-                {/* Action buttons */}
+                {/* AI Tweak */}
+                <AITweakPanel
+                  taskId={taskId}
+                  generating={generating}
+                  modules={usecaseTree.map((m) => m.name)}
+                  onTweakStarted={() => {
+                    setGenerating(true);
+                    setGenStatus("正在微调用例...");
+                  }}
+                />
+
+                {/* Rating */}
+                <RatingPanel taskId={taskId} />
+
+                {/* Module table — collapsed by default */}
+                <ModuleOverviewTable
+                  modules={usecaseTree}
+                  totalCases={usecaseTree.reduce((s, m) => s + m.cases.length, 0)}
+                />
+
+                {/* Bottom action buttons */}
                 <div className="flex justify-between">
-                  <button onClick={() => { setWizStep(0); setGenerating(false); setGenStatus(""); }}
-                    className="border border-border text-muted-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:border-muted-foreground/40 flex items-center gap-2 transition-colors">
-                    <ArrowLeft className="w-4 h-4" />重新配置
+                  <button
+                    onClick={() => {
+                      setWizStep(0);
+                      setGenerating(false);
+                      setGenStatus("");
+                    }}
+                    className="border border-border text-muted-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:border-muted-foreground/40 flex items-center gap-2 transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    重新配置
                   </button>
-                  <button onClick={() => onNavigateToTab?.(2)}
-                    className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm flex items-center gap-2 transition-all hover:bg-primary/90">
-                    <Edit3 className="w-4 h-4" />去编辑用例<ArrowRight className="w-4 h-4" />
+                  <button
+                    onClick={() => onNavigateToTab?.(2)}
+                    className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm flex items-center gap-2 transition-all hover:bg-primary/90"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    去编辑用例
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </>
@@ -528,18 +580,41 @@ export function GenerateWizard({
       </div>
 
       {/* Right: Execution Panel */}
-      <div className="w-80 flex-shrink-0">
-        <ExecutionPanel
-          taskId={taskId}
-          generating={generating}
-          configSummary={{
-            source: uploadedFiles.length > 0 ? uploadedFiles.map((f) => f.name).join(", ") : (selectedReq ? "最近需求" : (requirementText ? "文本输入" : "未选择")),
-            capabilities: `${capabilities.filter((c) => c.selected).length} / ${capabilities.length}`,
-            dimensions: `${dimensions.filter((d) => d.active).length} 个`,
-            fewShot: `${fewShot.filter((f) => f.selected).length} 份`,
-          }}
-        />
-      </div>
+      <ExecutionPanel
+        taskId={taskId}
+        generating={generating}
+        wizStep={wizStep}
+        hasResult={!generating && !!usecaseTree && usecaseTree.length > 0}
+        configSummary={{
+          source: uploadedFiles.length > 0
+            ? uploadedFiles.map((f) => f.name).join(", ")
+            : selectedReq
+            ? "最近需求"
+            : requirementText
+            ? "文本输入"
+            : "未选择",
+          capabilities: `${capabilities.filter((c) => c.selected).length} / ${capabilities.length}`,
+          dimensions: `${dimensions.filter((d) => d.active).length} 个`,
+          fewShot: `${fewShot.filter((f) => f.selected).length} 份`,
+        }}
+        foundFiles={Array.from(new Set([...scanner.foundFiles, ...loadedFiles]))}
+        onDownloadFile={(fileName) => {
+          if (!taskId) return;
+          window.open(`/api/tasks/${taskId}/download?file=${encodeURIComponent(fileName)}`);
+        }}
+        onScrollToAITweak={() => {
+          document.querySelector("[data-ai-tweak]")?.scrollIntoView({ behavior: "smooth" });
+        }}
+        onScrollToRating={() => {
+          document.querySelector("[data-rating]")?.scrollIntoView({ behavior: "smooth" });
+        }}
+        onNavigateToEditor={() => onNavigateToTab?.(2)}
+        onReconfigure={() => {
+          setWizStep(0);
+          setGenerating(false);
+          setGenStatus("");
+        }}
+      />
     </div>
   );
 }
