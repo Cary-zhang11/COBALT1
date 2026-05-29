@@ -1,173 +1,235 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useTaskEvents } from "@/hooks/use-task-events";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { useMemo } from "react";
+import { CheckCircle2, Download, MessageSquare, Star, Edit3, RefreshCw } from "lucide-react";
 
-interface WorkflowNode {
-  name: string;
-  desc: string;
-  state: "wait" | "running" | "done";
-  progress: number;
-}
-
-const WORKFLOW_TEMPLATE: WorkflowNode[] = [
-  { name: "文档解析", desc: "PRD 解析与规则预加载", state: "wait", progress: 0 },
-  { name: "需求分析", desc: "模块划分 · 场景分组 · 维度识别", state: "wait", progress: 0 },
-  { name: "用例生成", desc: "LLM 逐模块生成用例", state: "wait", progress: 0 },
-  { name: "质量校验", desc: "格式 + 完整度自检", state: "wait", progress: 0 },
-  { name: "导出格式", desc: "生成 XMind + Markdown", state: "wait", progress: 0 },
+const WORKFLOW_NODES: { name: string; key: string }[] = [
+  { name: "文档解析", key: "source" },
+  { name: "知识检索", key: "rag" },
+  { name: "LLM 生成", key: "llm" },
+  { name: "质量校验", key: "quality" },
+  { name: "导出格式化", key: "export" },
 ];
 
 interface ExecutionPanelProps {
   taskId: string | null;
   generating: boolean;
+  wizStep: number;
+  hasResult: boolean;
   configSummary: {
     source: string;
     capabilities: string;
     dimensions: string;
     fewShot: string;
   };
-  onComplete?: (status: string) => void;
+  foundFiles: string[];
+  onDownloadFile: (fileName: string) => void;
+  onScrollToAITweak: () => void;
+  onScrollToRating: () => void;
+  onNavigateToEditor: () => void;
+  onReconfigure: () => void;
 }
 
-export function ExecutionPanel({ taskId, generating, configSummary, onComplete }: ExecutionPanelProps) {
-  const [nodes, setNodes] = useState<WorkflowNode[]>(WORKFLOW_TEMPLATE);
-  const seenStepsRef = useRef(new Set<number>());
-  const prevLogCountRef = useRef(0);
+function deriveNodeStates(
+  foundFiles: string[],
+  generating: boolean
+): { name: string; state: "wait" | "running" | "done" }[] {
+  const hasSourceMd = foundFiles.some((f) => f.includes("_source"));
+  const hasTestcaseMd = foundFiles.some(
+    (f) => f.includes("测试用例") && f.endsWith(".md")
+  );
+  const hasXmind = foundFiles.some((f) => f.endsWith(".xmind"));
 
-  const { status, logs } = useTaskEvents({
-    taskId: taskId || "",
-    enabled: !!taskId && generating,
-    onComplete,
+  return WORKFLOW_NODES.map((node, i) => {
+    let state: "wait" | "running" | "done";
+    switch (i) {
+      case 0:
+        state = hasSourceMd ? "done" : generating ? "running" : "wait";
+        break;
+      case 1:
+        state = hasTestcaseMd ? "done" : hasSourceMd ? "running" : "wait";
+        break;
+      case 2:
+        state = hasTestcaseMd ? "done" : hasSourceMd ? "running" : "wait";
+        break;
+      case 3:
+        state = hasTestcaseMd ? "done" : "wait";
+        break;
+      case 4:
+        state = hasXmind ? "done" : hasTestcaseMd ? "running" : "wait";
+        break;
+      default:
+        state = "wait";
+    }
+    return { name: node.name, state };
   });
+}
 
-  // Reset on generation start/stop
-  useEffect(() => {
-    if (generating) {
-      seenStepsRef.current.clear();
-      prevLogCountRef.current = 0;
-      setNodes(WORKFLOW_TEMPLATE.map((n, i) => ({
-        ...n,
-        state: i === 0 ? "running" as const : "wait" as const,
-      })));
-    }
-  }, [generating]);
+export function ExecutionPanel({
+  taskId,
+  generating,
+  wizStep,
+  hasResult,
+  configSummary,
+  foundFiles,
+  onDownloadFile,
+  onScrollToAITweak,
+  onScrollToRating,
+  onNavigateToEditor,
+  onReconfigure,
+}: ExecutionPanelProps) {
+  const nodes = useMemo(
+    () => deriveNodeStates(foundFiles, generating),
+    [foundFiles, generating]
+  );
 
-  // Scan new SSE logs for [WF:done:xxx] markers and advance nodes
-  useEffect(() => {
-    if (!generating) return;
-    const newLogs = logs.slice(prevLogCountRef.current);
-    prevLogCountRef.current = logs.length;
+  const mdFile = foundFiles.find(
+    (f) => f.includes("测试用例") && f.endsWith(".md")
+  );
+  const xmindFile = foundFiles.find((f) => f.endsWith(".xmind"));
 
-    for (const log of newLogs) {
-      if (log.type !== "chunk" || !log.output) continue;
-      // Use global regex to catch multiple markers in one chunk
-      const re = /\[WF:done:(.+?)\]/g;
-      let match: RegExpExecArray | null;
-      while ((match = re.exec(log.output)) !== null) {
-        const stepName = match[1];
-        const idx = WORKFLOW_TEMPLATE.findIndex((n) => n.name === stepName);
-        if (idx === -1 || seenStepsRef.current.has(idx)) continue;
-        seenStepsRef.current.add(idx);
-
-        setNodes((prev) =>
-          prev.map((n, i) => {
-            if (i === idx) return { ...n, state: "done" as const, progress: 100 };
-            if (i === idx + 1 && prev[i]?.state === "wait") return { ...n, state: "running" as const };
-            return n;
-          })
-        );
-      }
-    }
-  }, [logs, generating]);
-
-  // Mark all remaining done when task completes
-  useEffect(() => {
-    if (status === "completed") {
-      setNodes((prev) => prev.map((n) => ({ ...n, state: "done" as const, progress: 100 })));
-    }
-  }, [status]);
-
-  return (
-    <div className="bg-card rounded-xl shadow-sm p-4 sticky top-20">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="font-semibold text-foreground text-sm">执行轨迹</h4>
-        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-cyan-100 text-cyan-700">工作流</span>
-      </div>
-
-      {!generating && (
-        <>
-          {/* Idle: greyed-out workflow preview */}
-          <div className="space-y-2 mb-3 opacity-40">
-            {nodes.map((node, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0" />
-                <span className="text-xs text-muted-foreground">{node.name}</span>
-                <span className="text-xs text-muted-foreground/50 ml-auto">{node.desc}</span>
+  // Mode 1: Config Preview (wizStep < 2)
+  if (wizStep < 2) {
+    return (
+      <div className="w-48 flex-shrink-0">
+        <div className="bg-card rounded-xl shadow-sm p-4 sticky top-20">
+          <h4 className="font-semibold text-sm text-foreground mb-3">
+            当前配置预览
+          </h4>
+          <div className="bg-muted rounded-lg p-3 space-y-2">
+            {[
+              ["物料来源", configSummary.source],
+              ["已选能力", configSummary.capabilities],
+              ["覆盖维度", configSummary.dimensions],
+              ["few-shot", configSummary.fewShot],
+              ["输出格式", "XMind + Markdown"],
+            ].map(([label, value]) => (
+              <div
+                key={label as string}
+                className="flex items-center justify-between text-xs"
+              >
+                <span className="text-muted-foreground">{label}</span>
+                <span className="font-medium max-w-[100px] truncate">
+                  {value}
+                </span>
               </div>
             ))}
           </div>
-          <div className="border-t border-border pt-3 bg-muted rounded-lg p-3 space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground mb-1">当前配置预览</p>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">物料来源</span>
-            <span className="font-medium max-w-[120px] truncate">{configSummary.source}</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">已选能力</span>
-            <span className="font-medium">{configSummary.capabilities}</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">覆盖维度</span>
-            <span className="font-medium">{configSummary.dimensions}</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">few-shot</span>
-            <span className="font-medium">{configSummary.fewShot}</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">输出格式</span>
-            <span className="font-medium">XMind + Markdown</span>
-          </div>
-        </div></>
-      )}
+        </div>
+      </div>
+    );
+  }
 
-      {generating && (
-        <div className="space-y-2">
-          {nodes.map((node, i) => (
-            <div
-              key={i}
-              className={`flex items-center gap-3 transition-all duration-500 ${
-                node.state === "wait" ? "opacity-30" : "opacity-100"
-              }`}
-            >
-              <div
-                className={`flex-shrink-0 border rounded-lg px-2 py-1 text-xs font-medium w-20 text-center transition-all ${
-                  node.state === "done"
-                    ? "bg-green-50 border-green-200 text-green-700"
-                    : node.state === "running"
-                    ? "bg-cyan-50 border-cyan-200 text-cyan-700 animate-pulse"
-                    : "bg-muted border-border text-muted-foreground"
-                }`}
+  // Mode 2: Progress Dots (wizStep === 2 && generating)
+  if (wizStep === 2 && generating) {
+    return (
+      <div className="w-48 flex-shrink-0">
+        <div className="bg-card rounded-xl shadow-sm p-4 sticky top-20">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse inline-block" />
+            <span className="text-xs font-semibold text-foreground">生成中</span>
+          </div>
+          <div className="flex flex-col">
+            {nodes.map((node, i) => (
+              <div key={i} className="flex items-stretch">
+                {/* Dot + vertical line column */}
+                <div className="flex flex-col items-center mr-2.5">
+                  {node.state === "done" ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                  ) : node.state === "running" ? (
+                    <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0 shadow-[0_0_0_3px_rgba(99,102,241,0.3)]" />
+                  ) : (
+                    <div className="w-3 h-3 rounded-full bg-border flex-shrink-0" />
+                  )}
+                  {i < nodes.length - 1 && (
+                    <div
+                      className={`w-px flex-1 my-1 ${
+                        node.state === "done" ? "bg-green-200" : "bg-border"
+                      }`}
+                    />
+                  )}
+                </div>
+                {/* Label */}
+                <div
+                  className={`pb-2 text-xs font-medium transition-opacity ${
+                    node.state === "done"
+                      ? "text-green-700"
+                      : node.state === "running"
+                      ? "text-primary"
+                      : "text-muted-foreground opacity-40"
+                  }`}
+                >
+                  {node.name}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Mode 3: Quick Actions (wizStep === 2 && !generating)
+  if (wizStep === 2 && !generating && (foundFiles.length > 0 || hasResult)) {
+    return (
+      <div className="w-48 flex-shrink-0">
+        <div className="bg-card rounded-xl shadow-sm p-4 sticky top-20">
+          <h4 className="font-semibold text-sm text-foreground mb-3">
+            快捷操作
+          </h4>
+          <div className="space-y-2">
+            {mdFile && (
+              <button
+                onClick={() => onDownloadFile(mdFile)}
+                className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-muted/30 transition-colors"
               >
-                {node.name}
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">{node.desc}</p>
-              </div>
-              {node.state === "done" && <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />}
-              {node.state === "running" && <Loader2 className="w-4 h-4 text-cyan-500 animate-spin flex-shrink-0" />}
-            </div>
-          ))}
+                <Download className="w-3.5 h-3.5 text-primary" />
+                下载 Markdown
+              </button>
+            )}
+            {xmindFile && (
+              <button
+                onClick={() => onDownloadFile(xmindFile)}
+                className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-muted/30 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5 text-primary" />
+                下载 XMind
+              </button>
+            )}
+            <button
+              onClick={onScrollToAITweak}
+              className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-muted/30 transition-colors"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-primary" />
+              AI 微调
+            </button>
+            <button
+              onClick={onScrollToRating}
+              className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-muted/30 transition-colors"
+            >
+              <Star className="w-3.5 h-3.5 text-primary" />
+              评价
+            </button>
+            <button
+              onClick={onNavigateToEditor}
+              className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-muted/30 transition-colors"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-primary" />
+              去编辑用例
+            </button>
+            <button
+              onClick={onReconfigure}
+              className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-muted/30 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-primary" />
+              重新配置
+            </button>
+          </div>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {status === "completed" && (
-        <div className="mt-4 pt-3 border-t border-border">
-          <p className="text-xs text-muted-foreground">工作流执行完成，用例文件已就绪</p>
-        </div>
-      )}
-    </div>
-  );
+  // Fallback: nothing to show yet
+  return <div className="w-48 flex-shrink-0" />;
 }
