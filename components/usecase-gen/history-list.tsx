@@ -5,7 +5,7 @@ import { useTasks } from "@/hooks/use-tasks";
 import {
   Loader2, Clock, FileText, AlertCircle, ExternalLink, Play, RefreshCw,
 } from "lucide-react";
-import type { UsecaseModule } from "./shared/types";
+import type { UsecaseModule, TweakEntry } from "./shared/types";
 
 interface HistoryListProps {
   skillId: string | undefined;
@@ -14,6 +14,7 @@ interface HistoryListProps {
     tree: UsecaseModule[];
     stats: { totalCases: number; qualityScore: number; modules: number };
     outputFiles?: string[];
+    tweakHistory?: TweakEntry[];
   }) => void;
   onResumeTask: (taskId: string) => void;
 }
@@ -91,6 +92,7 @@ export function HistoryList({ skillId, onLoadResult, onResumeTask }: HistoryList
             modules: report.tree.length,
           },
           outputFiles: fileNames,
+          tweakHistory: report.tweakHistory || [],
         });
       }
     } catch {

@@ -79,9 +79,14 @@ export function GenerateWizard({
   const preTweakTreeRef = useRef<UsecaseModule[] | null>(null);
 
   // Output scanner — replaces SSE onComplete callback
+  const tweakBaselineCases = preTweakTreeRef.current
+    ? preTweakTreeRef.current.reduce((s, m) => s + m.cases.length, 0)
+    : undefined;
+
   const scanner = useOutputScanner({
     taskId: taskId || "",
     enabled: generating && !!taskId,
+    initialTotalCases: tweakBaselineCases,
     onResult: (data) => {
       const tree = data.tree as UsecaseModule[];
       const summary = data.summary;
@@ -559,6 +564,10 @@ export function GenerateWizard({
                     if (!taskId) return;
                     const current = tweakHistoryMap[taskId] || [];
                     onTweakHistoryUpdate(taskId, [...current, entry]);
+                  }}
+                  onTweakHistoryUpdate={(history) => {
+                    if (!taskId) return;
+                    onTweakHistoryUpdate(taskId, history);
                   }}
                 />
 

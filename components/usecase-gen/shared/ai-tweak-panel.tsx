@@ -12,6 +12,7 @@ interface AITweakPanelProps {
   onTweakStarted: () => void;
   onCancelTweak: () => void;
   onRecordTweak: (entry: TweakEntry) => void;
+  onTweakHistoryUpdate: (history: TweakEntry[]) => void;
 }
 
 const QUICK_CHIPS = [
@@ -31,6 +32,7 @@ export function AITweakPanel({
   onTweakStarted,
   onCancelTweak,
   onRecordTweak,
+  onTweakHistoryUpdate,
 }: AITweakPanelProps) {
   const [input, setInput] = useState("");
   const [scope, setScope] = useState("all");
@@ -54,19 +56,27 @@ export function AITweakPanel({
           body: JSON.stringify({ instruction, scope: scope !== "all" ? scope : undefined }),
         });
       } else {
-        await fetch(`/api/tasks/${taskId}/tweak`, {
+        const res = await fetch(`/api/tasks/${taskId}/tweak`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ instruction, scope: scope !== "all" ? scope : undefined }),
         });
+        const data = await res.json();
 
-        onRecordTweak({
-          round: tweakHistory.length + 1,
-          instruction: text,
-          time: new Date().toLocaleString("zh-CN"),
-          delta: scope !== "all" ? `模块: ${scope}` : "全部模块",
-          status: "running",
-        });
+        // Sync from API response (round + full history)
+        if (data.tweakHistory) {
+          onTweakHistoryUpdate(
+            data.tweakHistory as TweakEntry[]
+          );
+        } else {
+          onRecordTweak({
+            round: data.round || tweakHistory.length + 1,
+            instruction: text,
+            time: new Date().toLocaleString("zh-CN"),
+            delta: scope !== "all" ? `模块: ${scope}` : "全部模块",
+            status: "running",
+          });
+        }
 
         onTweakStarted();
       }

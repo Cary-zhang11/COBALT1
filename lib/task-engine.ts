@@ -186,6 +186,16 @@ export async function resumeTask(
     await copyFilesToWorkspace(taskId, uploadedFiles);
   }
 
+  const tweakRound = task.tweakCount || 0;
+
+  // Snapshot existing files for post-resume rename
+  let preFileNames: Set<string> | undefined;
+  try {
+    const outputDir = getOutputPath(taskId);
+    const entries = await fs.readdir(outputDir);
+    preFileNames = new Set(entries);
+  } catch { /* dir may not exist */ }
+
   await prisma.task.update({
     where: { id: taskId },
     data: {
@@ -212,6 +222,31 @@ export async function resumeTask(
       }
 
       if (event.type === "pause") {
+        // Rename new files that lack _v{N} suffix
+        if (
+          event.pauseReason === "output_complete" &&
+          tweakRound > 0 &&
+          preFileNames
+        ) {
+          try {
+            const outputDir = getOutputPath(taskId);
+            const entries = await fs.readdir(outputDir, { withFileTypes: true });
+            for (const entry of entries) {
+              if (!entry.isFile()) continue;
+              if (preFileNames.has(entry.name)) continue;
+              const ext = path.extname(entry.name);
+              const base = path.basename(entry.name, ext);
+              if (!/_v\d+$/.test(base)) {
+                await fs.rename(
+                  path.join(outputDir, entry.name),
+                  path.join(outputDir, `${base}_v${tweakRound}${ext}`)
+                );
+              }
+            }
+          } catch { /* non-critical */ }
+          await collectOutputFiles(taskId);
+        }
+
         await prisma.task.update({
           where: { id: taskId },
           data: {
@@ -222,7 +257,7 @@ export async function resumeTask(
             duration: previousDuration + (Date.now() - startTime),
           },
         });
-        return; // Stop the stream; CLI process will be killed in finally
+        return;
       }
 
       if (event.type === "error") {
@@ -243,7 +278,7 @@ export async function resumeTask(
     await prisma.task.update({
       where: { id: taskId },
       data: {
-        status: "completed",
+        status: "paused",
         output,
         duration: previousDuration + (Date.now() - startTime),
       },

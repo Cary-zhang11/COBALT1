@@ -100,7 +100,7 @@ export async function GET(
       if (cached) {
         const data = cached as Record<string, unknown>;
         // Recompute outputFiles each time (download URLs may change)
-        return NextResponse.json({ ...data, outputFiles });
+        return NextResponse.json({ ...data, outputFiles, tweakHistory: task.tweakHistory });
       }
     }
 
@@ -111,6 +111,7 @@ export async function GET(
         rawMarkdown: "",
         outputFiles,
         meta: { sourceDoc: "", generatedAt: "", prdVersion: "" },
+        tweakHistory: task.tweakHistory,
       });
     }
 
@@ -127,11 +128,11 @@ export async function GET(
       duration: task.duration,
     };
 
-    // Persist cache for next request
+    // Persist cache for next request (tweakHistory NOT cached — always from DB)
     const cachePath = path.join(path.dirname(mdPath), CACHE_FILE);
     await writeCache(cachePath, data);
 
-    return NextResponse.json(data);
+    return NextResponse.json({ ...data, tweakHistory: task.tweakHistory });
   } catch (error) {
     console.error("Report error:", error);
     return NextResponse.json(

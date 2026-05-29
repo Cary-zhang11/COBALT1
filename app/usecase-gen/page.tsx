@@ -29,9 +29,13 @@ export default function UsecaseGenPage() {
     tree: UsecaseModule[];
     stats: { totalCases: number; qualityScore: number; modules: number };
     outputFiles?: string[];
+    tweakHistory?: TweakEntry[];
   }) => {
     setUsecaseTree(result.tree);
     setPreloadedResult(result);
+    if (result.tweakHistory) {
+      setTweakHistoryMap((prev) => ({ ...prev, [result.taskId]: result.tweakHistory! }));
+    }
     setActiveTab(0);
   };
 
@@ -87,6 +91,12 @@ export default function UsecaseGenPage() {
                 }
                 return { ...prev, [taskId]: entries };
               });
+              // Persist to DB
+              fetch(`/api/tasks/${taskId}/tweak`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ round, updates }),
+              }).catch(() => {});
             }}
           />
         )}

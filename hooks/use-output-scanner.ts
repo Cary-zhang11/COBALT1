@@ -17,6 +17,8 @@ interface UseOutputScannerOptions {
   }) => void;
   onError?: (error: string) => void;
   enabled?: boolean;
+  /** Skip stability detection when totalCases equals this value (pre-tweak baseline) */
+  initialTotalCases?: number;
 }
 
 interface FileSizeMap {
@@ -29,6 +31,7 @@ export function useOutputScanner({
   onResult,
   onError,
   enabled = true,
+  initialTotalCases,
 }: UseOutputScannerOptions) {
   const [isScanning, setIsScanning] = useState(false);
   const [foundFiles, setFoundFiles] = useState<FileInfo[]>([]);
@@ -38,6 +41,8 @@ export function useOutputScanner({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbacksRef = useRef({ onResult, onError });
   callbacksRef.current = { onResult, onError };
+  const initialCasesRef = useRef(initialTotalCases);
+  initialCasesRef.current = initialTotalCases;
 
   const stop = useCallback(() => {
     stopRef.current = true;
@@ -119,6 +124,17 @@ export function useOutputScanner({
           );
 
           if (mdFiles.length > 0 && currentCases > 0) {
+            // Skip if still at baseline (tweak hasn't produced new output yet)
+            if (
+              initialCasesRef.current !== undefined &&
+              currentCases === initialCasesRef.current
+            ) {
+              if (!stopRef.current) {
+                timerRef.current = setTimeout(poll, interval);
+              }
+              return;
+            }
+
             const prevEntry = fileSizesRef.current["_md"];
             const newStableCount =
               prevEntry && prevEntry.size === currentCases
@@ -130,8 +146,8 @@ export function useOutputScanner({
               stableCount: newStableCount,
             };
 
-            // Stable for 2 consecutive polls → complete
-            if (newStableCount >= 2) {
+            // Stable for 2 consecutive polls + task not running → complete
+            if (newStableCount >= 2 && status !== "running") {
               callbacksRef.current.onResult?.(report);
               stop();
               return;
