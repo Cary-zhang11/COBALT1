@@ -19,30 +19,30 @@ const mockTree: UsecaseModule[] = [
 
 describe("CaseEditor", () => {
   it("shows empty state when no usecaseTree", () => {
-    render(<CaseEditor usecaseTree={null} tweakHistory={[]} />);
+    render(<CaseEditor usecaseTree={null} />);
     expect(screen.getByText("暂无生成结果，请先在「生成向导」中生成用例")).toBeDefined();
   });
 
   it("renders module names in tree", () => {
-    render(<CaseEditor usecaseTree={mockTree} tweakHistory={[]} />);
+    render(<CaseEditor usecaseTree={mockTree} />);
     expect(screen.getByText("1. 登录模块")).toBeDefined();
     expect(screen.getByText("2. 注册模块")).toBeDefined();
   });
 
   it("shows case names under open module", () => {
-    render(<CaseEditor usecaseTree={mockTree} tweakHistory={[]} />);
+    render(<CaseEditor usecaseTree={mockTree} />);
     expect(screen.getByText("正常登录")).toBeDefined();
     expect(screen.getByText("密码错误")).toBeDefined();
   });
 
   it("hides cases of closed module", () => {
-    render(<CaseEditor usecaseTree={mockTree} tweakHistory={[]} />);
+    render(<CaseEditor usecaseTree={mockTree} />);
     // 注册模块 closed, cases hidden
     expect(screen.queryByText("正常注册")).toBeNull();
   });
 
   it("shows case detail when clicking a case", () => {
-    render(<CaseEditor usecaseTree={mockTree} tweakHistory={[]} />);
+    render(<CaseEditor usecaseTree={mockTree} />);
     fireEvent.click(screen.getByText("正常登录"));
     // Detail section labels should appear
     expect(screen.getByText("前置条件")).toBeDefined();
@@ -51,13 +51,13 @@ describe("CaseEditor", () => {
   });
 
   it("shows toolbar with export buttons", () => {
-    render(<CaseEditor usecaseTree={mockTree} tweakHistory={[]} />);
+    render(<CaseEditor usecaseTree={mockTree} />);
     expect(screen.getByText("导出 XMind")).toBeDefined();
     expect(screen.getByText("导出 Excel")).toBeDefined();
   });
 
   it("shows save bar at bottom", () => {
-    render(<CaseEditor usecaseTree={mockTree} tweakHistory={[]} />);
+    render(<CaseEditor usecaseTree={mockTree} />);
     expect(screen.getByText("保存修改")).toBeDefined();
     expect(screen.getByText("放弃修改")).toBeDefined();
   });

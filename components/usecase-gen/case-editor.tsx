@@ -1,16 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import type { UsecaseModule, UsecaseCase, TweakEntry } from "./shared/types";
+import type { UsecaseModule, UsecaseCase } from "./shared/types";
 import { mockQuickActions } from "./shared/mock-data";
 import { ChevronRight, Download, Wand2, CheckCircle2 } from "lucide-react";
 
 interface CaseEditorProps {
   usecaseTree: UsecaseModule[] | null;
-  tweakHistory: TweakEntry[];
 }
 
-export function CaseEditor({ usecaseTree, tweakHistory }: CaseEditorProps) {
+export function CaseEditor({ usecaseTree }: CaseEditorProps) {
   const [modules, setModules] = useState<UsecaseModule[]>(usecaseTree || []);
   const [selectedCase, setSelectedCase] = useState<UsecaseCase | null>(null);
   const [showSaveTip, setShowSaveTip] = useState(false);

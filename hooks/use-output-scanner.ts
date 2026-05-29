@@ -54,6 +54,7 @@ export function useOutputScanner({
     stopRef.current = false;
     setIsScanning(true);
     fileSizesRef.current = {};
+    setFoundFiles([]);
 
     const poll = async () => {
       if (stopRef.current) return;

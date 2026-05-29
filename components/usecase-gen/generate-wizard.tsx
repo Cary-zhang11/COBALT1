@@ -21,8 +21,8 @@ import {
 
 interface GenerateWizardProps {
   onComplete: (tree: UsecaseModule[], summary?: { totalCases: number; qualityScore: number; modules: number }) => void;
-  tweakHistory: TweakEntry[];
-  onTweakHistoryUpdate: (history: TweakEntry[]) => void;
+  tweakHistoryMap: Record<string, TweakEntry[]>;
+  onTweakHistoryUpdate: (taskId: string, history: TweakEntry[]) => void;
   usecaseTree: UsecaseModule[] | null;
   skillId: string | undefined;
   onNavigateToTab?: (tabIndex: number) => void;
@@ -44,7 +44,7 @@ interface UploadedFile {
 const STEPS = ["输入物料", "选择平台能力", "生成并预览"];
 
 export function GenerateWizard({
-  onComplete, tweakHistory, onTweakHistoryUpdate, usecaseTree, skillId,
+  onComplete, tweakHistoryMap, onTweakHistoryUpdate, usecaseTree, skillId,
   onNavigateToTab, preloadedResult, onClearPreloaded, resumeTaskId, onClearResume,
 }: GenerateWizardProps) {
   const createTask = useCreateTask();
@@ -439,29 +439,6 @@ export function GenerateWizard({
               </div>
             )}
 
-            {/* Generating state — tree already exists (tweak in progress) */}
-            {generating && usecaseTree && usecaseTree.length > 0 && (
-              <div className="bg-card rounded-xl shadow-sm p-4 mb-4 flex items-center gap-3 border border-primary/20">
-                <Loader2 className="w-4 h-4 text-primary animate-spin flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">微调中...</p>
-                  <p className="text-xs text-muted-foreground">{genStatus || "AI 正在基于已有用例进行修改"}</p>
-                </div>
-                <button
-                  onClick={() => {
-                    cancelTask.mutate(taskId!);
-                    scanner.stop();
-                    setGenerating(false);
-                    setGenStatus("");
-                  }}
-                  disabled={cancelTask.isPending}
-                  className="ml-auto border border-red-200 text-red-500 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-50 disabled:opacity-40"
-                >
-                  取消微调
-                </button>
-              </div>
-            )}
-
             {/* Error state */}
             {!generating && genStatus === "生成失败" && (
               <div className="bg-card rounded-xl shadow-sm p-8 text-center">
@@ -483,8 +460,8 @@ export function GenerateWizard({
               </div>
             )}
 
-            {/* Completed: Result display */}
-            {!generating && genStatus !== "生成失败" && usecaseTree && usecaseTree.length > 0 && (
+            {/* Result display — visible when tree exists (even during tweak), hidden only during first gen */}
+            {usecaseTree && usecaseTree.length > 0 && genStatus !== "生成失败" && (
               <>
                 {/* KPI Cards */}
                 <div className="grid grid-cols-4 gap-4">
@@ -538,16 +515,24 @@ export function GenerateWizard({
                 {/* AI Tweak */}
                 <AITweakPanel
                   taskId={taskId}
-                  generating={generating}
+                  generating={generating && !!usecaseTree && usecaseTree.length > 0}
                   modules={usecaseTree.map((m) => m.name)}
-                  tweakHistory={tweakHistory}
+                  tweakHistory={taskId ? tweakHistoryMap[taskId] || [] : []}
                   onTweakStarted={() => {
                     setLoadedFiles([]);
                     setGenerating(true);
                     setGenStatus("正在微调用例...");
                   }}
+                  onCancelTweak={() => {
+                    cancelTask.mutate(taskId!);
+                    scanner.stop();
+                    setGenerating(false);
+                    setGenStatus("");
+                  }}
                   onRecordTweak={(entry) => {
-                    onTweakHistoryUpdate([...tweakHistory, entry]);
+                    if (!taskId) return;
+                    const current = tweakHistoryMap[taskId] || [];
+                    onTweakHistoryUpdate(taskId, [...current, entry]);
                   }}
                 />
 
@@ -585,7 +570,7 @@ export function GenerateWizard({
               </>
             )}
 
-            {/* Completed but empty result */}
+            {/* Empty result — only when truly empty and not generating */}
             {!generating && genStatus !== "生成失败" && (!usecaseTree || usecaseTree.length === 0) && (
               <div className="bg-card rounded-xl shadow-sm p-8 text-center">
                 <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-muted flex items-center justify-center">

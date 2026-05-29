@@ -35,7 +35,7 @@ import { GenerateWizard } from "../generate-wizard";
 
 const defaultProps = {
   onComplete: vi.fn(),
-  tweakHistory: [],
+  tweakHistoryMap: {},
   onTweakHistoryUpdate: vi.fn(),
   usecaseTree: null,
   skillId: "test-skill-id",

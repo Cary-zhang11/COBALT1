@@ -13,7 +13,7 @@ const TABS = ["生成向导", "历史记录", "用例预览编辑", "数据看�
 export default function UsecaseGenPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [usecaseTree, setUsecaseTree] = useState<UsecaseModule[] | null>(null);
-  const [tweakHistory, setTweakHistory] = useState<TweakEntry[]>([]);
+  const [tweakHistoryMap, setTweakHistoryMap] = useState<Record<string, TweakEntry[]>>({});
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [preloadedResult, setPreloadedResult] = useState<{
     tree: UsecaseModule[];
@@ -65,8 +65,10 @@ export default function UsecaseGenPage() {
         {activeTab === 0 && (
           <GenerateWizard
             onComplete={(tree) => setUsecaseTree(tree)}
-            tweakHistory={tweakHistory}
-            onTweakHistoryUpdate={setTweakHistory}
+            tweakHistoryMap={tweakHistoryMap}
+            onTweakHistoryUpdate={(taskId, history) => {
+              setTweakHistoryMap((prev) => ({ ...prev, [taskId]: history }));
+            }}
             usecaseTree={usecaseTree}
             skillId={skillId}
             onNavigateToTab={setActiveTab}
@@ -84,7 +86,7 @@ export default function UsecaseGenPage() {
           />
         )}
         {activeTab === 2 && (
-          <CaseEditor usecaseTree={usecaseTree} tweakHistory={tweakHistory} />
+          <CaseEditor usecaseTree={usecaseTree} />
         )}
         {activeTab === 3 && <Dashboard />}
         {activeTab === 4 && <KnowledgeBase />}
