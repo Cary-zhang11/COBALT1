@@ -65,12 +65,13 @@ export async function POST(
       // dir may not exist
     }
 
-    // Update task input and set to running for re-execution
+    // Update task input, increment tweak count, and set to running for re-execution
     await prisma.task.update({
       where: { id: taskId },
       data: {
         input: tweakInput,
         status: "running",
+        tweakCount: { increment: 1 },
         pauseReason: null,
         pausedAt: null,
       },

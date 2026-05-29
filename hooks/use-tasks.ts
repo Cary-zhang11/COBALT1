@@ -8,6 +8,7 @@ interface Task {
   input: string;
   output: string | null;
   duration: number | null;
+  tweakCount?: number;
   createdAt: string;
   skill: { name: string; description: string };
 }

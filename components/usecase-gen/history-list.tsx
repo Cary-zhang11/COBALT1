@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTasks } from "@/hooks/use-tasks";
 import {
-  Loader2, Clock, FileText, AlertCircle, ExternalLink, Play,
+  Loader2, Clock, FileText, AlertCircle, ExternalLink, Play, RefreshCw,
 } from "lucide-react";
 import type { UsecaseModule } from "./shared/types";
 
@@ -208,6 +208,12 @@ export function HistoryList({ skillId, onLoadResult, onResumeTask }: HistoryList
                 >
                   {statusConf.label}
                 </span>
+                {task.tweakCount != null && task.tweakCount > 0 && (
+                  <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-violet-100 text-violet-700 flex-shrink-0 flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3" />
+                    已微调 {task.tweakCount} 次
+                  </span>
+                )}
                 {isRunning && (
                   <Play className="w-4 h-4 text-blue-500 flex-shrink-0" />
                 )}
