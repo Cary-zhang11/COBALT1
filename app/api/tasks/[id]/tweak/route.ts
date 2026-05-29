@@ -55,6 +55,24 @@ export async function POST(
       ? `以下是已生成的测试用例：\n\n${existingOutput}\n\n---\n\n用户微调指令：${instruction}${scopeDirective}\n\n请在已有测试用例基础上进行修改，保持格式一致，只修改涉及的部分，不要重新生成全部内容。`
       : `${instruction}${scopeDirective}`;
 
+    // Rename existing files with version suffix so tweaked files coexist
+    const tweakRound = (task.tweakCount || 0) + 1;
+    try {
+      const entries = await fs.readdir(outputDir);
+      for (const entry of entries) {
+        const oldPath = path.join(outputDir, entry);
+        const stat = await fs.stat(oldPath);
+        if (stat.isFile()) {
+          const ext = path.extname(entry);
+          const base = path.basename(entry, ext);
+          const newName = `${base}_v${tweakRound}${ext}`;
+          await fs.rename(oldPath, path.join(outputDir, newName));
+        }
+      }
+    } catch {
+      // output dir may not exist yet
+    }
+
     // Update task input, increment tweak count, and set to running for re-execution
     await prisma.task.update({
       where: { id: taskId },
