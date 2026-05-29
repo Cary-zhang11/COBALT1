@@ -16,6 +16,7 @@ export default function UsecaseGenPage() {
   const [tweakHistoryMap, setTweakHistoryMap] = useState<Record<string, TweakEntry[]>>({});
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [preloadedResult, setPreloadedResult] = useState<{
+    taskId: string;
     tree: UsecaseModule[];
     stats: { totalCases: number; qualityScore: number; modules: number };
     outputFiles?: string[];
@@ -24,6 +25,7 @@ export default function UsecaseGenPage() {
   const skillId = process.env.NEXT_PUBLIC_USECASE_SKILL_ID;
 
   const handleLoadResult = (result: {
+    taskId: string;
     tree: UsecaseModule[];
     stats: { totalCases: number; qualityScore: number; modules: number };
     outputFiles?: string[];

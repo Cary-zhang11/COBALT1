@@ -27,6 +27,7 @@ interface GenerateWizardProps {
   skillId: string | undefined;
   onNavigateToTab?: (tabIndex: number) => void;
   preloadedResult?: {
+    taskId: string;
     tree: UsecaseModule[];
     stats: { totalCases: number; qualityScore: number; modules: number };
     outputFiles?: string[];
@@ -99,6 +100,7 @@ export function GenerateWizard({
   // Handle preloaded result from history
   useEffect(() => {
     if (preloadedResult) {
+      setTaskId(preloadedResult.taskId);
       setWizStep(2);
       setGenStats({
         totalCases: preloadedResult.stats.totalCases,

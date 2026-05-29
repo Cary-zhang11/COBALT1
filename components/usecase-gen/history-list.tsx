@@ -10,6 +10,7 @@ import type { UsecaseModule } from "./shared/types";
 interface HistoryListProps {
   skillId: string | undefined;
   onLoadResult: (result: {
+    taskId: string;
     tree: UsecaseModule[];
     stats: { totalCases: number; qualityScore: number; modules: number };
     outputFiles?: string[];
@@ -55,6 +56,7 @@ export function HistoryList({ skillId, onLoadResult, onResumeTask }: HistoryList
         const parsed = parseUsecaseOutput(task.output);
         if (parsed.tree) {
           onLoadResult({
+            taskId: task.id,
             tree: parsed.tree,
             stats: parsed.summary || {
               totalCases: parsed.tree.reduce(
@@ -79,6 +81,7 @@ export function HistoryList({ skillId, onLoadResult, onResumeTask }: HistoryList
           (f: { name: string }) => f.name
         );
         onLoadResult({
+          taskId: task.id,
           tree: report.tree,
           stats: report.summary || {
             totalCases: report.tree.reduce(
