@@ -17,6 +17,7 @@ interface ExecutionPanelProps {
   generating: boolean;
   wizStep: number;
   hasResult: boolean;
+  isTweak?: boolean;
   configSummary: {
     source: string;
     capabilities: string;
@@ -71,6 +72,7 @@ export function ExecutionPanel({
   generating,
   wizStep,
   hasResult,
+  isTweak,
   configSummary,
   foundFiles,
   onDownloadFile,
@@ -121,8 +123,8 @@ export function ExecutionPanel({
     );
   }
 
-  // Mode 2: Progress Dots (wizStep === 2 && generating)
-  if (wizStep === 2 && generating) {
+  // Mode 2: Progress Dots (wizStep === 2 && generating && not tweak)
+  if (wizStep === 2 && generating && !isTweak) {
     return (
       <div className="w-48 flex-shrink-0">
         <div className="bg-card rounded-xl shadow-sm p-4 sticky top-20">

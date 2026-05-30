@@ -14,6 +14,8 @@ interface UseOutputScannerOptions {
     tree: unknown;
     summary?: { totalCases: number; qualityScore: number; modules: number };
     outputFiles?: { name: string; path: string }[];
+    tweakHistory?: unknown;
+    tweakCount?: number;
   }) => void;
   onError?: (error: string) => void;
   enabled?: boolean;
@@ -43,6 +45,8 @@ export function useOutputScanner({
   callbacksRef.current = { onResult, onError };
   const initialCasesRef = useRef(initialTotalCases);
   initialCasesRef.current = initialTotalCases;
+  const prevTaskIdRef = useRef(taskId);
+  const baselineVersionRef = useRef<number | null>(null);
 
   const stop = useCallback(() => {
     stopRef.current = true;
@@ -56,10 +60,16 @@ export function useOutputScanner({
   useEffect(() => {
     if (!taskId || !enabled) return;
 
+    const taskChanged = prevTaskIdRef.current !== taskId;
+    prevTaskIdRef.current = taskId;
+
     stopRef.current = false;
     setIsScanning(true);
     fileSizesRef.current = {};
-    setFoundFiles([]);
+    baselineVersionRef.current = null;
+    if (taskChanged) {
+      setFoundFiles([]);
+    }
 
     const poll = async () => {
       if (stopRef.current) return;
@@ -124,15 +134,27 @@ export function useOutputScanner({
           );
 
           if (mdFiles.length > 0 && currentCases > 0) {
-            // Skip if still at baseline (tweak hasn't produced new output yet)
-            if (
-              initialCasesRef.current !== undefined &&
-              currentCases === initialCasesRef.current
-            ) {
-              if (!stopRef.current) {
-                timerRef.current = setTimeout(poll, interval);
+            // Detect highest version from file names (e.g. _v7)
+            let maxVersion = 0;
+            for (const f of mdFiles) {
+              const m = f.name.match(/_v(\d+)\.md$/);
+              if (m) maxVersion = Math.max(maxVersion, parseInt(m[1], 10));
+            }
+
+            // Baseline: wait for a new versioned file to appear (tweak)
+            if (initialCasesRef.current !== undefined) {
+              if (maxVersion > 0 && baselineVersionRef.current === null) {
+                baselineVersionRef.current = maxVersion;
               }
-              return;
+              if (
+                baselineVersionRef.current !== null &&
+                maxVersion <= baselineVersionRef.current
+              ) {
+                if (!stopRef.current) {
+                  timerRef.current = setTimeout(poll, interval);
+                }
+                return;
+              }
             }
 
             const prevEntry = fileSizesRef.current["_md"];

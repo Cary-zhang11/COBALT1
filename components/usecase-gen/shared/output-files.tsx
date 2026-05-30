@@ -10,7 +10,8 @@ interface OutputFilesProps {
 
 function isDisplayable(name: string): boolean {
   if (name.includes("_source")) return false;
-  return name.includes("测试用例") && (name.endsWith(".md") || name.endsWith(".xmind"));
+  if (name.includes("archive/")) return false;
+  return name.endsWith(".md") || name.endsWith(".xmind");
 }
 
 function downloadFile(taskId: string, file: FileInfo) {

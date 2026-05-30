@@ -61,9 +61,15 @@ export function AITweakPanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ instruction, scope: scope !== "all" ? scope : undefined }),
         });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error("Tweak POST failed:", errData.error || res.status);
+          return;
+        }
+
         const data = await res.json();
 
-        // Sync from API response (round + full history)
         if (data.tweakHistory) {
           onTweakHistoryUpdate(
             data.tweakHistory as TweakEntry[]

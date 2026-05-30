@@ -93,14 +93,16 @@ export async function GET(
     // Single pass: collect files + find test case .md
     const { files: outputFiles, mdPath, mdMtime } = await collectOutputFiles(outputDir, params.id);
 
-    // Try file-based cache (persists across restarts, invalidated by md mtime)
+    // Try file-based cache (persists across restarts, invalidated by md mtime + tweakCount)
     if (mdPath) {
       const cachePath = path.join(path.dirname(mdPath), CACHE_FILE);
       const cached = await readCache(cachePath, mdMtime);
       if (cached) {
         const data = cached as Record<string, unknown>;
-        // Recompute outputFiles each time (download URLs may change)
-        return NextResponse.json({ ...data, outputFiles, tweakHistory: task.tweakHistory });
+        // Only use cache if tweakCount matches (prevents cross-tweak-round cache)
+        if (data.tweakCount === task.tweakCount) {
+          return NextResponse.json({ ...data, outputFiles, tweakHistory: task.tweakHistory });
+        }
       }
     }
 
@@ -126,9 +128,10 @@ export async function GET(
       outputFiles,
       meta: parsed.meta,
       duration: task.duration,
+      tweakCount: task.tweakCount,
     };
 
-    // Persist cache for next request (tweakHistory NOT cached — always from DB)
+    // Persist cache for next request
     const cachePath = path.join(path.dirname(mdPath), CACHE_FILE);
     await writeCache(cachePath, data);
 

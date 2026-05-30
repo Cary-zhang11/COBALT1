@@ -96,7 +96,7 @@ export default function UsecaseGenPage() {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ round, updates }),
-              }).catch(() => {});
+              }).catch((err) => console.error("Tweak PATCH failed:", err));
             }}
           />
         )}

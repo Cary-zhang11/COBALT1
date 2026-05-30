@@ -99,6 +99,11 @@ export function GenerateWizard({
       });
       setGenerating(false);
 
+      // Sync tweakHistory from report (DB is source of truth)
+      if (data.tweakHistory && taskId) {
+        onTweakHistoryUpdate(taskId, data.tweakHistory as TweakEntry[]);
+      }
+
       // Compute tweak delta if we had a pre-existing tree
       if (preTweakTreeRef.current && taskId && onUpdateTweakEntry) {
         const oldCases = preTweakTreeRef.current.flatMap((m) => m.cases.map((c) => c.id));
@@ -109,7 +114,8 @@ export function GenerateWizard({
         const removed = oldCases.filter((id) => !newSet.has(id)).length;
         const modified = oldCases.filter((id) => newSet.has(id)).length;
         const summaryText = `+${added} · 修改 ${modified} · -${removed}`;
-        const round = (tweakHistoryMap[taskId] || []).length;
+        const serverHistory = (data.tweakHistory as TweakEntry[]) || tweakHistoryMap[taskId] || [];
+        const round = serverHistory.length;
         onUpdateTweakEntry(taskId, round, { status: "done", summary: summaryText });
         preTweakTreeRef.current = null;
       }
@@ -119,7 +125,8 @@ export function GenerateWizard({
       setGenerating(false);
       // Mark last tweak entry as failed
       if (taskId && onUpdateTweakEntry) {
-        const round = (tweakHistoryMap[taskId] || []).length;
+        const history = tweakHistoryMap[taskId] || [];
+        const round = history.length;
         onUpdateTweakEntry(taskId, round, { status: "failed" });
       }
     },
@@ -629,6 +636,7 @@ export function GenerateWizard({
         generating={generating}
         wizStep={wizStep}
         hasResult={!generating && !!usecaseTree && usecaseTree.length > 0}
+        isTweak={generating && !!usecaseTree && usecaseTree.length > 0}
         configSummary={{
           source: uploadedFiles.length > 0
             ? uploadedFiles.map((f) => f.name).join(", ")
