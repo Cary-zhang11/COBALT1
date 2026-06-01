@@ -41,10 +41,12 @@
 - ~~重新配置~~（删除）
 
 保留 4 个：
-1. 下载 Markdown（最新版本文件）
-2. 下载 XMind（最新版本文件）
+1. 下载 Markdown（最新版本文件 — 按 `_v{N}.md` 版本号排序取最高版本）
+2. 下载 XMind（最新版本文件 — 按 `_v{N}.xmind` 版本号排序取最高版本）
 3. AI 微调（→ `onScrollToAITweak`）
 4. 去编辑用例（→ `onNavigateToEditor`）
+
+**最新版本查找**：复用 `hooks/use-output-scanner.ts` 中已有的 `maxXmindVersion` 逻辑，MD 文件同样按 `_v{N}.md` 模式排序。取 `foundFiles` 中版本号最高的文件，而非 `.find()` 返回的第一个。
 
 **同步清理**：
 - `ExecutionPanelProps` 接口删除 `onScrollToRating`、`onReconfigure` 字段
@@ -70,11 +72,13 @@ AI 微调面板
 
 - `RatingPanel` 组件引用（组件文件保留不动，后续可能复用）
 - 底部「重新配置」按钮
+- 底部整个 `flex justify-between` 按钮区（两个按钮都移走后 div 为空，整体移除）
 
 ### 2.3 修改
 
-- `ModuleOverviewTable` 默认 `collapsed = false`（展开）
+- `ModuleOverviewTable` 默认 `collapsed = false`（展开，`useState(false)` → `useState(true)`）
 - 「去编辑用例」按钮移到 `OutputFiles` 和 `AITweakPanel` 之间，样式不变
+- `OutputFiles` 改动：文件名变为可点击按钮（`cursor-pointer`），点击打开 `FilePreviewModal`；Modal 状态（`selectedFile`）由 OutputFiles 内部 `useState` 管理
 
 ### 2.4 耗时修复
 
