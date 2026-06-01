@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
 import { useOutputScanner, type FileInfo } from "@/hooks/use-output-scanner";
+import { useTaskEvents } from "@/hooks/use-task-events";
 import { ExecutionPanel } from "./shared/execution-panel";
 import { OutputFiles } from "./shared/output-files";
 import { AITweakPanel } from "./shared/ai-tweak-panel";
 import { RatingPanel } from "./shared/rating-panel";
 import { ModuleOverviewTable } from "./shared/module-overview-table";
 import {
-  mockRecentReqs, mockFewShotExamples, mockCapabilities,
-  mockDimensions, mockQuickActions,
+  mockRecentReqs, mockFewShotExamples,
 } from "./shared/mock-data";
 import type { UsecaseModule, TweakEntry } from "./shared/types";
 import {
@@ -31,7 +31,7 @@ interface UploadedFile {
   path: string;
 }
 
-const STEPS = ["输入物料", "选择平台能力", "生成并预览"];
+const STEPS = ["输入物料", "关联用例", "生成并预览"];
 
 export function GenerateWizard({
   initialTaskId, onComplete, skillId, onNavigateToTab,
@@ -49,11 +49,7 @@ export function GenerateWizard({
 
   // Mutable refs for mutable mock arrays
   const fewShotRef = useRef(mockFewShotExamples.map((f) => ({ ...f })));
-  const capabilitiesRef = useRef(mockCapabilities.map((c) => ({ ...c })));
-  const dimensionsRef = useRef(mockDimensions.map((d) => ({ ...d })));
   const [fewShot, setFewShot] = useState(fewShotRef.current);
-  const [capabilities, setCapabilities] = useState(capabilitiesRef.current);
-  const [dimensions, setDimensions] = useState(dimensionsRef.current);
 
   // Generation
   const [generating, setGenerating] = useState(false);
@@ -142,6 +138,21 @@ export function GenerateWizard({
       }
     },
   });
+
+  // Parse [WF:done:xxx] from SSE logs for real-time stage progress
+  const { logs: taskLogs } = useTaskEvents({
+    taskId: taskId || "",
+    enabled: generating && !!taskId,
+  });
+
+  const logStages = useMemo(() => {
+    const s = new Set<string>();
+    for (const log of taskLogs) {
+      const m = log.output?.match(/\[WF:done:([^\]]+)\]/);
+      if (m) s.add(m[1]);
+    }
+    return s;
+  }, [taskLogs]);
 
   // Load task from initialTaskId (history selection)
   useEffect(() => {
@@ -343,6 +354,31 @@ export function GenerateWizard({
               </div>
             </div>
 
+            {/* Validation message */}
+            {validationMsg && (
+              <p className="text-sm text-red-500 font-medium flex items-center gap-1.5 animate-in fade-in">
+                <span>⚠️</span> {validationMsg}
+              </p>
+            )}
+            <div className="flex justify-end">
+              <button onClick={() => {
+                if (!uploadedFiles.length && !requirementText.trim()) {
+                  setValidationMsg("请至少上传一个需求文档，或粘贴需求文本");
+                  return;
+                }
+                setValidationMsg("");
+                setWizStep(1);
+              }}
+                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2">
+                下一步：关联用例<ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: 关联用例 */}
+        {wizStep === 1 && (
+          <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-card rounded-xl shadow-sm p-5">
                 <h3 className="font-semibold mb-3 text-sm">最近需求</h3>
@@ -369,60 +405,6 @@ export function GenerateWizard({
                 </div>
               </div>
             </div>
-
-            {/* Validation message */}
-            {validationMsg && (
-              <p className="text-sm text-red-500 font-medium flex items-center gap-1.5 animate-in fade-in">
-                <span>⚠️</span> {validationMsg}
-              </p>
-            )}
-            <div className="flex justify-end">
-              <button onClick={() => {
-                if (!uploadedFiles.length && !requirementText.trim()) {
-                  setValidationMsg("请至少上传一个需求文档，或粘贴需求文本");
-                  return;
-                }
-                setValidationMsg("");
-                setWizStep(1);
-              }}
-                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2">
-                下一步：选择平台能力<ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2 */}
-        {wizStep === 1 && (
-          <div className="space-y-4">
-            <div className="bg-card rounded-xl shadow-sm p-5">
-              <h3 className="font-semibold mb-4">知识库与规范增强</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {capabilities.map((cap, i) => (
-                  <label key={i} className={`flex items-start gap-3 border rounded-xl p-4 cursor-pointer ${cap.selected ? "border-cyan-500 bg-cyan-50" : "border-border hover:border-muted-foreground/30"}`}>
-                    <input type="checkbox" checked={cap.selected} onChange={() => { const n = [...capabilities]; n[i] = { ...n[i], selected: !cap.selected }; setCapabilities(n); }} className="accent-cyan-500 mt-0.5" />
-                    <div><p className="text-sm font-medium">{cap.name}</p><p className="text-xs text-muted-foreground mt-0.5">{cap.desc}</p></div>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="bg-card rounded-xl shadow-sm p-5">
-              <h3 className="font-semibold mb-4">覆盖维度配置</h3>
-              <div className="flex flex-wrap gap-2">
-                {dimensions.map((dim, i) => (
-                  <button key={i} onClick={() => { const n = [...dimensions]; n[i] = { ...n[i], active: !dim.active }; setDimensions(n); }}
-                    className={`px-3 py-2.5 min-h-[44px] rounded-lg text-sm border font-medium transition-all duration-200 active:scale-95 ${dim.active ? "bg-primary text-primary-foreground border-primary shadow-sm" : "text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"}`}>{dim.name}</button>
-                ))}
-              </div>
-            </div>
-            <div className="bg-card rounded-xl shadow-sm p-5">
-              <h3 className="font-semibold mb-4">生成参数</h3>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div><span className="text-xs text-muted-foreground block mb-1">输出格式</span><div className="border-l-2 border-primary pl-3 py-1.5 text-foreground font-medium">XMind + Excel</div></div>
-                <div><span className="text-xs text-muted-foreground block mb-1">用例粒度</span><div className="border-l-2 border-primary pl-3 py-1.5 text-foreground font-medium">标准（推荐）</div></div>
-                <div><span className="text-xs text-muted-foreground block mb-1">优先级策略</span><div className="border-l-2 border-primary pl-3 py-1.5 text-foreground font-medium">P0/P1/P2 三级</div></div>
-              </div>
-            </div>
             <div className="flex justify-between">
               <button onClick={() => setWizStep(0)}
                 className="border border-border text-muted-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:border-muted-foreground/40 flex items-center gap-2">
@@ -436,7 +418,7 @@ export function GenerateWizard({
           </div>
         )}
 
-        {/* Step 3：生成结果 */}
+        {/* Step 2：生成结果 */}
         {wizStep === 2 && (
           <div className="space-y-5">
             {/* Generating state — first generation, no tree yet */}
@@ -633,8 +615,6 @@ export function GenerateWizard({
             : requirementText
             ? "文本输入"
             : "未选择",
-          capabilities: `${capabilities.filter((c) => c.selected).length} / ${capabilities.length}`,
-          dimensions: `${dimensions.filter((d) => d.active).length} 个`,
           fewShot: `${fewShot.filter((f) => f.selected).length} 份`,
         }}
         foundFiles={(() => {
@@ -645,6 +625,7 @@ export function GenerateWizard({
             return true;
           });
         })()}
+        logStages={logStages}
         onDownloadFile={(file) => {
           if (!taskId) return;
           const url = `/api/tasks/${taskId}/download?file=${encodeURIComponent(file.relativePath)}`;
