@@ -130,9 +130,11 @@ saveOutputAndReport(taskId):
   }[];
   dimensionCoverage: {           // 覆盖维度分布饼图
     name: string;                // "主流程" | "分支流程" | ...
-    covered: number;             // 已覆盖 task 数
-    total: number;               // 总 task 数
+    covered: number;             // 该维度已覆盖的 task 数
+    total: number;               // 已完成的 task 总数
   }[];
+  // 聚合方式：遍历所有已完成 task 的 dimensionCoverage JSON，
+  // 按维度 name 分组统计 covered === true 的 task 数
   topUsers: {                    // Top 10
     userName: string;
     count: number;
