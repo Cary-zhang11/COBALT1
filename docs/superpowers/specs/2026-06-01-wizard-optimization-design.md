@@ -20,13 +20,18 @@
 
 **修改**：两步算法——
 1. 先按现有独立判断逻辑算出每个节点的初始状态
-2. 从左到右扫描：找到最右侧状态为 `done` 或 `running` 的节点，将其左侧所有 `wait` 节点强制改为 `done`
+2. 从左到右扫描：找到最右侧状态为 `done` 或 `running` 的节点，将其左侧所有节点（无论 `wait` 还是 `running`）强制改为 `done`
 
 ```
-示例（5 个节点）：
+示例 1（最右侧 done/running 是 done）：
   独立判断: wait, running, wait, done, wait
-  层叠后:   done, running, done,  done, wait
-  ↑ 节点 3 是 done → 节点 0、2 强制 done；节点 4 在右侧不受影响
+  层叠后:   done, done,    done, done, wait
+  ↑ 节点 3 是 done → 节点 0/1/2 全部强制 done；节点 4 在右侧不受影响
+
+示例 2（最右侧 done/running 是 running）：
+  独立判断: wait, running, wait, wait, wait
+  层叠后:   done, running, wait, wait, wait
+  ↑ 节点 1 是 running → 节点 0 强制 done；节点 1 自身保持 running
 ```
 
 ### 1.2 宽度调整
