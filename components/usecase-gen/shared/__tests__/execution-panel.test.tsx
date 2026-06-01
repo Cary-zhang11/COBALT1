@@ -4,8 +4,6 @@ import { ExecutionPanel } from "../execution-panel";
 
 const defaultConfig = {
   source: "文本输入",
-  capabilities: "3/4",
-  dimensions: "3 个",
   fewShot: "1 份",
 };
 
@@ -25,7 +23,7 @@ describe("ExecutionPanel", () => {
       );
       expect(screen.getByText("当前配置预览")).toBeDefined();
       expect(screen.getByText("文本输入")).toBeDefined();
-      expect(screen.getByText("3/4")).toBeDefined();
+      expect(screen.getByText("1 份")).toBeDefined();
     });
 
     it("renders config summary on Step 1", () => {
@@ -55,8 +53,8 @@ describe("ExecutionPanel", () => {
       );
       expect(screen.getByText("生成中")).toBeDefined();
       expect(screen.getByText("文档解析")).toBeDefined();
-      expect(screen.getByText("LLM 生成")).toBeDefined();
-      expect(screen.getByText("导出格式化")).toBeDefined();
+      expect(screen.getByText("用例生成")).toBeDefined();
+      expect(screen.getByText("导出格式")).toBeDefined();
     });
 
     it("marks nodes as done based on foundFiles", () => {

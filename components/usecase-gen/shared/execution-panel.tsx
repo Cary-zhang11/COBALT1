@@ -6,10 +6,10 @@ import type { FileInfo } from "@/hooks/use-output-scanner";
 
 const WORKFLOW_NODES: { name: string; key: string }[] = [
   { name: "文档解析", key: "source" },
-  { name: "知识检索", key: "rag" },
-  { name: "LLM 生成", key: "llm" },
+  { name: "需求分析", key: "rag" },
+  { name: "用例生成", key: "llm" },
   { name: "质量校验", key: "quality" },
-  { name: "导出格式化", key: "export" },
+  { name: "导出格式", key: "export" },
 ];
 
 interface ExecutionPanelProps {
@@ -20,11 +20,11 @@ interface ExecutionPanelProps {
   isTweak?: boolean;
   configSummary: {
     source: string;
-    capabilities: string;
-    dimensions: string;
     fewShot: string;
   };
   foundFiles: FileInfo[];
+  /** Completed stages parsed from [WF:done:xxx] log markers */
+  logStages?: Set<string>;
   onDownloadFile: (file: FileInfo) => void;
   onScrollToAITweak: () => void;
   onScrollToRating: () => void;
@@ -34,7 +34,8 @@ interface ExecutionPanelProps {
 
 function deriveNodeStates(
   foundFiles: FileInfo[],
-  generating: boolean
+  generating: boolean,
+  logStages?: Set<string>
 ): { name: string; state: "wait" | "running" | "done" }[] {
   const hasSourceMd = foundFiles.some((f) => f.name.includes("_source"));
   const hasTestcaseMd = foundFiles.some(
@@ -46,19 +47,19 @@ function deriveNodeStates(
     let state: "wait" | "running" | "done";
     switch (i) {
       case 0:
-        state = hasSourceMd ? "done" : generating ? "running" : "wait";
+        state = logStages?.has(node.name) || hasSourceMd ? "done" : generating ? "running" : "wait";
         break;
       case 1:
-        state = hasTestcaseMd ? "done" : hasSourceMd ? "running" : "wait";
+        state = logStages?.has(node.name) || hasTestcaseMd ? "done" : hasSourceMd ? "running" : "wait";
         break;
       case 2:
-        state = hasTestcaseMd ? "done" : hasSourceMd ? "running" : "wait";
+        state = logStages?.has(node.name) || hasTestcaseMd ? "done" : hasSourceMd ? "running" : "wait";
         break;
       case 3:
-        state = hasTestcaseMd ? "done" : "wait";
+        state = logStages?.has(node.name) || hasTestcaseMd ? "done" : "wait";
         break;
       case 4:
-        state = hasXmind ? "done" : hasTestcaseMd ? "running" : "wait";
+        state = logStages?.has(node.name) || hasXmind ? "done" : hasTestcaseMd ? "running" : "wait";
         break;
       default:
         state = "wait";
@@ -75,6 +76,7 @@ export function ExecutionPanel({
   isTweak,
   configSummary,
   foundFiles,
+  logStages,
   onDownloadFile,
   onScrollToAITweak,
   onScrollToRating,
@@ -82,8 +84,8 @@ export function ExecutionPanel({
   onReconfigure,
 }: ExecutionPanelProps) {
   const nodes = useMemo(
-    () => deriveNodeStates(foundFiles, generating),
-    [foundFiles, generating]
+    () => deriveNodeStates(foundFiles, generating, logStages),
+    [foundFiles, generating, logStages]
   );
 
   const mdFile = foundFiles.find(
@@ -102,8 +104,6 @@ export function ExecutionPanel({
           <div className="bg-muted rounded-lg p-3 space-y-2">
             {[
               ["物料来源", configSummary.source],
-              ["已选能力", configSummary.capabilities],
-              ["覆盖维度", configSummary.dimensions],
               ["few-shot", configSummary.fewShot],
               ["输出格式", "XMind + Markdown"],
             ].map(([label, value]) => (
