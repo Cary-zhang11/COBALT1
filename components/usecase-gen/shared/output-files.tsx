@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Download, Loader2, Eye } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import type { FileInfo } from "@/hooks/use-output-scanner";
 import { FilePreviewModal } from "./file-preview";
 
@@ -53,30 +53,29 @@ export function OutputFiles({ taskId, files }: OutputFilesProps) {
                 key={i}
                 className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2 text-sm"
               >
-                <button
-                  onClick={() => {
-                    if (isPreviewable(f.name) && taskId) {
-                      setSelectedFile(f);
-                    }
-                  }}
-                  disabled={!isPreviewable(f.name) || !taskId}
-                  className="flex items-center gap-2 min-w-0 text-left hover:text-primary transition-colors disabled:cursor-default"
-                  title={isPreviewable(f.name) ? "点击预览" : undefined}
-                >
-                  <Eye className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                  <span className="truncate">{f.name}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    if (!taskId) return;
-                    downloadFile(taskId, f);
-                  }}
-                  disabled={!taskId}
-                  className="text-primary hover:text-primary/70 disabled:opacity-40 flex-shrink-0 ml-2"
-                  title="下载"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
+                <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mr-2" />
+                <span className="truncate flex-1 min-w-0">{f.name}</span>
+                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  {isPreviewable(f.name) && taskId && (
+                    <button
+                      onClick={() => setSelectedFile(f)}
+                      className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-colors"
+                    >
+                      预览
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (!taskId) return;
+                      downloadFile(taskId, f);
+                    }}
+                    disabled={!taskId}
+                    className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground font-medium hover:bg-muted/60 hover:text-foreground disabled:opacity-40 transition-colors"
+                    title="下载"
+                  >
+                    下载
+                  </button>
+                </div>
               </div>
             ))}
           </div>
