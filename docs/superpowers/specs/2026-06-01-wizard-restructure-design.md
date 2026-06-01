@@ -125,18 +125,18 @@ const reportSection = extractSectionByKeyword(markdown, "完整性检查报告")
 | 文件 | 改动类型 | 说明 |
 |------|---------|------|
 | `components/usecase-gen/generate-wizard.tsx` | 重构 | STEPS 改名；Step 0 删两块；Step 1 删三块+加两块；清理 capabilities/dimensions state；按钮文案更新；configSummary 简化 |
-| `components/usecase-gen/shared/execution-panel.tsx` | 适配 | configSummary 接口去掉 capabilities/dimensions/fewShot 字段 |
+| `components/usecase-gen/shared/execution-panel.tsx` | 适配 | configSummary 接口去掉 capabilities/dimensions 字段（fewShot 保留，因为 Step 1 中仍在使用） |
 | `hooks/use-output-scanner.ts` | 修复 | 稳定性检查去掉 status !== "running" 条件 |
 | `lib/parse-testcase-md.ts` | 修复 | 章节匹配从硬编码编号改为关键词匹配 |
 
-**不动**：`ai-tweak-panel.tsx`、`rating-panel.tsx`、`output-files.tsx`、`module-overview-table.tsx`、`history-list.tsx`、`use-output-scanner.ts`（除一行外）、所有 API 路由、`page.tsx`
+**不动**：`ai-tweak-panel.tsx`、`rating-panel.tsx`、`output-files.tsx`、`module-overview-table.tsx`、`history-list.tsx`、所有 API 路由、`page.tsx`
 
 ---
 
 ## 测试策略
 
 1. **GenerateWizard**：Step 0 渲染验证（最近需求/few-shot 不存在）；Step 1 渲染验证（capabilities/dimensions/params 不存在，最近需求/few-shot 存在）；按钮文案验证；步骤条名称验证
-2. **ExecutionPanel**：configSummary 简化后不传 capabilities/dimensions/fewShot，不影响渲染
+2. **ExecutionPanel**：configSummary 去掉 capabilities/dimensions，保留 source 和 fewShot，不影响渲染
 3. **useOutputScanner**：status 为 running 时 totalCases 稳定 2 轮后也能触发 onResult
 4. **parseTestcaseMarkdown**：用不同章节编号的 md 文件验证关键词匹配（如「## 五、完整性检查报告」「## 六、完整性检查报告」均正确匹配）
 
