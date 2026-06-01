@@ -166,9 +166,9 @@ export function AITweakPanel({
             </span>
           </div>
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
-            {tweakHistory.map((entry, i) => (
+            {tweakHistory.slice().reverse().map((entry, i) => (
               <div
-                key={i}
+                key={entry.round}
                 className="bg-muted/40 rounded-lg px-3 py-2 text-xs"
               >
                 <div className="flex items-center justify-between mb-0.5">
