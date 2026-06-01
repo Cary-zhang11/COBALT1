@@ -529,7 +529,7 @@ import { getAuthUser } from "@/lib/auth";
 export async function GET(req: NextRequest) {
   try {
     const token = req.cookies.get("token")?.value;
-    const { userId } = await getAuthUser(token);
+    await getAuthUser(token);
 
     const search = req.nextUrl.searchParams.get("search") || "";
     const tag = req.nextUrl.searchParams.get("tag") || "";
@@ -720,6 +720,7 @@ export async function GET(req: NextRequest) {
           totalCases: true,
           qualityScore: true,
           report: true,
+          outputFiles: true,
           user: { select: { name: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -741,6 +742,7 @@ export async function GET(req: NextRequest) {
           qualityScore: t.qualityScore || 0,
           modules: summary?.modules as number || 0,
           userName: t.user?.name || "未知",
+          mdFileName: (t.outputFiles as string[] | null)?.find((f: string) => f.endsWith(".md") && f.includes("测试用例")) || "",
         };
       }),
       total,
@@ -1001,6 +1003,7 @@ git commit -m "feat: replace mock data with real stats API in dashboard, add rec
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { FileText, Plus, Loader2, Trash2, Eye } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { FilePreviewModal } from "./shared/file-preview";
 
 interface KnowledgeItem {
@@ -1020,6 +1023,7 @@ interface HistoryItem {
   qualityScore: number;
   modules: number;
   userName: string;
+  mdFileName: string;
 }
 
 const TABS = ["业务知识", "历史用例"];
@@ -1028,7 +1032,8 @@ export function KnowledgeBase() {
   const [tab, setTab] = useState(0);
   const [search, setSearch] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
-  const [previewFile, setPreviewFile] = useState<string | null>(null);
+  const [previewContent, setPreviewContent] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState("");
   const [previewTaskId, setPreviewTaskId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -1180,9 +1185,14 @@ export function KnowledgeBase() {
                         </div>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => {
-                              setPreviewFile(item.title + ".md");
-                              setPreviewTaskId(null);
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/knowledge/${item.id}`);
+                                const data = await res.json();
+                                setPreviewTitle(data.title);
+                                setPreviewContent(data.content);
+                                setPreviewTaskId(null);
+                              } catch { /* ignore */ }
                             }}
                             className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30"
                           >
@@ -1232,7 +1242,8 @@ export function KnowledgeBase() {
                       </div>
                       <button
                         onClick={() => {
-                          setPreviewFile(`测试用例.md`);
+                          setPreviewContent(item.mdFileName);
+                          setPreviewTitle("");
                           setPreviewTaskId(item.id);
                         }}
                         className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30"
@@ -1281,11 +1292,31 @@ export function KnowledgeBase() {
         </div>
       )}
 
-      {/* Preview Modal */}
+      {/* Knowledge content preview (inline modal) */}
+      {previewContent !== null && !previewTaskId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={(e) => { if (e.target === e.currentTarget) { setPreviewContent(null); } }}>
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h3 className="font-semibold text-sm truncate pr-4">{previewTitle}</h3>
+              <button onClick={() => setPreviewContent(null)} className="p-1 rounded-lg hover:bg-muted">✕</button>
+            </div>
+            <div className="flex-1 overflow-auto p-6">
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown>{previewContent}</ReactMarkdown>
+              </div>
+            </div>
+            <div className="flex justify-end px-6 py-3 border-t">
+              <button onClick={() => setPreviewContent(null)} className="px-4 py-2 rounded-lg text-sm bg-muted hover:bg-muted/60">关闭</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History file preview */}
       <FilePreviewModal
-        open={previewFile !== null}
-        onClose={() => setPreviewFile(null)}
-        fileName={previewFile || ""}
+        open={previewContent !== null && previewTaskId !== null}
+        onClose={() => { setPreviewContent(null); setPreviewTaskId(null); }}
+        fileName={previewContent || ""}
         taskId={previewTaskId}
       />
     </div>
