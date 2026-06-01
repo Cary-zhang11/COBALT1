@@ -74,14 +74,37 @@ function extractMeta(markdown: string): ParseMeta {
 }
 
 /**
- * Extract a section between two markers (or to end of file).
+ * Extract a section by keyword matching instead of hardcoded section numbers.
+ * Matches any "## N、keyword" or "## N. keyword" header regardless of the number.
  */
-function extractSection(markdown: string, startMarker: string, endMarker?: string): string {
-  const startIdx = markdown.indexOf(startMarker);
-  if (startIdx === -1) return "";
-  const from = startIdx;
-  const to = endMarker ? markdown.indexOf(endMarker, from) : markdown.length;
-  return markdown.slice(from, to === -1 ? markdown.length : to);
+function extractSectionByKeyword(
+  markdown: string,
+  startKeyword: string,
+  endKeyword?: string
+): string {
+  const startPattern = new RegExp(
+    `^##\\s+[一二三四五六七八九十\\d]+[、.]\\s*${startKeyword}`,
+    "m"
+  );
+  const startMatch = markdown.match(startPattern);
+  if (!startMatch || startMatch.index === undefined) return "";
+
+  const from = startMatch.index;
+  let to = markdown.length;
+
+  if (endKeyword) {
+    const endPattern = new RegExp(
+      `^##\\s+[一二三四五六七八九十\\d]+[、.]\\s*${endKeyword}`,
+      "m"
+    );
+    const rest = markdown.slice(from + 1);
+    const endMatch = rest.match(endPattern);
+    if (endMatch && endMatch.index !== undefined) {
+      to = from + 1 + endMatch.index;
+    }
+  }
+
+  return markdown.slice(from, to);
 }
 
 /**
@@ -249,17 +272,17 @@ export function parseTestcaseMarkdown(markdown: string): ParseResult {
   // Find the cases section — parse all test-case bearing sections
   // Sections: 一(测试用例), 二(网络相关), 三(兼容性测试)
   // Stop before 四(埋点测试)/五(冒烟测试)/六(完整性检查) as those have different formats
-  const casesSection = extractSection(
+  const casesSection = extractSectionByKeyword(
     markdown,
-    "## 一、测试用例",
-    "## 四、"
+    "测试用例",
+    "冒烟测试清单"
   );
   const tree = parseCasesSection(casesSection);
 
   // Find the report section for summary
-  const reportSection = extractSection(
+  const reportSection = extractSectionByKeyword(
     markdown,
-    "## 六、完整性检查报告"
+    "完整性检查报告"
   );
   const summary = parseSummarySection(reportSection);
 

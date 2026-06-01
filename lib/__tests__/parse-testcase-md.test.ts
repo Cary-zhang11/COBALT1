@@ -156,4 +156,37 @@ describe("parseTestcaseMarkdown", () => {
     expect(result.tree![0].name).toBe("默认模块");
     expect(result.tree![0].cases[0].id).toBe("tc-001");
   });
+
+  it("matches summary section regardless of Chinese number prefix", () => {
+    const md = `## 一、测试用例
+
+### 1.1 模块A
+
+- tc-001-p0：测试用例
+  - 前置
+    - 预期
+
+## 三、冒烟测试清单
+
+- tc-001-p0：用例标题 | 描述
+
+## 五、完整性检查报告
+
+### 3. 用例数量统计（按功能模块）
+
+- 模块A：1个，占比100%
+- **合计**：**1个**
+
+### 4. 优先级统计
+- P0：1个，占比100%
+- **合计**：1个，占比100%
+`;
+
+    const result = parseTestcaseMarkdown(md);
+    expect(result.tree).not.toBeNull();
+    expect(result.summary.totalCases).toBe(1);
+    // 冒烟测试清单 section should NOT be parsed as cases
+    const cases = result.tree!.flatMap((m) => m.cases);
+    expect(cases.length).toBe(1);
+  });
 });
