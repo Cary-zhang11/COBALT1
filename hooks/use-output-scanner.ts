@@ -169,7 +169,7 @@ export function useOutputScanner({
             };
 
             // Stable for 2 consecutive polls + task not running → complete
-            if (newStableCount >= 2 && status !== "running") {
+            if (newStableCount >= 2) {
               callbacksRef.current.onResult?.(report);
               stop();
               return;
