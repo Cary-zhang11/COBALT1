@@ -208,5 +208,5 @@ if __name__ == '__main__':
     md_file = sys.argv[1] if len(sys.argv) > 1 else 'docs/卖换估一体化测试用例_22.md'
     md_dir = os.path.dirname(os.path.abspath(md_file))
     base_name = os.path.splitext(os.path.basename(md_file))[0] + '.xmind'
-    xmind_file = os.path.join( base_name)
+    xmind_file = os.path.join(md_dir, base_name)
     md_to_xmind(md_file, xmind_file)

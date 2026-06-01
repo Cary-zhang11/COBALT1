@@ -206,7 +206,7 @@ export function GenerateWizard({
           if (cancelled) return;
           setTaskId(initialTaskId);
           setGenerating(true);
-          setGenStatus("正在恢复执行进度...");
+          setGenStatus("正在加载...");
           setWizStep(2);
         }
       } catch { /* fall through */ }

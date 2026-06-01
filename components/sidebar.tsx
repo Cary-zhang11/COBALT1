@@ -16,15 +16,12 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { href: "/", label: "日志列表", icon: LayoutDashboard },
-  // TODO: 本期先隐藏新建任务和工具库入口
-  // { href: "/tasks/new", label: "新建任务", icon: PlusCircle },
-  // { href: "/skills", label: "工具库", icon: Wand2 },
-  { href: "/usecase-gen?tab=generate", label: "生成向导", icon: Wand2 },
+  { href: "/usecase-gen?tab=generate", label: "用例生成", icon: Wand2 },
   { href: "/usecase-gen?tab=history", label: "历史记录", icon: Clock },
   { href: "/usecase-gen?tab=editor", label: "用例预览编辑", icon: FileText },
   { href: "/usecase-gen?tab=dashboard", label: "数据看板", icon: BarChart3 },
   { href: "/usecase-gen?tab=knowledge", label: "知识库管理", icon: BookOpen },
+  { href: "/", label: "日志列表", icon: LayoutDashboard },
 ];
 
 export function Sidebar() {
