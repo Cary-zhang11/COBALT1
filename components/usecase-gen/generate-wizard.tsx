@@ -477,6 +477,10 @@ export function GenerateWizard({
             {usecaseTree && usecaseTree.length > 0 && genStatus !== "生成失败" && (
               <>
                 {/* KPI Cards */}
+                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-primary" />
+                  数据概览
+                </h3>
                 <div className="grid grid-cols-4 gap-4">
                   <div className="bg-card rounded-xl shadow-sm p-5 flex items-start justify-between">
                     <div>
