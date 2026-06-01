@@ -19,12 +19,29 @@ interface UseOutputScannerOptions {
   }) => void;
   onError?: (error: string) => void;
   enabled?: boolean;
-  /** Skip stability detection when totalCases equals this value (pre-tweak baseline) */
-  initialTotalCases?: number;
 }
 
-interface FileSizeMap {
-  [filename: string]: { size: number; stableCount: number };
+/**
+ * Extract version number from xmind filename.
+ *   "测试用例.xmind"       → 0  (no version suffix = v0)
+ *   "测试用例_v3.xmind"    → 3
+ * Returns -1 if no xmind files in the list.
+ */
+function maxXmindVersion(files: FileInfo[]): number {
+  const xmindFiles = files.filter((f) => f.name.endsWith(".xmind"));
+  if (xmindFiles.length === 0) return -1;
+
+  let maxV = -1;
+  for (const f of xmindFiles) {
+    const m = f.name.match(/_v(\d+)\.xmind$/);
+    if (m) {
+      maxV = Math.max(maxV, parseInt(m[1], 10));
+    } else {
+      // Unversioned file → treat as v0 if no versioned file found yet
+      maxV = Math.max(maxV, 0);
+    }
+  }
+  return maxV;
 }
 
 export function useOutputScanner({
@@ -33,20 +50,17 @@ export function useOutputScanner({
   onResult,
   onError,
   enabled = true,
-  initialTotalCases,
 }: UseOutputScannerOptions) {
   const [isScanning, setIsScanning] = useState(false);
   const [foundFiles, setFoundFiles] = useState<FileInfo[]>([]);
   const [, setPollCount] = useState(0);
-  const fileSizesRef = useRef<FileSizeMap>({});
   const stopRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbacksRef = useRef({ onResult, onError });
   callbacksRef.current = { onResult, onError };
-  const initialCasesRef = useRef(initialTotalCases);
-  initialCasesRef.current = initialTotalCases;
   const prevTaskIdRef = useRef(taskId);
-  const baselineVersionRef = useRef<number | null>(null);
+  /** xmind baseline version — set on first poll, completion waits for higher version */
+  const baselineXmindRef = useRef<number | null>(null);
 
   const stop = useCallback(() => {
     stopRef.current = true;
@@ -65,8 +79,7 @@ export function useOutputScanner({
 
     stopRef.current = false;
     setIsScanning(true);
-    fileSizesRef.current = {};
-    baselineVersionRef.current = null;
+    baselineXmindRef.current = null;
     if (taskChanged) {
       setFoundFiles([]);
     }
@@ -105,11 +118,10 @@ export function useOutputScanner({
         }
         const report = await reportRes.json();
 
-        // 3. Check if output files exist
+        // 3. Map files
         const files = report.outputFiles || [];
         const newFoundFiles: FileInfo[] = files.map(
           (f: { name: string; path: string }) => {
-            // Extract relativePath from the download URL in `path`
             let relativePath = f.name;
             try {
               const url = new URL(f.path, "http://x");
@@ -125,57 +137,32 @@ export function useOutputScanner({
           setFoundFiles(newFoundFiles);
         }
 
-        // 4. Stability check — use totalCases as stability proxy
-        if (report.tree && newFoundFiles.length > 0) {
-          const currentCases = report.summary?.totalCases || 0;
+        // 4. Completion check — xmind file version as gate
+        const currentXmindVersion = maxXmindVersion(newFoundFiles);
 
-          const mdFiles = newFoundFiles.filter((f: FileInfo) =>
-            f.name.includes("测试用例")
-          );
-
-          if (mdFiles.length > 0 && currentCases > 0) {
-            // Detect highest version from file names (e.g. _v7)
-            let maxVersion = 0;
-            for (const f of mdFiles) {
-              const m = f.name.match(/_v(\d+)\.md$/);
-              if (m) maxVersion = Math.max(maxVersion, parseInt(m[1], 10));
-            }
-
-            // Baseline: wait for a new versioned file to appear (tweak)
-            if (initialCasesRef.current !== undefined) {
-              if (maxVersion > 0 && baselineVersionRef.current === null) {
-                baselineVersionRef.current = maxVersion;
-              }
-              if (
-                baselineVersionRef.current !== null &&
-                maxVersion <= baselineVersionRef.current
-              ) {
-                if (!stopRef.current) {
-                  timerRef.current = setTimeout(poll, interval);
-                }
-                return;
-              }
-            }
-
-            const prevEntry = fileSizesRef.current["_md"];
-            const newStableCount =
-              prevEntry && prevEntry.size === currentCases
-                ? prevEntry.stableCount + 1
-                : 1;
-
-            fileSizesRef.current["_md"] = {
-              size: currentCases,
-              stableCount: newStableCount,
-            };
-
-            // Stable for 2 consecutive polls + task not running → complete
-            if (newStableCount >= 2) {
-              callbacksRef.current.onResult?.(report);
-              stop();
-              return;
-            }
-          }
+        // Record baseline on first poll (null → first value seen)
+        if (baselineXmindRef.current === null) {
+          baselineXmindRef.current = currentXmindVersion;
         }
+
+        // Wait for a new xmind version to appear
+        if (currentXmindVersion <= baselineXmindRef.current) {
+          if (!stopRef.current) {
+            timerRef.current = setTimeout(poll, interval);
+          }
+          return;
+        }
+
+        // New xmind detected — verify tree is parsed before completing
+        if (!report.tree) {
+          if (!stopRef.current) {
+            timerRef.current = setTimeout(poll, interval);
+          }
+          return;
+        }
+
+        callbacksRef.current.onResult?.(report);
+        stop();
       } catch {
         // Network error — retry next poll
       }
