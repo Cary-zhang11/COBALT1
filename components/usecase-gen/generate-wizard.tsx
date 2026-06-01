@@ -509,8 +509,8 @@ export function GenerateWizard({
                   <div className="bg-card rounded-xl shadow-sm p-5 flex items-start justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground font-medium">生成耗时</p>
-                      <p className="text-3xl font-bold mt-1 text-foreground">{genStats?.duration || "-"}</p>
-                      <p className="text-xs text-muted-foreground mt-1">秒</p>
+                      <p className="text-3xl font-bold mt-1 text-foreground">{genStats?.duration != null ? (genStats.duration / 60000).toFixed(1) : "-"}</p>
+                      <p className="text-xs text-muted-foreground mt-1">分钟</p>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center"><Clock className="w-5 h-5 text-violet-600" /></div>
                   </div>
