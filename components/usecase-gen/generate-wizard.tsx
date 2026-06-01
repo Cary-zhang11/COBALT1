@@ -195,7 +195,7 @@ export function GenerateWizard({
             totalCases: summary?.totalCases || 0,
             qualityScore: summary?.qualityScore || 0,
             modules: summary?.modules || 0,
-            duration: 0,
+            duration: (report as Record<string, unknown>).duration as number || 0,
           });
           setGenerating(false);
           setGenStatus("");
