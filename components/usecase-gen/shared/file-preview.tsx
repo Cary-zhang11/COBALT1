@@ -2,17 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
-import { X, Loader2, AlertCircle, ChevronRight, ChevronDown } from "lucide-react";
-
-interface XMindTopic {
-  title: string;
-  children: XMindTopic[];
-}
-
-interface XMindSheet {
-  title: string;
-  rootTopic: XMindTopic;
-}
+import { X, Loader2, AlertCircle } from "lucide-react";
 
 interface FilePreviewModalProps {
   open: boolean;
@@ -21,53 +11,10 @@ interface FilePreviewModalProps {
   taskId: string | null;
 }
 
-function XMindTreeNode({ topic, depth = 0 }: { topic: XMindTopic; depth?: number }) {
-  const [expanded, setExpanded] = useState(depth < 2);
-
-  if (topic.children.length === 0) {
-    return (
-      <div
-        className="flex items-center py-0.5 text-sm text-muted-foreground"
-        style={{ paddingLeft: `${depth * 20 + 24}px` }}
-      >
-        {topic.title}
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1 py-0.5 text-sm font-medium hover:text-foreground transition-colors w-full text-left"
-        style={{ paddingLeft: `${depth * 20 + 4}px` }}
-      >
-        {expanded ? (
-          <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
-        ) : (
-          <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
-        )}
-        <span className="truncate">{topic.title}</span>
-      </button>
-      {expanded && (
-        <div>
-          {topic.children.map((child, i) => (
-            <XMindTreeNode key={i} topic={child} depth={depth + 1} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function FilePreviewModal({ open, onClose, fileName, taskId }: FilePreviewModalProps) {
   const [mdContent, setMdContent] = useState<string | null>(null);
-  const [xmindData, setXmindData] = useState<XMindSheet[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const isMd = fileName.endsWith(".md");
-  const isXmind = fileName.endsWith(".xmind");
 
   const fetchContent = useCallback(async () => {
     if (!taskId || !open) return;
@@ -75,33 +22,20 @@ export function FilePreviewModal({ open, onClose, fileName, taskId }: FilePrevie
     setLoading(true);
     setError(null);
     setMdContent(null);
-    setXmindData(null);
 
     try {
-      if (isXmind) {
-        const res = await fetch(
-          `/api/tasks/${taskId}/xmind-preview?file=${encodeURIComponent(fileName)}`
-        );
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error((errData as { error?: string }).error || "解析失败");
-        }
-        const data = await res.json();
-        setXmindData(data.sheets as XMindSheet[]);
-      } else {
-        const res = await fetch(
-          `/api/tasks/${taskId}/download?file=${encodeURIComponent(fileName)}`
-        );
-        if (!res.ok) throw new Error("文件加载失败");
-        const text = await res.text();
-        setMdContent(text);
-      }
+      const res = await fetch(
+        `/api/tasks/${taskId}/download?file=${encodeURIComponent(fileName)}`
+      );
+      if (!res.ok) throw new Error("文件加载失败");
+      const text = await res.text();
+      setMdContent(text);
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载失败");
     } finally {
       setLoading(false);
     }
-  }, [taskId, open, fileName, isXmind]);
+  }, [taskId, open, fileName]);
 
   useEffect(() => {
     if (open) fetchContent();
@@ -153,24 +87,9 @@ export function FilePreviewModal({ open, onClose, fileName, taskId }: FilePrevie
             </div>
           )}
 
-          {!loading && !error && isMd && mdContent !== null && (
+          {!loading && !error && mdContent !== null && (
             <div className="prose prose-sm max-w-none dark:prose-invert">
               <ReactMarkdown>{mdContent}</ReactMarkdown>
-            </div>
-          )}
-
-          {!loading && !error && isXmind && xmindData && (
-            <div className="space-y-4">
-              {xmindData.map((sheet, i) => (
-                <div key={i}>
-                  <h4 className="font-semibold text-sm mb-2 text-muted-foreground">
-                    {sheet.title}
-                  </h4>
-                  <div className="border rounded-xl p-3">
-                    <XMindTreeNode topic={sheet.rootTopic} />
-                  </div>
-                </div>
-              ))}
             </div>
           )}
         </div>

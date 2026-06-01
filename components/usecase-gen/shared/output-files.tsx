@@ -17,7 +17,7 @@ function isDisplayable(name: string): boolean {
 }
 
 function isPreviewable(name: string): boolean {
-  return name.endsWith(".md") || name.endsWith(".xmind");
+  return name.endsWith(".md");
 }
 
 function downloadFile(taskId: string, file: FileInfo) {
