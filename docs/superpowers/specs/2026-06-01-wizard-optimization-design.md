@@ -18,14 +18,15 @@
 
 **当前问题**：`deriveNodeStates` 每个节点独立判断状态，只看对应文件是否出现。当后续节点（如导出格式）先于前面节点完成时，中间节点仍显示 wait，不符合直觉。
 
-**修改**：引入层叠完成逻辑——当前节点 running/done 时，其之前所有节点强制 done。
+**修改**：两步算法——
+1. 先按现有独立判断逻辑算出每个节点的初始状态
+2. 从左到右扫描：找到最右侧状态为 `done` 或 `running` 的节点，将其左侧所有 `wait` 节点强制改为 `done`
 
 ```
-新逻辑：
-节点 N 状态 =
-  如果 N 本身已完成 → "done"
-  如果 N-1 是 done 且 N 未 done → "running"
-  否则 → "wait"
+示例（5 个节点）：
+  独立判断: wait, running, wait, done, wait
+  层叠后:   done, running, done,  done, wait
+  ↑ 节点 3 是 done → 节点 0、2 强制 done；节点 4 在右侧不受影响
 ```
 
 ### 1.2 宽度调整
@@ -44,6 +45,10 @@
 2. 下载 XMind（最新版本文件）
 3. AI 微调（→ `onScrollToAITweak`）
 4. 去编辑用例（→ `onNavigateToEditor`）
+
+**同步清理**：
+- `ExecutionPanelProps` 接口删除 `onScrollToRating`、`onReconfigure` 字段
+- `generate-wizard.tsx` 中删除向 ExecutionPanel 传递这两个回调的代码
 
 ---
 
@@ -126,17 +131,16 @@ OutputFiles 过滤逻辑调整：**所有 `.md` 和 `.xmind` 文件**均显示�
 interface FilePreviewModalProps {
   open: boolean;
   onClose: () => void;
-  fileName: string;      // 文件名（用于标题显示和类型判断）
-  taskId: string | null;  // 用于构造 API URL
-  fileType: "md" | "xmind";
+  fileName: string;      // 文件名，扩展名决定渲染方式：.md → Markdown，.xmind → 树形结构
+  taskId: string | null; // 用于构造 API URL
 }
 ```
 
-**内部状态**：
-- `content: string | null` — MD 原始文本
-- `xmindTree: XMindNode[] | null` — XMind 解析后的树
-- `loading: boolean`
-- `error: string | null`
+Modal 内部根据 `fileName` 扩展名自动判断调用哪个 API：
+- `.md` → `GET /api/tasks/:id/download?file=xxx.md` → 原始文本 → `react-markdown` 渲染
+- `.xmind` → `GET /api/tasks/:id/xmind-preview?file=xxx.xmind` → JSON 树 → 折叠树渲染
+
+**状态管理**：预览 Modal 的状态（`selectedFile: string | null`）由 `OutputFiles` 组件内部管理。OutputFiles 点击文件名时设置 `selectedFile`，FilePreviewModal 关闭时清空。
 
 ---
 
