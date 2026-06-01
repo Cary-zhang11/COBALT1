@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import type { Prisma } from "@prisma/client";
 import { cliRuntime } from "./claude-cli-runtime";
 import { getWorkspacePath, getOutputPath, copyFilesToWorkspace } from "./sandbox";
 import type { AgentEvent } from "./agent-runtime";
@@ -349,12 +350,25 @@ export async function saveOutputAndReport(taskId: string): Promise<void> {
         tree: parsed.tree,
         summary: parsed.summary,
         meta: parsed.meta,
+        dimensions: parsed.dimensions,
       };
+
+      // First-time generation — write stats columns
+      const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { totalCases: true },
+      });
+
+      if (task && task.totalCases === null) {
+        updates.totalCases = parsed.summary.totalCases;
+        updates.qualityScore = parsed.summary.qualityScore;
+        updates.dimensionCoverage = parsed.dimensions as unknown as Prisma.InputJsonValue;
+      }
     }
 
     await prisma.task.update({
       where: { id: taskId },
-      data: updates,
+      data: updates as Prisma.TaskUpdateInput,
     });
   } catch {
     // No output files
