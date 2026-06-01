@@ -7,7 +7,7 @@ import { useTaskEvents } from "@/hooks/use-task-events";
 import { ExecutionPanel } from "./shared/execution-panel";
 import { OutputFiles } from "./shared/output-files";
 import { AITweakPanel } from "./shared/ai-tweak-panel";
-import { RatingPanel } from "./shared/rating-panel";
+
 import { ModuleOverviewTable } from "./shared/module-overview-table";
 import {
   mockRecentReqs, mockFewShotExamples,
@@ -90,7 +90,7 @@ export function GenerateWizard({
         totalCases: summary?.totalCases || 0,
         qualityScore: summary?.qualityScore || 0,
         modules: summary?.modules || 0,
-        duration: 0,
+        duration: data.duration || 0,
       });
       setGenerating(false);
 
@@ -525,6 +525,18 @@ export function GenerateWizard({
                   })()}
                 />
 
+                {/* Go to editor button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => onNavigateToTab?.(2)}
+                    className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm flex items-center gap-2 transition-all hover:bg-primary/90"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    去编辑用例
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+
                 {/* AI Tweak */}
                 <AITweakPanel
                   taskId={taskId}
@@ -553,37 +565,12 @@ export function GenerateWizard({
                   }}
                 />
 
-                {/* Rating */}
-                <RatingPanel taskId={taskId} />
-
                 {/* Module table */}
                 <ModuleOverviewTable
                   modules={usecaseTree}
                   totalCases={usecaseTree.reduce((s, m) => s + m.cases.length, 0)}
                 />
 
-                {/* Bottom action buttons */}
-                <div className="flex justify-between">
-                  <button
-                    onClick={() => {
-                      setWizStep(0);
-                      setGenerating(false);
-                      setGenStatus("");
-                    }}
-                    className="border border-border text-muted-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:border-muted-foreground/40 flex items-center gap-2 transition-colors"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    重新配置
-                  </button>
-                  <button
-                    onClick={() => onNavigateToTab?.(2)}
-                    className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm flex items-center gap-2 transition-all hover:bg-primary/90"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    去编辑用例
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
               </>
             )}
 
@@ -644,15 +631,7 @@ export function GenerateWizard({
         onScrollToAITweak={() => {
           document.querySelector("[data-ai-tweak]")?.scrollIntoView({ behavior: "smooth" });
         }}
-        onScrollToRating={() => {
-          document.querySelector("[data-rating]")?.scrollIntoView({ behavior: "smooth" });
-        }}
         onNavigateToEditor={() => onNavigateToTab?.(2)}
-        onReconfigure={() => {
-          setWizStep(0);
-          setGenerating(false);
-          setGenStatus("");
-        }}
       />
     </div>
   );
