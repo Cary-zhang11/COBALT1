@@ -75,11 +75,25 @@ export function GenerateWizard({
     }).catch((err) => console.error("Tweak PATCH failed:", err));
   }, []);
 
+  // Track xmind version for scanner baseline (prevents premature completion on tweak)
+  const [xmindBaseline, setXmindBaseline] = useState(-1);
+
   // Output scanner
   const scanner = useOutputScanner({
     taskId: taskId || "",
     enabled: generating && !!taskId,
+    xmindBaselineVersion: xmindBaseline,
     onResult: (data) => {
+      // Record current xmind version as new baseline for next tweak
+      const outputFiles = (data.outputFiles || []) as { name: string; path: string }[];
+      const xmindFiles = outputFiles.filter((f) => f.name.endsWith(".xmind"));
+      let maxV = -1;
+      for (const f of xmindFiles) {
+        const m = f.name.match(/_v(\d+)\.xmind$/);
+        if (m) maxV = Math.max(maxV, parseInt(m[1], 10));
+        else maxV = Math.max(maxV, 0);
+      }
+      setXmindBaseline(maxV);
       const tree = data.tree as UsecaseModule[];
       const summary = data.summary;
       setUsecaseTree(tree);

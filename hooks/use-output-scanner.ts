@@ -19,6 +19,11 @@ interface UseOutputScannerOptions {
   }) => void;
   onError?: (error: string) => void;
   enabled?: boolean;
+  /** Current xmind version before tweak started.
+   *  -1 = no xmind exists yet (initial generation), any xmind triggers completion.
+   *   0 = unversioned xmind exists, wait for _v1+.
+   *   N = _v{N}.xmind exists, wait for _v{N+1}+. */
+  xmindBaselineVersion?: number;
 }
 
 /**
@@ -50,6 +55,7 @@ export function useOutputScanner({
   onResult,
   onError,
   enabled = true,
+  xmindBaselineVersion = -1,
 }: UseOutputScannerOptions) {
   const [isScanning, setIsScanning] = useState(false);
   const [foundFiles, setFoundFiles] = useState<FileInfo[]>([]);
@@ -59,8 +65,6 @@ export function useOutputScanner({
   const callbacksRef = useRef({ onResult, onError });
   callbacksRef.current = { onResult, onError };
   const prevTaskIdRef = useRef(taskId);
-  /** xmind baseline version — set on first poll, completion waits for higher version */
-  const baselineXmindRef = useRef<number | null>(null);
 
   const stop = useCallback(() => {
     stopRef.current = true;
@@ -79,7 +83,6 @@ export function useOutputScanner({
 
     stopRef.current = false;
     setIsScanning(true);
-    baselineXmindRef.current = null;
     if (taskChanged) {
       setFoundFiles([]);
     }
@@ -140,13 +143,8 @@ export function useOutputScanner({
         // 4. Completion check — xmind file version as gate
         const currentXmindVersion = maxXmindVersion(newFoundFiles);
 
-        // Record baseline on first poll (null → first value seen)
-        if (baselineXmindRef.current === null) {
-          baselineXmindRef.current = currentXmindVersion;
-        }
-
-        // Wait for a new xmind version to appear
-        if (currentXmindVersion <= baselineXmindRef.current) {
+        // Wait for a new xmind version to appear (above baseline)
+        if (currentXmindVersion <= xmindBaselineVersion) {
           if (!stopRef.current) {
             timerRef.current = setTimeout(poll, interval);
           }
