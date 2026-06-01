@@ -10,7 +10,7 @@ interface ModuleOverviewTableProps {
 }
 
 export function ModuleOverviewTable({ modules, totalCases }: ModuleOverviewTableProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   return (
     <div className="bg-card rounded-xl shadow-sm overflow-hidden">
