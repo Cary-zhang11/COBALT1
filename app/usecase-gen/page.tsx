@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { GenerateWizard } from "@/components/usecase-gen/generate-wizard";
 import { CaseEditor } from "@/components/usecase-gen/case-editor";
 import { Dashboard } from "@/components/usecase-gen/dashboard";
@@ -9,11 +10,33 @@ import { HistoryList } from "@/components/usecase-gen/history-list";
 import type { UsecaseModule } from "@/components/usecase-gen/shared/types";
 
 const TABS = ["生成向导", "历史记录", "用例预览编辑", "数据看板", "知识库管理"];
+const TAB_KEYS = ["generate", "history", "editor", "dashboard", "knowledge"];
+const TAB_INDEX: Record<string, number> = Object.fromEntries(TAB_KEYS.map((k, i) => [k, i]));
 
 export default function UsecaseGenPage() {
-  const [activeTab, setActiveTab] = useState(0);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const [activeTab, setActiveTabState] = useState(() => {
+    const tab = searchParams.get("tab");
+    return tab && TAB_INDEX[tab] !== undefined ? TAB_INDEX[tab] : 0;
+  });
   const [usecaseTree, setUsecaseTree] = useState<UsecaseModule[] | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
+  // Sync URL → state (sidebar clicks / bookmark)
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && TAB_INDEX[tab] !== undefined) {
+      setActiveTabState(TAB_INDEX[tab]);
+    }
+  }, [searchParams]);
+
+  // Sync state → URL (tab bar clicks / internal navigation)
+  const setActiveTab = useCallback((i: number) => {
+    setActiveTabState(i);
+    router.replace(`/usecase-gen?tab=${TAB_KEYS[i]}`, { scroll: false });
+  }, [router]);
 
   const skillId = process.env.NEXT_PUBLIC_USECASE_SKILL_ID;
 

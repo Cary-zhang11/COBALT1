@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import {
   LayoutDashboard,
-  PlusCircle,
-  Wand2,
   LogOut,
   Cpu,
+  Wand2,
   FileText,
+  Clock,
+  BarChart3,
+  BookOpen,
 } from "lucide-react";
 
 const navItems = [
@@ -18,12 +20,26 @@ const navItems = [
   // TODO: 本期先隐藏新建任务和工具库入口
   // { href: "/tasks/new", label: "新建任务", icon: PlusCircle },
   // { href: "/skills", label: "工具库", icon: Wand2 },
-  { href: "/usecase-gen", label: "用例生成", icon: FileText },
+  { href: "/usecase-gen?tab=generate", label: "生成向导", icon: Wand2 },
+  { href: "/usecase-gen?tab=history", label: "历史记录", icon: Clock },
+  { href: "/usecase-gen?tab=editor", label: "用例预览编辑", icon: FileText },
+  { href: "/usecase-gen?tab=dashboard", label: "数据看板", icon: BarChart3 },
+  { href: "/usecase-gen?tab=knowledge", label: "知识库管理", icon: BookOpen },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user, logout } = useAuthStore();
+
+  function isNavActive(href: string) {
+    if (href === "/") return pathname === "/";
+    const [hrefPath, hrefQuery] = href.split("?");
+    if (pathname !== hrefPath) return false;
+    if (!hrefQuery) return true;
+    const hrefTab = new URLSearchParams(hrefQuery).get("tab");
+    return searchParams.get("tab") === hrefTab;
+  }
 
   return (
     <aside className="w-64 border-r bg-card flex flex-col">
@@ -46,10 +62,7 @@ export function Sidebar() {
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+          const isActive = isNavActive(item.href);
           return (
             <Link
               key={item.href}
