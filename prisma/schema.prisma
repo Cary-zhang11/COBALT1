@@ -19,6 +19,7 @@ model User {
   tasks     Task[]
   skills    Skill[]
   feedbacks TaskFeedback[]
+  knowledge Knowledge[]
 }
 
 model Skill {
@@ -73,6 +74,11 @@ model Task {
   outputFiles String[] @default([])
   duration    Int?
 
+  totalCases        Int?
+  qualityScore      Int?
+  category          String?
+  dimensionCoverage Json?
+
   agentRuntime  String  @default("claude-cli")
   modelProvider String?
   tokenUsage    Int?
@@ -118,4 +124,16 @@ model TaskFeedback {
   rating    Int
   comment   String?
   createdAt DateTime @default(now())
+}
+
+model Knowledge {
+  id        String    @id @default(uuid())
+  title     String
+  content   String    @db.Text
+  tags      String[]  @default([])
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  refCount  Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
