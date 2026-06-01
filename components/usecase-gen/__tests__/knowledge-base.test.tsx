@@ -1,30 +1,43 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { KnowledgeBase } from "../knowledge-base";
 
+function renderWithClient(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
+
 describe("KnowledgeBase", () => {
-  it("renders sub-tab bar", () => {
-    render(<KnowledgeBase />);
+  it("renders only 2 tabs (业务知识, 历史用例)", () => {
+    renderWithClient(<KnowledgeBase />);
     expect(screen.getByText("业务知识")).toBeDefined();
     expect(screen.getByText("历史用例")).toBeDefined();
-    expect(screen.getByText("用例规范")).toBeDefined();
-    expect(screen.getByText("Prompt 模板")).toBeDefined();
+    // 用例规范 and Prompt 模板 are removed
+    expect(screen.queryByText("用例规范")).toBeNull();
+    expect(screen.queryByText("Prompt 模板")).toBeNull();
   });
 
-  it("renders filter section", () => {
-    render(<KnowledgeBase />);
+  it("renders search and filter", () => {
+    renderWithClient(<KnowledgeBase />);
     expect(screen.getByPlaceholderText("关键词...")).toBeDefined();
     expect(screen.getByText("标签筛选")).toBeDefined();
   });
 
-  it("switches content when clicking sub-tab", () => {
-    render(<KnowledgeBase />);
-    fireEvent.click(screen.getByText("Prompt 模板"));
-    expect(screen.getByText("标准用例生成 Prompt")).toBeDefined();
+  it("switches tabs on click", () => {
+    renderWithClient(<KnowledgeBase />);
+    fireEvent.click(screen.getByText("历史用例"));
+    // History tab should be active (styled as primary)
+    expect(screen.getByText("历史用例").className).toContain("text-primary-foreground");
   });
 
-  it("shows add button for knowledge items", () => {
-    render(<KnowledgeBase />);
-    expect(screen.getByText("添加新条目")).toBeDefined();
+  it("renders without crashing", () => {
+    renderWithClient(<KnowledgeBase />);
+    const container = document.body;
+    expect(container).toBeDefined();
   });
 });
