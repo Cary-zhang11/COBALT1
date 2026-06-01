@@ -42,10 +42,18 @@ export interface ParseMeta {
   prdVersion: string;
 }
 
+export interface DimensionCoverage {
+  name: string;
+  code: string;
+  covered: boolean;
+  caseCount: number;
+}
+
 export interface ParseResult {
   tree: UsecaseModule[] | null;
   summary: ParseSummary;
   meta: ParseMeta;
+  dimensions: DimensionCoverage[];
 }
 
 interface RawCase {
@@ -264,6 +272,29 @@ function parseSummarySection(section: string): ParseSummary {
 }
 
 /**
+ * Parse dimension coverage from the '维度覆盖检查' section of the report.
+ * Matches lines like: - 主流程（D1）：是，12个，已覆盖
+ */
+function parseDimensionCoverage(markdown: string): DimensionCoverage[] {
+  const section = extractSectionByKeyword(markdown, "维度覆盖检查");
+  if (!section) return [];
+
+  const results: DimensionCoverage[] = [];
+  const lineRegex = /^-\s+(.+?)（(D\d+)）[：:]\s*(是|否)，?(\d+)?个/gm;
+  let match: RegExpExecArray | null;
+
+  while ((match = lineRegex.exec(section)) !== null) {
+    const name = match[1].trim();
+    const code = match[2];
+    const covered = match[3] === "是";
+    const caseCount = match[4] ? parseInt(match[4], 10) : 0;
+    results.push({ name, code, covered, caseCount });
+  }
+
+  return results;
+}
+
+/**
  * Main entry point: parse a test case markdown file into tree + summary.
  */
 export function parseTestcaseMarkdown(markdown: string): ParseResult {
@@ -298,5 +329,6 @@ export function parseTestcaseMarkdown(markdown: string): ParseResult {
     tree: tree.length > 0 ? tree : null,
     summary,
     meta,
+    dimensions: parseDimensionCoverage(markdown),
   };
 }
