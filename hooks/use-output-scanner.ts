@@ -19,20 +19,23 @@ interface UseOutputScannerOptions {
   }) => void;
   onError?: (error: string) => void;
   enabled?: boolean;
-  /** Current xmind version before tweak started.
-   *  -1 = no xmind exists yet (initial generation), any xmind triggers completion.
-   *   0 = unversioned xmind exists, wait for _v1+.
-   *   N = _v{N}.xmind exists, wait for _v{N+1}+. */
+  /**
+   * Baseline xmind version the scanner should wait past.
+   * The scanner completes only when a higher-version .xmind appears AND report.tree is available.
+   *   -1 = no xmind existed before → any xmind (v0+) triggers completion (initial generation)
+   *    0 = unversioned xmind exists → wait for _v1+
+   *    N = _v{N}.xmind exists → wait for _v{N+1}+
+   */
   xmindBaselineVersion?: number;
 }
 
 /**
- * Extract version number from xmind filename.
- *   "测试用例.xmind"       → 0  (no version suffix = v0)
+ * Extract version number from xmind filenames in a file list.
+ *   "测试用例.xmind"       → 0  (no version suffix)
  *   "测试用例_v3.xmind"    → 3
- * Returns -1 if no xmind files in the list.
+ * Returns -1 if no xmind files present.
  */
-function maxXmindVersion(files: FileInfo[]): number {
+export function maxXmindVersion(files: FileInfo[]): number {
   const xmindFiles = files.filter((f) => f.name.endsWith(".xmind"));
   if (xmindFiles.length === 0) return -1;
 
@@ -42,7 +45,6 @@ function maxXmindVersion(files: FileInfo[]): number {
     if (m) {
       maxV = Math.max(maxV, parseInt(m[1], 10));
     } else {
-      // Unversioned file → treat as v0 if no versioned file found yet
       maxV = Math.max(maxV, 0);
     }
   }
@@ -65,6 +67,9 @@ export function useOutputScanner({
   const callbacksRef = useRef({ onResult, onError });
   callbacksRef.current = { onResult, onError };
   const prevTaskIdRef = useRef(taskId);
+  // Keep baseline in a ref so poll() always reads the latest value
+  const baselineRef = useRef(xmindBaselineVersion);
+  baselineRef.current = xmindBaselineVersion;
 
   const stop = useCallback(() => {
     stopRef.current = true;
@@ -140,18 +145,17 @@ export function useOutputScanner({
           setFoundFiles(newFoundFiles);
         }
 
-        // 4. Completion check — xmind file version as gate
+        // 4. Completion gate — wait for xmind version higher than baseline
         const currentXmindVersion = maxXmindVersion(newFoundFiles);
 
-        // Wait for a new xmind version to appear (above baseline)
-        if (currentXmindVersion <= xmindBaselineVersion) {
+        if (currentXmindVersion <= baselineRef.current) {
           if (!stopRef.current) {
             timerRef.current = setTimeout(poll, interval);
           }
           return;
         }
 
-        // New xmind detected — verify tree is parsed before completing
+        // Higher-version xmind detected — verify tree before completing
         if (!report.tree) {
           if (!stopRef.current) {
             timerRef.current = setTimeout(poll, interval);
@@ -179,7 +183,7 @@ export function useOutputScanner({
         clearTimeout(timerRef.current);
       }
     };
-  }, [taskId, enabled, interval, stop]);
+  }, [taskId, enabled, interval, stop, xmindBaselineVersion]);
 
   return { isScanning, foundFiles, stop };
 }

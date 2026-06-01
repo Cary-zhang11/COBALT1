@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
-import { useOutputScanner, type FileInfo } from "@/hooks/use-output-scanner";
+import { useOutputScanner, maxXmindVersion, type FileInfo } from "@/hooks/use-output-scanner";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { ExecutionPanel } from "./shared/execution-panel";
 import { OutputFiles } from "./shared/output-files";
@@ -57,6 +57,7 @@ export function GenerateWizard({
   const [taskId, setTaskId] = useState<string | null>(null);
   const [genStats, setGenStats] = useState<{ totalCases: number; qualityScore: number; modules: number; duration: number } | null>(null);
   const [loadedFiles, setLoadedFiles] = useState<FileInfo[]>([]);
+  const [xmindBaseline, setXmindBaseline] = useState(-1);
 
   // Internal state (previously from parent props)
   const [usecaseTree, setUsecaseTree] = useState<UsecaseModule[] | null>(null);
@@ -75,25 +76,12 @@ export function GenerateWizard({
     }).catch((err) => console.error("Tweak PATCH failed:", err));
   }, []);
 
-  // Track xmind version for scanner baseline (prevents premature completion on tweak)
-  const [xmindBaseline, setXmindBaseline] = useState(-1);
-
   // Output scanner
   const scanner = useOutputScanner({
     taskId: taskId || "",
     enabled: generating && !!taskId,
     xmindBaselineVersion: xmindBaseline,
     onResult: (data) => {
-      // Record current xmind version as new baseline for next tweak
-      const outputFiles = (data.outputFiles || []) as { name: string; path: string }[];
-      const xmindFiles = outputFiles.filter((f) => f.name.endsWith(".xmind"));
-      let maxV = -1;
-      for (const f of xmindFiles) {
-        const m = f.name.match(/_v(\d+)\.xmind$/);
-        if (m) maxV = Math.max(maxV, parseInt(m[1], 10));
-        else maxV = Math.max(maxV, 0);
-      }
-      setXmindBaseline(maxV);
       const tree = data.tree as UsecaseModule[];
       const summary = data.summary;
       setUsecaseTree(tree);
@@ -262,6 +250,7 @@ export function GenerateWizard({
     setGenStatus("正在解析需求文档...");
     setLoadedFiles([]);
     setTweakHistory([]);
+    setXmindBaseline(-1);
     preTweakTreeRef.current = null;
     try {
       const { taskId: newTaskId } = await createTask.mutateAsync({
@@ -543,6 +532,8 @@ export function GenerateWizard({
                   modules={usecaseTree.map((m) => m.name)}
                   tweakHistory={tweakHistory}
                   onTweakStarted={() => {
+                    const baseline = maxXmindVersion([...scanner.foundFiles, ...loadedFiles]);
+                    setXmindBaseline(baseline);
                     preTweakTreeRef.current = usecaseTree;
                     setLoadedFiles([]);
                     setGenerating(true);
