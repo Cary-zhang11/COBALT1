@@ -17,8 +17,7 @@ describe("ExecutionPanel", () => {
           taskId={null} generating={false} wizStep={0} hasResult={false}
           configSummary={defaultConfig} foundFiles={[]}
           onDownloadFile={noop} onScrollToAITweak={noop}
-          onScrollToRating={noop} onNavigateToEditor={noop}
-          onReconfigure={noop}
+          onNavigateToEditor={noop}
         />
       );
       expect(screen.getByText("当前配置预览")).toBeDefined();
@@ -32,8 +31,7 @@ describe("ExecutionPanel", () => {
           taskId={null} generating={false} wizStep={1} hasResult={false}
           configSummary={defaultConfig} foundFiles={[]}
           onDownloadFile={noop} onScrollToAITweak={noop}
-          onScrollToRating={noop} onNavigateToEditor={noop}
-          onReconfigure={noop}
+          onNavigateToEditor={noop}
         />
       );
       expect(screen.getByText("当前配置预览")).toBeDefined();
@@ -47,8 +45,7 @@ describe("ExecutionPanel", () => {
           taskId="test-id" generating={true} wizStep={2} hasResult={false}
           configSummary={defaultConfig} foundFiles={[]}
           onDownloadFile={noop} onScrollToAITweak={noop}
-          onScrollToRating={noop} onNavigateToEditor={noop}
-          onReconfigure={noop}
+          onNavigateToEditor={noop}
         />
       );
       expect(screen.getByText("生成中")).toBeDefined();
@@ -63,12 +60,30 @@ describe("ExecutionPanel", () => {
           taskId="test-id" generating={true} wizStep={2} hasResult={false}
           configSummary={defaultConfig} foundFiles={[{ name: "_source.md", relativePath: "_source.md" }]}
           onDownloadFile={noop} onScrollToAITweak={noop}
-          onScrollToRating={noop} onNavigateToEditor={noop}
-          onReconfigure={noop}
+          onNavigateToEditor={noop}
         />
       );
       const docParse = screen.getByText("文档解析");
       expect(docParse.className).toContain("text-green-700");
+    });
+
+    it("cascades done status — later done nodes force earlier nodes to done", () => {
+      // Only xmind exists (export done), but _source.md not yet created
+      render(
+        <ExecutionPanel
+          taskId="test-id" generating={true} wizStep={2} hasResult={false}
+          configSummary={defaultConfig}
+          foundFiles={[{ name: "测试用例.xmind", relativePath: "测试用例.xmind" }]}
+          onDownloadFile={noop} onScrollToAITweak={noop}
+          onNavigateToEditor={noop}
+        />
+      );
+      const docParse = screen.getByText("文档解析");
+      const requirement = screen.getByText("需求分析");
+      const caseGen = screen.getByText("用例生成");
+      expect(docParse.className).toContain("text-green-700");
+      expect(requirement.className).toContain("text-green-700");
+      expect(caseGen.className).toContain("text-green-700");
     });
   });
 
@@ -84,17 +99,14 @@ describe("ExecutionPanel", () => {
           taskId="test-id" generating={false} wizStep={2} hasResult={true}
           configSummary={defaultConfig} foundFiles={foundFiles}
           onDownloadFile={noop} onScrollToAITweak={noop}
-          onScrollToRating={noop} onNavigateToEditor={noop}
-          onReconfigure={noop}
+          onNavigateToEditor={noop}
         />
       );
       expect(screen.getByText("快捷操作")).toBeDefined();
       expect(screen.getByText("下载 Markdown")).toBeDefined();
       expect(screen.getByText("下载 XMind")).toBeDefined();
       expect(screen.getByText("AI 微调")).toBeDefined();
-      expect(screen.getByText("评价")).toBeDefined();
       expect(screen.getByText("去编辑用例")).toBeDefined();
-      expect(screen.getByText("重新配置")).toBeDefined();
     });
 
     it("calls onDownloadFile when download button clicked", () => {
@@ -104,27 +116,11 @@ describe("ExecutionPanel", () => {
           taskId="test-id" generating={false} wizStep={2} hasResult={true}
           configSummary={defaultConfig} foundFiles={foundFiles}
           onDownloadFile={onDownload} onScrollToAITweak={noop}
-          onScrollToRating={noop} onNavigateToEditor={noop}
-          onReconfigure={noop}
+          onNavigateToEditor={noop}
         />
       );
       fireEvent.click(screen.getByText("下载 Markdown"));
       expect(onDownload).toHaveBeenCalledWith(foundFiles[0]);
-    });
-
-    it("calls onReconfigure when clicked", () => {
-      const onReconfig = vi.fn();
-      render(
-        <ExecutionPanel
-          taskId="test-id" generating={false} wizStep={2} hasResult={true}
-          configSummary={defaultConfig} foundFiles={foundFiles}
-          onDownloadFile={noop} onScrollToAITweak={noop}
-          onScrollToRating={noop} onNavigateToEditor={noop}
-          onReconfigure={onReconfig}
-        />
-      );
-      fireEvent.click(screen.getByText("重新配置"));
-      expect(onReconfig).toHaveBeenCalled();
     });
 
     it("shows empty wrapper when no files and no result", () => {
@@ -133,8 +129,7 @@ describe("ExecutionPanel", () => {
           taskId="test-id" generating={false} wizStep={2} hasResult={false}
           configSummary={defaultConfig} foundFiles={[]}
           onDownloadFile={noop} onScrollToAITweak={noop}
-          onScrollToRating={noop} onNavigateToEditor={noop}
-          onReconfigure={noop}
+          onNavigateToEditor={noop}
         />
       );
       expect(screen.queryByText("快捷操作")).toBeNull();
