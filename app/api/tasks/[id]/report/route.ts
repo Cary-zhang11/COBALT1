@@ -101,30 +101,33 @@ export async function GET(
     let report = (task.report as Record<string, unknown>) || {};
     let fileList = task.outputFiles as string[];
 
-    // Fallback: rebuild report from filesystem for tasks without DB report
-    if (!task.report) {
-      const outputDir = getOutputPath(params.id);
+    // Always scan filesystem for latest files (DB may be stale between write and saveOutputAndReport)
+    const outputDir = getOutputPath(params.id);
+    const fsFiles = await collectFilesRelative(outputDir);
+    if (fsFiles.length > 0) {
+      fileList = fsFiles;
+    }
 
-      // Normalize old absolute paths to relative
-      fileList = normalizeOutputFilePaths(task.outputFiles as string[], outputDir);
-
-      // Try to find and parse the md file from filesystem
-      const mdPath = await findLatestMdFile(outputDir);
-      if (mdPath) {
-        try {
-          const mdContent = await fs.readFile(mdPath, "utf-8");
-          const parsed = parseTestcaseMarkdown(mdContent);
+    // Try filesystem parse for latest tree (DB report may be stale during tweak)
+    const mdPath = await findLatestMdFile(outputDir);
+    if (mdPath) {
+      try {
+        const mdContent = await fs.readFile(mdPath, "utf-8");
+        const parsed = parseTestcaseMarkdown(mdContent);
+        if (parsed.tree) {
           report = {
             tree: parsed.tree,
             summary: parsed.summary,
             meta: parsed.meta,
           };
-        } catch {
-          console.error("Failed to parse md for task", params.id);
         }
+      } catch {
+        console.error("Failed to parse md for task", params.id);
       }
+    }
 
-      // Persist the rebuilt report to DB (don't block response on this)
+    // Persist to DB if changed (don't block response)
+    if (!task.report || fsFiles.length > 0) {
       prisma.task
         .update({
           where: { id: params.id },
