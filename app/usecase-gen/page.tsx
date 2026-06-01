@@ -6,43 +6,16 @@ import { CaseEditor } from "@/components/usecase-gen/case-editor";
 import { Dashboard } from "@/components/usecase-gen/dashboard";
 import { KnowledgeBase } from "@/components/usecase-gen/knowledge-base";
 import { HistoryList } from "@/components/usecase-gen/history-list";
-import type { UsecaseModule, TweakEntry } from "@/components/usecase-gen/shared/types";
+import type { UsecaseModule } from "@/components/usecase-gen/shared/types";
 
 const TABS = ["生成向导", "历史记录", "用例预览编辑", "数据看板", "知识库管理"];
 
 export default function UsecaseGenPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [usecaseTree, setUsecaseTree] = useState<UsecaseModule[] | null>(null);
-  const [tweakHistoryMap, setTweakHistoryMap] = useState<Record<string, TweakEntry[]>>({});
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
-  const [preloadedResult, setPreloadedResult] = useState<{
-    taskId: string;
-    tree: UsecaseModule[];
-    stats: { totalCases: number; qualityScore: number; modules: number };
-    outputFiles?: string[];
-  } | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   const skillId = process.env.NEXT_PUBLIC_USECASE_SKILL_ID;
-
-  const handleLoadResult = (result: {
-    taskId: string;
-    tree: UsecaseModule[];
-    stats: { totalCases: number; qualityScore: number; modules: number };
-    outputFiles?: string[];
-    tweakHistory?: TweakEntry[];
-  }) => {
-    setUsecaseTree(result.tree);
-    setPreloadedResult(result);
-    if (result.tweakHistory) {
-      setTweakHistoryMap((prev) => ({ ...prev, [result.taskId]: result.tweakHistory! }));
-    }
-    setActiveTab(0);
-  };
-
-  const handleResumeTask = (taskId: string) => {
-    setCurrentTaskId(taskId);
-    setActiveTab(0);
-  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -70,41 +43,20 @@ export default function UsecaseGenPage() {
       <div className="flex-1 overflow-auto p-6">
         {activeTab === 0 && (
           <GenerateWizard
+            key={activeTaskId}
+            initialTaskId={activeTaskId}
             onComplete={(tree) => setUsecaseTree(tree)}
-            tweakHistoryMap={tweakHistoryMap}
-            onTweakHistoryUpdate={(taskId, history) => {
-              setTweakHistoryMap((prev) => ({ ...prev, [taskId]: history }));
-            }}
-            usecaseTree={usecaseTree}
             skillId={skillId}
             onNavigateToTab={setActiveTab}
-            preloadedResult={preloadedResult}
-            onClearPreloaded={() => setPreloadedResult(null)}
-            resumeTaskId={currentTaskId}
-            onClearResume={() => setCurrentTaskId(null)}
-            onUpdateTweakEntry={(taskId, round, updates) => {
-              setTweakHistoryMap((prev) => {
-                const entries = [...(prev[taskId] || [])];
-                const idx = entries.findIndex((e) => e.round === round);
-                if (idx >= 0) {
-                  entries[idx] = { ...entries[idx], ...updates };
-                }
-                return { ...prev, [taskId]: entries };
-              });
-              // Persist to DB
-              fetch(`/api/tasks/${taskId}/tweak`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ round, updates }),
-              }).catch((err) => console.error("Tweak PATCH failed:", err));
-            }}
           />
         )}
         {activeTab === 1 && (
           <HistoryList
             skillId={skillId}
-            onLoadResult={handleLoadResult}
-            onResumeTask={handleResumeTask}
+            onSelectTask={(taskId) => {
+              setActiveTaskId(taskId);
+              setActiveTab(0);
+            }}
           />
         )}
         {activeTab === 2 && (

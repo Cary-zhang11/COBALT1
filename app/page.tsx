@@ -2,8 +2,7 @@
 
 import { useTasks } from "@/hooks/use-tasks";
 import { useRouter } from "next/navigation";
-import { Clock, CheckCircle2, AlertCircle, Loader2, Plus } from "lucide-react";
-import Link from "next/link";
+import { Clock, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   pending: { label: "等待中", color: "text-yellow-600 bg-yellow-50", icon: Clock },
@@ -32,29 +31,17 @@ export default function DashboardPage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold">任务列表</h1>
+            <h1 className="text-2xl font-bold">日志列表</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              管理你的所有执行任务
+              查看所有执行日志
             </p>
           </div>
-          <Link
-            href="/tasks/new"
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            新建任务
-          </Link>
+{/* TODO: 本期先隐藏新建任务入口 */}
         </div>
 
         {tasks.length === 0 ? (
           <div className="text-center py-16 bg-muted/30 rounded-xl border border-dashed">
-            <p className="text-muted-foreground mb-4">暂无任务</p>
-            <Link
-              href="/tasks/new"
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-            >
-              创建第一个任务 →
-            </Link>
+            <p className="text-muted-foreground mb-4">暂无日志</p>
           </div>
         ) : (
           <div className="space-y-3">

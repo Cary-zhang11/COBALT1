@@ -14,9 +14,10 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { href: "/", label: "任务列表", icon: LayoutDashboard },
-  { href: "/tasks/new", label: "新建任务", icon: PlusCircle },
-  { href: "/skills", label: "工具库", icon: Wand2 },
+  { href: "/", label: "日志列表", icon: LayoutDashboard },
+  // TODO: 本期先隐藏新建任务和工具库入口
+  // { href: "/tasks/new", label: "新建任务", icon: PlusCircle },
+  // { href: "/skills", label: "工具库", icon: Wand2 },
   { href: "/usecase-gen", label: "用例生成", icon: FileText },
 ];
 

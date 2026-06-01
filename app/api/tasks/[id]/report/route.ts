@@ -3,18 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
 import { getOutputPath } from "@/lib/sandbox";
 import { parseTestcaseMarkdown } from "@/lib/parse-testcase-md";
+import type { Prisma } from "@prisma/client";
 import fs from "fs/promises";
 import path from "path";
 
-const CACHE_FILE = ".report_cache.json";
-
-async function collectOutputFiles(outputDir: string, taskId: string): Promise<{
-  files: { name: string; path: string }[];
-  mdPath: string | null;
-  mdMtime: number;
-}> {
-  const files: { name: string; path: string }[] = [];
-  const mdCandidates: { path: string; version: number; mtime: number }[] = [];
+async function findLatestMdFile(outputDir: string): Promise<string | null> {
+  const candidates: { path: string; version: number }[] = [];
 
   async function walk(dir: string) {
     let entries;
@@ -28,48 +22,64 @@ async function collectOutputFiles(outputDir: string, taskId: string): Promise<{
       if (entry.isDirectory()) {
         if (entry.name === "archive") continue;
         await walk(fullPath);
-      } else {
-        const relativePath = path.relative(outputDir, fullPath);
-        files.push({
-          name: entry.name,
-          path: `/api/tasks/${taskId}/download?file=${encodeURIComponent(relativePath)}`,
+      } else if (entry.name.includes("测试用例") && entry.name.endsWith(".md")) {
+        const m = entry.name.match(/_v(\d+)\.md$/);
+        candidates.push({
+          path: fullPath,
+          version: m ? parseInt(m[1], 10) : 0,
         });
-        if (entry.name.includes("测试用例") && entry.name.endsWith(".md")) {
-          try {
-            const stat = await fs.stat(fullPath);
-            const m = entry.name.match(/_v(\d+)\.md$/);
-            mdCandidates.push({
-              path: fullPath,
-              version: m ? parseInt(m[1], 10) : 0,
-              mtime: stat.mtimeMs,
-            });
-          } catch { /* skip */ }
-        }
       }
     }
   }
 
   await walk(outputDir);
-  mdCandidates.sort((a, b) => b.version - a.version);
-  const best = mdCandidates[0];
-  return { files, mdPath: best?.path ?? null, mdMtime: best?.mtime ?? 0 };
+  candidates.sort((a, b) => b.version - a.version);
+  return candidates[0]?.path ?? null;
 }
 
-async function readCache(cachePath: string, mdMtime: number): Promise<unknown | null> {
+async function collectFilesRelative(dir: string, base?: string): Promise<string[]> {
+  const baseDir = base || dir;
+  const results: string[] = [];
   try {
-    const stat = await fs.stat(cachePath);
-    if (stat.mtimeMs >= mdMtime) {
-      const raw = await fs.readFile(cachePath, "utf-8");
-      return JSON.parse(raw);
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const subFiles = await collectFilesRelative(fullPath, baseDir);
+        results.push(...subFiles);
+      } else {
+        results.push(path.relative(baseDir, fullPath));
+      }
     }
-  } catch { /* cache miss */ }
-  return null;
+  } catch {
+    // dir not found
+  }
+  return results;
 }
 
-async function writeCache(cachePath: string, data: unknown): Promise<void> {
-  try {
-    await fs.writeFile(cachePath, JSON.stringify(data), "utf-8");
-  } catch { /* non-critical */ }
+function normalizeOutputFilePaths(
+  outputFiles: string[],
+  outputDir: string
+): string[] {
+  return outputFiles.map((f) => {
+    // If already a relative path (no backslash, no colon), return as-is
+    if (!f.includes("\\") && !f.includes(":") && !f.startsWith("/")) {
+      return f;
+    }
+    // Convert absolute path to relative
+    try {
+      return path.relative(outputDir, f);
+    } catch {
+      return path.basename(f);
+    }
+  });
+}
+
+function buildFileEntries(taskId: string, files: string[]) {
+  return files.map((f) => ({
+    name: path.basename(f),
+    path: `/api/tasks/${taskId}/download?file=${encodeURIComponent(f)}`,
+  }));
 }
 
 export async function GET(
@@ -88,54 +98,53 @@ export async function GET(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    const outputDir = getOutputPath(params.id);
+    let report = (task.report as Record<string, unknown>) || {};
+    let fileList = task.outputFiles as string[];
 
-    // Single pass: collect files + find test case .md
-    const { files: outputFiles, mdPath, mdMtime } = await collectOutputFiles(outputDir, params.id);
+    // Fallback: rebuild report from filesystem for tasks without DB report
+    if (!task.report) {
+      const outputDir = getOutputPath(params.id);
 
-    // Try file-based cache (persists across restarts, invalidated by md mtime + tweakCount)
-    if (mdPath) {
-      const cachePath = path.join(path.dirname(mdPath), CACHE_FILE);
-      const cached = await readCache(cachePath, mdMtime);
-      if (cached) {
-        const data = cached as Record<string, unknown>;
-        // Only use cache if tweakCount matches (prevents cross-tweak-round cache)
-        if (data.tweakCount === task.tweakCount) {
-          return NextResponse.json({ ...data, outputFiles, tweakHistory: task.tweakHistory });
+      // Normalize old absolute paths to relative
+      fileList = normalizeOutputFilePaths(task.outputFiles as string[], outputDir);
+
+      // Try to find and parse the md file from filesystem
+      const mdPath = await findLatestMdFile(outputDir);
+      if (mdPath) {
+        try {
+          const mdContent = await fs.readFile(mdPath, "utf-8");
+          const parsed = parseTestcaseMarkdown(mdContent);
+          report = {
+            tree: parsed.tree,
+            summary: parsed.summary,
+            meta: parsed.meta,
+          };
+        } catch {
+          console.error("Failed to parse md for task", params.id);
         }
       }
+
+      // Persist the rebuilt report to DB (don't block response on this)
+      prisma.task
+        .update({
+          where: { id: params.id },
+          data: { report: report as Prisma.InputJsonValue, outputFiles: fileList },
+        })
+        .catch((err) => console.error("Failed to persist report for task", params.id, err));
     }
 
-    if (!mdPath) {
-      return NextResponse.json({
-        tree: null,
-        summary: { totalCases: 0, qualityScore: 0, modules: 0 },
-        rawMarkdown: "",
-        outputFiles,
-        meta: { sourceDoc: "", generatedAt: "", prdVersion: "" },
-        tweakHistory: task.tweakHistory,
-      });
-    }
+    const outputFiles = buildFileEntries(params.id, fileList);
 
-    // Cold path: read and parse the markdown
-    const mdContent = await fs.readFile(mdPath, "utf-8");
-    const parsed = parseTestcaseMarkdown(mdContent);
-
-    const data = {
-      tree: parsed.tree,
-      summary: parsed.summary,
-      rawMarkdown: mdContent,
+    return NextResponse.json({
+      tree: report.tree ?? null,
+      summary: report.summary ?? { totalCases: 0, qualityScore: 0, modules: 0 },
+      rawMarkdown: "",
       outputFiles,
-      meta: parsed.meta,
+      meta: report.meta ?? {},
       duration: task.duration,
       tweakCount: task.tweakCount,
-    };
-
-    // Persist cache for next request
-    const cachePath = path.join(path.dirname(mdPath), CACHE_FILE);
-    await writeCache(cachePath, data);
-
-    return NextResponse.json({ ...data, tweakHistory: task.tweakHistory });
+      tweakHistory: task.tweakHistory,
+    });
   } catch (error) {
     console.error("Report error:", error);
     return NextResponse.json(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
 import { useOutputScanner, type FileInfo } from "@/hooks/use-output-scanner";
 import { ExecutionPanel } from "./shared/execution-panel";
@@ -20,22 +20,10 @@ import {
 } from "lucide-react";
 
 interface GenerateWizardProps {
+  initialTaskId?: string | null;
   onComplete: (tree: UsecaseModule[], summary?: { totalCases: number; qualityScore: number; modules: number }) => void;
-  tweakHistoryMap: Record<string, TweakEntry[]>;
-  onTweakHistoryUpdate: (taskId: string, history: TweakEntry[]) => void;
-  usecaseTree: UsecaseModule[] | null;
   skillId: string | undefined;
   onNavigateToTab?: (tabIndex: number) => void;
-  preloadedResult?: {
-    taskId: string;
-    tree: UsecaseModule[];
-    stats: { totalCases: number; qualityScore: number; modules: number };
-    outputFiles?: string[];
-  } | null;
-  onClearPreloaded?: () => void;
-  resumeTaskId?: string | null;
-  onClearResume?: () => void;
-  onUpdateTweakEntry?: (taskId: string, round: number, updates: Partial<TweakEntry>) => void;
 }
 
 interface UploadedFile {
@@ -46,13 +34,12 @@ interface UploadedFile {
 const STEPS = ["输入物料", "选择平台能力", "生成并预览"];
 
 export function GenerateWizard({
-  onComplete, tweakHistoryMap, onTweakHistoryUpdate, usecaseTree, skillId,
-  onNavigateToTab, preloadedResult, onClearPreloaded, resumeTaskId, onClearResume,
-  onUpdateTweakEntry,
+  initialTaskId, onComplete, skillId, onNavigateToTab,
 }: GenerateWizardProps) {
   const createTask = useCreateTask();
   const executeTask = useExecuteTask();
   const resumeTask = useResumeTask();
+  const cancelTask = useCancelTask();
   // Wizard
   const [wizStep, setWizStep] = useState(0);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -75,22 +62,32 @@ export function GenerateWizard({
   const [genStats, setGenStats] = useState<{ totalCases: number; qualityScore: number; modules: number; duration: number } | null>(null);
   const [loadedFiles, setLoadedFiles] = useState<FileInfo[]>([]);
 
-  const cancelTask = useCancelTask();
+  // Internal state (previously from parent props)
+  const [usecaseTree, setUsecaseTree] = useState<UsecaseModule[] | null>(null);
+  const [tweakHistory, setTweakHistory] = useState<TweakEntry[]>([]);
+
   const preTweakTreeRef = useRef<UsecaseModule[] | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
-  // Output scanner — replaces SSE onComplete callback
-  const tweakBaselineCases = preTweakTreeRef.current
-    ? preTweakTreeRef.current.reduce((s, m) => s + m.cases.length, 0)
-    : undefined;
+  // Persist tweak entry update to DB
+  const persistTweakEntry = useCallback((tid: string, round: number, updates: Partial<TweakEntry>) => {
+    fetch(`/api/tasks/${tid}/tweak`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ round, updates }),
+    }).catch((err) => console.error("Tweak PATCH failed:", err));
+  }, []);
 
+  // Output scanner
   const scanner = useOutputScanner({
     taskId: taskId || "",
     enabled: generating && !!taskId,
-    initialTotalCases: tweakBaselineCases,
     onResult: (data) => {
       const tree = data.tree as UsecaseModule[];
       const summary = data.summary;
-      onComplete(tree, summary);
+      setUsecaseTree(tree);
+      onCompleteRef.current(tree, summary);
       setGenStats({
         totalCases: summary?.totalCases || 0,
         qualityScore: summary?.qualityScore || 0,
@@ -101,11 +98,11 @@ export function GenerateWizard({
 
       // Sync tweakHistory from report (DB is source of truth)
       if (data.tweakHistory && taskId) {
-        onTweakHistoryUpdate(taskId, data.tweakHistory as TweakEntry[]);
+        setTweakHistory(data.tweakHistory as TweakEntry[]);
       }
 
-      // Compute tweak delta if we had a pre-existing tree
-      if (preTweakTreeRef.current && taskId && onUpdateTweakEntry) {
+      // Compute tweak delta
+      if (preTweakTreeRef.current && taskId) {
         const oldCases = preTweakTreeRef.current.flatMap((m) => m.cases.map((c) => c.id));
         const newCases = tree.flatMap((m) => m.cases.map((c) => c.id));
         const oldSet = new Set(oldCases);
@@ -114,102 +111,96 @@ export function GenerateWizard({
         const removed = oldCases.filter((id) => !newSet.has(id)).length;
         const modified = oldCases.filter((id) => newSet.has(id)).length;
         const summaryText = `+${added} · 修改 ${modified} · -${removed}`;
-        const serverHistory = (data.tweakHistory as TweakEntry[]) || tweakHistoryMap[taskId] || [];
+        const serverHistory = (data.tweakHistory as TweakEntry[]) || tweakHistory;
         const round = serverHistory.length;
-        onUpdateTweakEntry(taskId, round, { status: "done", summary: summaryText });
+        setTweakHistory((prev) => {
+          const updated = [...prev];
+          const idx = updated.findIndex((e) => e.round === round);
+          if (idx >= 0) {
+            updated[idx] = { ...updated[idx], status: "done" as const, summary: summaryText };
+          }
+          return updated;
+        });
+        persistTweakEntry(taskId, round, { status: "done", summary: summaryText });
         preTweakTreeRef.current = null;
       }
     },
     onError: (msg) => {
       setGenStatus(msg);
       setGenerating(false);
-      // Mark last tweak entry as failed
-      if (taskId && onUpdateTweakEntry) {
-        const history = tweakHistoryMap[taskId] || [];
-        const round = history.length;
-        onUpdateTweakEntry(taskId, round, { status: "failed" });
+      if (taskId) {
+        setTweakHistory((prev) => {
+          const history = [...prev];
+          const round = history.length;
+          const idx = history.findIndex((e) => e.round === round);
+          if (idx >= 0) {
+            history[idx] = { ...history[idx], status: "failed" as const };
+          }
+          return history;
+        });
+        persistTweakEntry(taskId, tweakHistory.length, { status: "failed" });
       }
     },
   });
 
-  // Handle preloaded result from history
+  // Load task from initialTaskId (history selection)
   useEffect(() => {
-    if (preloadedResult) {
-      setTaskId(preloadedResult.taskId);
-      setWizStep(2);
-      setGenStats({
-        totalCases: preloadedResult.stats.totalCases,
-        qualityScore: preloadedResult.stats.qualityScore,
-        modules: preloadedResult.stats.modules,
-        duration: 0,
-      });
-      setGenerating(false);
-      setGenStatus("");
-      if (preloadedResult.outputFiles) {
-        setLoadedFiles(
-          preloadedResult.outputFiles.map((f) => ({ name: f, relativePath: f }))
-        );
-      }
-      onComplete(preloadedResult.tree, preloadedResult.stats);
-      onClearPreloaded?.();
-    }
-  }, [preloadedResult, onComplete, onClearPreloaded]);
-
-  // Handle resume task from history — try direct fetch first, fall back to scanner
-  useEffect(() => {
-    if (!resumeTaskId) return;
+    if (!initialTaskId) return;
 
     let cancelled = false;
     (async () => {
-      // Try direct report fetch — if files already exist, render immediately
       try {
-        const reportRes = await fetch(`/api/tasks/${resumeTaskId}/report`);
-        if (reportRes.ok) {
-          const report = await reportRes.json();
-          if (report.tree && report.outputFiles?.length > 0) {
-            if (cancelled) return;
-            const tree = report.tree as UsecaseModule[];
-            const summary = report.summary;
-            const fileInfos: FileInfo[] = report.outputFiles.map(
-              (f: { name: string; path: string }) => {
-                let relativePath = f.name;
-                try {
-                  const url = new URL(f.path, "http://x");
-                  const fileParam = url.searchParams.get("file");
-                  if (fileParam) relativePath = decodeURIComponent(fileParam);
-                } catch { /* fallback */ }
-                return { name: f.name, relativePath };
-              }
-            );
-            onComplete(tree, summary);
-            setTaskId(resumeTaskId);
-            setWizStep(2);
-            setGenStats({
-              totalCases: summary?.totalCases || 0,
-              qualityScore: summary?.qualityScore || 0,
-              modules: summary?.modules || 0,
-              duration: 0,
-            });
-            setGenerating(false);
-            setGenStatus("");
-            setLoadedFiles(fileInfos);
-            onClearResume?.();
-            return;
-          }
-        }
-      } catch { /* fall through to scanner */ }
+        const reportRes = await fetch(`/api/tasks/${initialTaskId}/report`);
+        if (!reportRes.ok || cancelled) return;
+        const report = await reportRes.json();
 
-      if (cancelled) return;
-      // Files not ready yet — start scanner polling
-      setTaskId(resumeTaskId);
-      setGenerating(true);
-      setGenStatus("正在恢复执行进度...");
-      setWizStep(2);
-      onClearResume?.();
+        if (cancelled) return;
+
+        if (report.tweakHistory) {
+          setTweakHistory(report.tweakHistory as TweakEntry[]);
+        }
+
+        if (report.tree && report.outputFiles?.length > 0) {
+          const tree = report.tree as UsecaseModule[];
+          const summary = report.summary;
+          const fileInfos: FileInfo[] = report.outputFiles.map(
+            (f: { name: string; path: string }) => {
+              let relativePath = f.name;
+              try {
+                const url = new URL(f.path, "http://x");
+                const fileParam = url.searchParams.get("file");
+                if (fileParam) relativePath = decodeURIComponent(fileParam);
+              } catch { /* fallback */ }
+              return { name: f.name, relativePath };
+            }
+          );
+          if (cancelled) return;
+          setUsecaseTree(tree);
+          setTaskId(initialTaskId);
+          setWizStep(2);
+          setGenStats({
+            totalCases: summary?.totalCases || 0,
+            qualityScore: summary?.qualityScore || 0,
+            modules: summary?.modules || 0,
+            duration: 0,
+          });
+          setGenerating(false);
+          setGenStatus("");
+          setLoadedFiles(fileInfos);
+          onCompleteRef.current(tree, summary);
+        } else {
+          // Files not ready — start scanner polling
+          if (cancelled) return;
+          setTaskId(initialTaskId);
+          setGenerating(true);
+          setGenStatus("正在恢复执行进度...");
+          setWizStep(2);
+        }
+      } catch { /* fall through */ }
     })();
 
     return () => { cancelled = true; };
-  }, [resumeTaskId, onClearResume, onComplete]);
+  }, [initialTaskId]);
 
   // Upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -245,6 +236,8 @@ export function GenerateWizard({
     setGenerating(true);
     setGenStatus("正在解析需求文档...");
     setLoadedFiles([]);
+    setTweakHistory([]);
+    preTweakTreeRef.current = null;
     try {
       const { taskId: newTaskId } = await createTask.mutateAsync({
         skillId,
@@ -258,8 +251,6 @@ export function GenerateWizard({
       setGenerating(false);
     }
   };
-
-  // (onExecutionComplete removed — replaced by useOutputScanner)
 
   if (!skillId) {
     return (
@@ -497,7 +488,7 @@ export function GenerateWizard({
               </div>
             )}
 
-            {/* Result display — visible when tree exists (even during tweak), hidden only during first gen */}
+            {/* Result display */}
             {usecaseTree && usecaseTree.length > 0 && genStatus !== "生成失败" && (
               <>
                 {/* KPI Cards */}
@@ -536,7 +527,7 @@ export function GenerateWizard({
                   </div>
                 </div>
 
-                {/* Output files — deduplicated by relativePath */}
+                {/* Output files */}
                 <OutputFiles
                   taskId={taskId}
                   files={(() => {
@@ -554,7 +545,7 @@ export function GenerateWizard({
                   taskId={taskId}
                   generating={generating && !!usecaseTree && usecaseTree.length > 0}
                   modules={usecaseTree.map((m) => m.name)}
-                  tweakHistory={taskId ? tweakHistoryMap[taskId] || [] : []}
+                  tweakHistory={tweakHistory}
                   onTweakStarted={() => {
                     preTweakTreeRef.current = usecaseTree;
                     setLoadedFiles([]);
@@ -568,20 +559,17 @@ export function GenerateWizard({
                     setGenStatus("");
                   }}
                   onRecordTweak={(entry) => {
-                    if (!taskId) return;
-                    const current = tweakHistoryMap[taskId] || [];
-                    onTweakHistoryUpdate(taskId, [...current, entry]);
+                    setTweakHistory((prev) => [...prev, entry]);
                   }}
                   onTweakHistoryUpdate={(history) => {
-                    if (!taskId) return;
-                    onTweakHistoryUpdate(taskId, history);
+                    setTweakHistory(history);
                   }}
                 />
 
                 {/* Rating */}
                 <RatingPanel taskId={taskId} />
 
-                {/* Module table — collapsed by default */}
+                {/* Module table */}
                 <ModuleOverviewTable
                   modules={usecaseTree}
                   totalCases={usecaseTree.reduce((s, m) => s + m.cases.length, 0)}
@@ -612,7 +600,7 @@ export function GenerateWizard({
               </>
             )}
 
-            {/* Empty result — only when truly empty and not generating */}
+            {/* Empty result */}
             {!generating && genStatus !== "生成失败" && (!usecaseTree || usecaseTree.length === 0) && (
               <div className="bg-card rounded-xl shadow-sm p-8 text-center">
                 <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-muted flex items-center justify-center">

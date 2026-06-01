@@ -5,18 +5,10 @@ import { useTasks } from "@/hooks/use-tasks";
 import {
   Loader2, Clock, FileText, AlertCircle, ExternalLink, Play, RefreshCw,
 } from "lucide-react";
-import type { UsecaseModule, TweakEntry } from "./shared/types";
 
 interface HistoryListProps {
   skillId: string | undefined;
-  onLoadResult: (result: {
-    taskId: string;
-    tree: UsecaseModule[];
-    stats: { totalCases: number; qualityScore: number; modules: number };
-    outputFiles?: string[];
-    tweakHistory?: TweakEntry[];
-  }) => void;
-  onResumeTask: (taskId: string) => void;
+  onSelectTask: (taskId: string) => void;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -42,63 +34,10 @@ function formatDate(dateStr: string): string {
   );
 }
 
-export function HistoryList({ skillId, onLoadResult, onResumeTask }: HistoryListProps) {
+export function HistoryList({ skillId, onSelectTask }: HistoryListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { data, isLoading, error, refetch } = useTasks(undefined, skillId);
   const tasks = data?.tasks || [];
-
-  const handleClickCompleted = async (task: { id: string; output: string | null }) => {
-    // Try client-side parse first — instant, no network
-    if (task.output) {
-      try {
-        const { parseUsecaseOutput } = await import(
-          "./shared/parse-usecase-output"
-        );
-        const parsed = parseUsecaseOutput(task.output);
-        if (parsed.tree) {
-          onLoadResult({
-            taskId: task.id,
-            tree: parsed.tree,
-            stats: parsed.summary || {
-              totalCases: parsed.tree.reduce(
-                (s, m) => s + m.cases.length, 0
-              ),
-              qualityScore: 0,
-              modules: parsed.tree.length,
-            },
-          });
-          return;
-        }
-      } catch { /* fall through to report API */ }
-    }
-
-    // Fallback: fetch report API (server-cached for completed tasks)
-    try {
-      const res = await fetch(`/api/tasks/${task.id}/report`);
-      if (!res.ok) throw new Error("Failed to load report");
-      const report = await res.json();
-      if (report.tree) {
-        const fileNames: string[] = (report.outputFiles || []).map(
-          (f: { name: string }) => f.name
-        );
-        onLoadResult({
-          taskId: task.id,
-          tree: report.tree,
-          stats: report.summary || {
-            totalCases: report.tree.reduce(
-              (s: number, m: { cases: unknown[] }) => s + m.cases.length, 0
-            ),
-            qualityScore: 0,
-            modules: report.tree.length,
-          },
-          outputFiles: fileNames,
-          tweakHistory: report.tweakHistory || [],
-        });
-      }
-    } catch {
-      // silently fail
-    }
-  };
 
   if (!skillId) {
     return (
@@ -186,14 +125,7 @@ export function HistoryList({ skillId, onLoadResult, onResumeTask }: HistoryList
               <div
                 onClick={() => {
                   setExpandedId(isExpanded ? null : task.id);
-                  if (isCompleted) {
-                    handleClickCompleted({
-                      id: task.id,
-                      output: task.output,
-                    });
-                  } else if (isRunning) {
-                    onResumeTask(task.id);
-                  }
+                  onSelectTask(task.id);
                 }}
                 className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
               >

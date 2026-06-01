@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { cliRuntime } from "./claude-cli-runtime";
 import { getWorkspacePath, getOutputPath, copyFilesToWorkspace } from "./sandbox";
 import type { AgentEvent } from "./agent-runtime";
+import { parseTestcaseMarkdown } from "./parse-testcase-md";
 import fs from "fs/promises";
 import path from "path";
 
@@ -103,25 +104,27 @@ export async function startTaskExecution(taskId: string): Promise<void> {
       }
 
       if (event.type === "pause") {
-        // On output_complete for tweaks: rename AI-generated files that lack _v{N}
-        if (event.pauseReason === "output_complete" && isTweak && preFileNames) {
-          try {
-            const outputDir = getOutputPath(taskId);
-            const entries = await fs.readdir(outputDir, { withFileTypes: true });
-            for (const entry of entries) {
-              if (!entry.isFile()) continue;
-              if (preFileNames.has(entry.name)) continue;
-              const ext = path.extname(entry.name);
-              const base = path.basename(entry.name, ext);
-              if (!/_v\d+$/.test(base)) {
-                await fs.rename(
-                  path.join(outputDir, entry.name),
-                  path.join(outputDir, `${base}_v${tweakRound}${ext}`)
-                );
+        // On output_complete: rename new files during tweaks, save report for all
+        if (event.pauseReason === "output_complete") {
+          if (isTweak && preFileNames) {
+            try {
+              const outputDir = getOutputPath(taskId);
+              const entries = await fs.readdir(outputDir, { withFileTypes: true });
+              for (const entry of entries) {
+                if (!entry.isFile()) continue;
+                if (preFileNames.has(entry.name)) continue;
+                const ext = path.extname(entry.name);
+                const base = path.basename(entry.name, ext);
+                if (!/_v\d+$/.test(base)) {
+                  await fs.rename(
+                    path.join(outputDir, entry.name),
+                    path.join(outputDir, `${base}_v${tweakRound}${ext}`)
+                  );
+                }
               }
-            }
-          } catch { /* non-critical */ }
-          await collectOutputFiles(taskId);
+            } catch { /* non-critical */ }
+          }
+          await saveOutputAndReport(taskId);
         }
 
         await prisma.task.update({
@@ -151,7 +154,7 @@ export async function startTaskExecution(taskId: string): Promise<void> {
     }
 
     // Stream ended normally (should not happen, but handle anyway)
-    await collectOutputFiles(taskId);
+    await saveOutputAndReport(taskId);
     await prisma.task.update({
       where: { id: taskId },
       data: {
@@ -222,29 +225,27 @@ export async function resumeTask(
       }
 
       if (event.type === "pause") {
-        // Rename new files that lack _v{N} suffix
-        if (
-          event.pauseReason === "output_complete" &&
-          tweakRound > 0 &&
-          preFileNames
-        ) {
-          try {
-            const outputDir = getOutputPath(taskId);
-            const entries = await fs.readdir(outputDir, { withFileTypes: true });
-            for (const entry of entries) {
-              if (!entry.isFile()) continue;
-              if (preFileNames.has(entry.name)) continue;
-              const ext = path.extname(entry.name);
-              const base = path.basename(entry.name, ext);
-              if (!/_v\d+$/.test(base)) {
-                await fs.rename(
-                  path.join(outputDir, entry.name),
-                  path.join(outputDir, `${base}_v${tweakRound}${ext}`)
-                );
+        // On output_complete: rename new files, save report for all
+        if (event.pauseReason === "output_complete") {
+          if (tweakRound > 0 && preFileNames) {
+            try {
+              const outputDir = getOutputPath(taskId);
+              const entries = await fs.readdir(outputDir, { withFileTypes: true });
+              for (const entry of entries) {
+                if (!entry.isFile()) continue;
+                if (preFileNames.has(entry.name)) continue;
+                const ext = path.extname(entry.name);
+                const base = path.basename(entry.name, ext);
+                if (!/_v\d+$/.test(base)) {
+                  await fs.rename(
+                    path.join(outputDir, entry.name),
+                    path.join(outputDir, `${base}_v${tweakRound}${ext}`)
+                  );
+                }
               }
-            }
-          } catch { /* non-critical */ }
-          await collectOutputFiles(taskId);
+            } catch { /* non-critical */ }
+          }
+          await saveOutputAndReport(taskId);
         }
 
         await prisma.task.update({
@@ -274,7 +275,7 @@ export async function resumeTask(
     }
 
     // Stream ended normally
-    await collectOutputFiles(taskId);
+    await saveOutputAndReport(taskId);
     await prisma.task.update({
       where: { id: taskId },
       data: {
@@ -334,30 +335,74 @@ async function logEvent(
   });
 }
 
-async function collectOutputFiles(taskId: string): Promise<void> {
+export async function saveOutputAndReport(taskId: string): Promise<void> {
   const outputDir = getOutputPath(taskId);
   try {
-    const files = await collectFilesRecursive(outputDir);
+    const files = await collectFilesRelative(outputDir);
+    const updates: Record<string, unknown> = { outputFiles: files };
+
+    const mdPath = await findLatestMdFile(outputDir);
+    if (mdPath) {
+      const mdContent = await fs.readFile(mdPath, "utf-8");
+      const parsed = parseTestcaseMarkdown(mdContent);
+      updates.report = {
+        tree: parsed.tree,
+        summary: parsed.summary,
+        meta: parsed.meta,
+      };
+    }
+
     await prisma.task.update({
       where: { id: taskId },
-      data: { outputFiles: files },
+      data: updates,
     });
   } catch {
     // No output files
   }
 }
 
-async function collectFilesRecursive(dir: string): Promise<string[]> {
+async function collectFilesRelative(dir: string, baseDir?: string): Promise<string[]> {
+  const base = baseDir || dir;
   const results: string[] = [];
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      const subFiles = await collectFilesRecursive(fullPath);
+      const subFiles = await collectFilesRelative(fullPath, base);
       results.push(...subFiles);
     } else {
-      results.push(fullPath);
+      results.push(path.relative(base, fullPath));
     }
   }
   return results;
+}
+
+async function findLatestMdFile(outputDir: string): Promise<string | null> {
+  const candidates: { path: string; version: number }[] = [];
+
+  async function walk(dir: string) {
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "archive") continue;
+        await walk(fullPath);
+      } else if (entry.name.includes("测试用例") && entry.name.endsWith(".md")) {
+        const m = entry.name.match(/_v(\d+)\.md$/);
+        candidates.push({
+          path: fullPath,
+          version: m ? parseInt(m[1], 10) : 0,
+        });
+      }
+    }
+  }
+
+  await walk(outputDir);
+  candidates.sort((a, b) => b.version - a.version);
+  return candidates[0]?.path ?? null;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Loader2, History, XCircle, CheckCircle2, AlertCircle } from "lucide-react";
+import { Send, Loader2, History, CheckCircle2, AlertCircle } from "lucide-react";
 import type { TweakEntry } from "./types";
 
 interface AITweakPanelProps {
@@ -94,24 +94,6 @@ export function AITweakPanel({
   return (
     <div className="bg-card rounded-xl shadow-sm p-5" data-ai-tweak>
       <h3 className="font-semibold text-sm mb-3">AI 微调</h3>
-
-      {/* Tweak in progress banner */}
-      {generating && (
-        <div className="mb-3 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5 flex items-center gap-2.5">
-          <Loader2 className="w-4 h-4 text-primary animate-spin flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-foreground">微调中...</p>
-            <p className="text-xs text-muted-foreground">新文件生成后将自动更新，无需刷新</p>
-          </div>
-          <button
-            onClick={onCancelTweak}
-            className="flex-shrink-0 text-muted-foreground hover:text-red-500 transition-colors"
-            title="取消微调"
-          >
-            <XCircle className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {/* Quick chips */}
       <div className="flex flex-wrap gap-2 mb-3">
