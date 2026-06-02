@@ -224,7 +224,7 @@ export function KnowledgeBase() {
           <FileText className="w-5 h-5 text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{item.req}</p>
+          <p className="text-sm font-medium truncate">{item.mdFileName}</p>
           <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
             <span>{item.createdAt}</span>
             <span>{item.userName}</span>
