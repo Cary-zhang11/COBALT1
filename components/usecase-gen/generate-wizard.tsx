@@ -31,6 +31,7 @@ interface UploadedFile {
 }
 
 const STEPS = ["输入物料", "关联用例", "生成并预览"];
+const BUSINESS_TYPES = ["C1C", "C1B", "C2C", "C2B", "数科", "车小妹"] as const;
 
 export function GenerateWizard({
   initialTaskId, onComplete, skillId, onNavigateToTab,
@@ -49,6 +50,16 @@ export function GenerateWizard({
   const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<Set<string>>(new Set());
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
 
+  // 左侧 — 业务知识筛选
+  const [kbSearch, setKbSearch] = useState("");
+  const [kbBusinessType, setKbBusinessType] = useState("");
+  const [kbPage, setKbPage] = useState(1);
+
+  // 右侧 — 历史用例筛选
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyBusinessType, setHistoryBusinessType] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+
   interface HistoryOption {
     id: string;
     displayName: string;
@@ -58,18 +69,41 @@ export function GenerateWizard({
   }
 
   const { data: knowledgeData } = useQuery({
-    queryKey: ["knowledge", { type: "knowledge" }],
-    queryFn: () => fetch("/api/knowledge?type=knowledge").then((r) => r.json()),
+    queryKey: ["knowledge", { type: "knowledge", search: kbSearch, businessType: kbBusinessType, page: kbPage }],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      params.set("type", "knowledge");
+      params.set("pageSize", "5");
+      params.set("page", String(kbPage));
+      if (kbSearch) params.set("search", kbSearch);
+      if (kbBusinessType) params.set("businessType", kbBusinessType);
+      return fetch(`/api/knowledge?${params}`).then((r) => r.json());
+    },
   });
 
   const { data: uploadedHistoryData } = useQuery({
-    queryKey: ["knowledge", { type: "history_uploaded" }],
-    queryFn: () => fetch("/api/knowledge?type=history_uploaded").then((r) => r.json()),
+    queryKey: ["knowledge", { type: "history_uploaded", search: historySearch, businessType: historyBusinessType, page: historyPage }],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      params.set("type", "history_uploaded");
+      params.set("pageSize", "5");
+      params.set("page", String(historyPage));
+      if (historySearch) params.set("search", historySearch);
+      if (historyBusinessType) params.set("businessType", historyBusinessType);
+      return fetch(`/api/knowledge?${params}`).then((r) => r.json());
+    },
   });
 
   const { data: platformHistoryData } = useQuery({
-    queryKey: ["knowledge-history"],
-    queryFn: () => fetch("/api/knowledge/history").then((r) => r.json()),
+    queryKey: ["knowledge-history", { search: historySearch, businessType: historyBusinessType, page: historyPage }],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      params.set("pageSize", "5");
+      params.set("page", String(historyPage));
+      if (historySearch) params.set("search", historySearch);
+      if (historyBusinessType) params.set("businessType", historyBusinessType);
+      return fetch(`/api/knowledge/history?${params}`).then((r) => r.json());
+    },
   });
 
   const historyOptions: HistoryOption[] = useMemo(() => {
@@ -493,6 +527,8 @@ export function GenerateWizard({
                   return;
                 }
                 setValidationMsg("");
+                setKbPage(1); setKbSearch(""); setKbBusinessType("");
+                setHistoryPage(1); setHistorySearch(""); setHistoryBusinessType("");
                 setWizStep(1);
               }}
                 className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2">
@@ -510,10 +546,32 @@ export function GenerateWizard({
               <div className="bg-card rounded-xl shadow-sm p-5">
                 <h3 className="font-semibold mb-1 text-sm">业务知识</h3>
                 <p className="text-xs text-muted-foreground mb-3">勾选本次生成需要参考的业务规范文档</p>
+
+                {/* 搜索 + 业务类型筛选 */}
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    placeholder="搜索..."
+                    value={kbSearch}
+                    onChange={(e) => { setKbSearch(e.target.value); setKbPage(1); }}
+                    className="flex-1 border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                  <select
+                    value={kbBusinessType}
+                    onChange={(e) => { setKbBusinessType(e.target.value); setKbPage(1); }}
+                    className="border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  >
+                    <option value="">全部</option>
+                    {BUSINESS_TYPES.map((bt) => (
+                      <option key={bt} value={bt}>{bt}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="space-y-1.5 max-h-64 overflow-y-auto">
                   {!knowledgeData ? (
                     <p className="text-xs text-muted-foreground py-4 text-center">加载中...</p>
-                  ) : ((knowledgeData as { items?: { id: string; title: string; businessType: string | null; updatedAt: string }[] }).items?.length || 0) === 0 ? (
+                  ) : ((knowledgeData as { total?: number; items?: { id: string; title: string; businessType: string | null; updatedAt: string }[] }).items?.length || 0) === 0 ? (
                     <p className="text-xs text-muted-foreground py-4 text-center">暂无业务知识，可前往知识库上传</p>
                   ) : (
                     (knowledgeData as { items: { id: string; title: string; businessType: string | null; updatedAt: string }[] }).items.map((item) => (
@@ -542,12 +600,44 @@ export function GenerateWizard({
                     ))
                   )}
                 </div>
+
+                {/* 加载更多 */}
+                {((knowledgeData as { total?: number })?.total || 0) > kbPage * 5 && (
+                  <button
+                    onClick={() => setKbPage((p) => p + 1)}
+                    className="mt-2 w-full text-xs text-muted-foreground hover:text-primary py-1 transition-colors"
+                  >
+                    共 {(knowledgeData as { total: number }).total} 条，加载更多 →
+                  </button>
+                )}
               </div>
 
               {/* 右侧：历史用例范文 */}
               <div className="bg-card rounded-xl shadow-sm p-5">
                 <h3 className="font-semibold mb-1 text-sm">历史用例范文</h3>
                 <p className="text-xs text-muted-foreground mb-3">勾选优秀历史用例作为 few-shot 参考</p>
+
+                {/* 搜索 + 业务类型筛选 */}
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    placeholder="搜索..."
+                    value={historySearch}
+                    onChange={(e) => { setHistorySearch(e.target.value); setHistoryPage(1); }}
+                    className="flex-1 border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                  <select
+                    value={historyBusinessType}
+                    onChange={(e) => { setHistoryBusinessType(e.target.value); setHistoryPage(1); }}
+                    className="border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  >
+                    <option value="">全部</option>
+                    {BUSINESS_TYPES.map((bt) => (
+                      <option key={bt} value={bt}>{bt}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="space-y-1.5 max-h-64 overflow-y-auto">
                   {(!uploadedHistoryData && !platformHistoryData) ? (
                     <p className="text-xs text-muted-foreground py-4 text-center">加载中...</p>
@@ -574,6 +664,17 @@ export function GenerateWizard({
                     ))
                   )}
                 </div>
+
+                {/* 加载更多 — 两个 API total 相加 */}
+                {(((uploadedHistoryData as { total?: number })?.total || 0) +
+                  ((platformHistoryData as { total?: number })?.total || 0)) > historyPage * 5 && (
+                  <button
+                    onClick={() => setHistoryPage((p) => p + 1)}
+                    className="mt-2 w-full text-xs text-muted-foreground hover:text-primary py-1 transition-colors"
+                  >
+                    共 {((uploadedHistoryData as { total: number })?.total || 0) + ((platformHistoryData as { total: number })?.total || 0)} 条，加载更多 →
+                  </button>
+                )}
               </div>
             </div>
             <div className="flex justify-between">
