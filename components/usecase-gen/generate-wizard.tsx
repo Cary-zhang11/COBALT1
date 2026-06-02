@@ -366,6 +366,7 @@ export function GenerateWizard({
         }
       }
 
+      console.log(`[wizard] sending referenceFiles:`, JSON.stringify(referenceFiles.map(r => ({ subdir: r.subdir, destName: r.destName, hasSourcePath: !!r.sourcePath, hasSourceTaskId: !!r.sourceTaskId }))));
       await executeTask.mutateAsync({ taskId: newTaskId, referenceFiles });
     } catch {
       setGenStatus("生成失败");

@@ -16,6 +16,7 @@ interface UseOutputScannerOptions {
     outputFiles?: { name: string; path: string }[];
     tweakHistory?: unknown;
     tweakCount?: number;
+    duration?: number;
   }) => void;
   onError?: (error: string) => void;
   enabled?: boolean;

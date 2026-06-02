@@ -32,47 +32,50 @@ export async function POST(
 
     try {
       const body = await req.json();
-      if (body.referenceFiles && Array.isArray(body.referenceFiles)) {
+      console.log(`[execute] received body.referenceFiles:`, JSON.stringify(body.referenceFiles || []));
+      if (body.referenceFiles && Array.isArray(body.referenceFiles) && body.referenceFiles.length > 0) {
         const UPLOADS_ROOT = path.resolve(process.cwd(), "uploads");
         const SANDBOX_ROOT = path.resolve(process.cwd(), "sandbox");
 
-        referenceFiles = body.referenceFiles.map(
-          (ref: {
-            sourcePath?: string;
-            sourceTaskId?: string;
-            mdFileName?: string;
-            subdir: string;
-            destName: string;
-          }) => {
+        referenceFiles = [];
+        for (const ref of body.referenceFiles) {
+          try {
             let sourcePath: string;
 
             if (ref.sourceTaskId) {
-              // 平台生成历史
               sourcePath = path.join(
                 getOutputPath(ref.sourceTaskId),
                 ref.mdFileName || ""
               );
             } else if (ref.sourcePath) {
-              // 业务知识/手动上传历史
               sourcePath = path.resolve(process.cwd(), ref.sourcePath);
             } else {
-              throw new Error("Invalid reference file");
+              console.warn(`[execute] skipping reference: no sourcePath or sourceTaskId`, ref);
+              continue;
             }
 
-            // 路径安全校验
             if (
               !sourcePath.startsWith(UPLOADS_ROOT) &&
               !sourcePath.startsWith(SANDBOX_ROOT)
             ) {
-              throw new Error(`Path traversal: ${sourcePath}`);
+              console.warn(`[execute] skipping reference: path traversal detected: ${sourcePath}`);
+              continue;
             }
 
-            return { sourcePath, subdir: ref.subdir, destName: ref.destName };
+            console.log(`[execute] resolved reference: ${sourcePath} → ${ref.subdir}/${ref.destName}`);
+            referenceFiles.push({
+              sourcePath,
+              subdir: ref.subdir,
+              destName: ref.destName,
+            });
+          } catch (err) {
+            console.warn(`[execute] skipping reference file due to error:`, err);
           }
-        );
+        }
+        console.log(`[execute] total referenceFiles resolved: ${referenceFiles.length}`);
       }
     } catch {
-      // body 可能为空（向后兼容）
+      console.log(`[execute] no body or body parse failed (backward compat)`);
     }
 
     startTaskExecution(params.id, referenceFiles).catch((err) => {
