@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
     await getAuthUser(token);
 
     const search = req.nextUrl.searchParams.get("search") || "";
+    const businessType = req.nextUrl.searchParams.get("businessType") || "";
     const page = parseInt(req.nextUrl.searchParams.get("page") || "1", 10);
     const pageSize = 20;
 
@@ -18,6 +19,14 @@ export async function GET(req: NextRequest) {
     };
     if (search) {
       where.input = { contains: search, mode: "insensitive" };
+    }
+    if (businessType) {
+      // "unclassified" 映射为 IS NULL
+      if (businessType === "unclassified") {
+        where.businessType = null;
+      } else {
+        where.businessType = businessType;
+      }
     }
 
     const [items, total] = await Promise.all([
@@ -31,6 +40,7 @@ export async function GET(req: NextRequest) {
           qualityScore: true,
           report: true,
           outputFiles: true,
+          businessType: true,
           user: { select: { name: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -55,6 +65,7 @@ export async function GET(req: NextRequest) {
           modules: summary?.modules as number || 0,
           userName: t.user?.name || "未知",
           mdFileName: mdFile,
+          businessType: t.businessType || null,
         };
       }),
       total,
