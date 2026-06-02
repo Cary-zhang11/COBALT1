@@ -79,6 +79,37 @@ export async function POST(
       console.log(`[execute] no body or body parse failed (backward compat)`);
     }
 
+    // 递增引用次数
+    if (referenceFiles && referenceFiles.length > 0) {
+      for (const ref of referenceFiles) {
+        try {
+          // 从路径中提取 uuid：uploads/knowledge/{uuid}.md 或 uploads/history/{uuid}.md
+          const knowledgeMatch = ref.sourcePath.match(/uploads\/(knowledge|history)\/([a-f0-9-]+)\.md$/i);
+          if (knowledgeMatch) {
+            const knowledgeId = knowledgeMatch[2];
+            await prisma.knowledge.update({
+              where: { id: knowledgeId },
+              data: { refCount: { increment: 1 } },
+            });
+            console.log(`[execute] incremented refCount for knowledge id="${knowledgeId}"`);
+            continue;
+          }
+          // 从路径中提取 taskId：sandbox/{taskId}/output/{fileName}
+          const taskMatch = ref.sourcePath.match(/sandbox[\\/]([a-f0-9-]+)[\\/]output[\\/]/i);
+          if (taskMatch) {
+            const sourceTaskId = taskMatch[1];
+            await prisma.task.update({
+              where: { id: sourceTaskId },
+              data: { refCount: { increment: 1 } },
+            });
+            console.log(`[execute] incremented refCount for platform task id="${sourceTaskId}"`);
+          }
+        } catch (err) {
+          console.warn(`[execute] failed to increment refCount:`, err);
+        }
+      }
+    }
+
     startTaskExecution(params.id, referenceFiles).catch((err) => {
       console.error("Task execution error:", err);
     });

@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
           report: true,
           outputFiles: true,
           businessType: true,
+          refCount: true,
           user: { select: { name: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -73,6 +74,7 @@ export async function GET(req: NextRequest) {
           userName: t.user?.name || "未知",
           mdFileName: mdFile,
           businessType: t.businessType || null,
+          refCount: t.refCount || 0,
         };
       }),
       total,

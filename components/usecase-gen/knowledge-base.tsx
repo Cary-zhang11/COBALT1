@@ -30,6 +30,7 @@ interface HistoryItem {
   userName: string;
   mdFileName: string;
   businessType: string | null;
+  refCount: number;
 }
 
 const MAIN_TABS = ["业务知识", "历史用例"];
@@ -233,6 +234,10 @@ export function KnowledgeBase() {
             <span>{item.modules} 模块</span>
             <BusinessTypeBadge type={item.businessType} />
           </div>
+        </div>
+        <div className="text-center flex-shrink-0">
+          <p className="text-lg font-bold text-cyan-500">{item.refCount}</p>
+          <p className="text-xs text-muted-foreground">引用次数</p>
         </div>
         <div className="flex gap-2 items-center">
           <button
