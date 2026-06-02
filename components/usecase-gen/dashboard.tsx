@@ -67,7 +67,8 @@ export function Dashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div className="flex-1 overflow-auto p-6 dashboard-charts">
+      <style>{`.dashboard-charts .recharts-sector:focus, .dashboard-charts .recharts-rectangle:focus, .dashboard-charts .recharts-wrapper:focus { outline: none !important; }`}</style>
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         {[
