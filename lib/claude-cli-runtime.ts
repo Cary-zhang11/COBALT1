@@ -113,33 +113,43 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
   }
 
   async cancel(key: string): Promise<void> {
+    console.log(`[cancel] cancel called, key="${key}"`);
     const proc = this.processes.get(key);
     if (!proc || proc.killed || proc.exitCode !== null) {
+      console.log(`[cancel] process not found/already dead for key="${key}", proc=${JSON.stringify(proc ? { killed: proc.killed, exitCode: proc.exitCode, pid: proc.pid } : null)}`);
       this.processes.delete(key);
       return;
     }
 
     const pid = proc.pid;
     if (!pid) {
+      console.log(`[cancel] no pid for key="${key}"`);
       this.processes.delete(key);
       return;
     }
 
+    console.log(`[cancel] killing pid=${pid} for key="${key}", platform=${process.platform}`);
+
     // Step 1: graceful SIGTERM
-    proc.kill("SIGTERM");
+    const killed = proc.kill("SIGTERM");
+    console.log(`[cancel] SIGTERM sent to pid=${pid}, result=${killed}`);
 
     // Step 2: after 2s, force kill entire process tree (Windows-safe)
     setTimeout(() => {
       if (!proc.killed && proc.exitCode === null) {
+        console.log(`[cancel] 2s elapsed, force killing pid=${pid}`);
         try {
           if (process.platform === "win32") {
             execSync(`taskkill /F /T /PID ${pid}`, { stdio: "ignore" });
           } else {
             proc.kill("SIGKILL");
           }
-        } catch {
-          // process already gone
+          console.log(`[cancel] force kill completed for pid=${pid}`);
+        } catch (err) {
+          console.log(`[cancel] force kill failed (process already gone):`, err);
         }
+      } else {
+        console.log(`[cancel] process already exited after SIGTERM, pid=${pid} killed=${proc.killed} exitCode=${proc.exitCode}`);
       }
       this.processes.delete(key);
     }, 2000);

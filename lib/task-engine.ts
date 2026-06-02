@@ -73,6 +73,11 @@ export async function startTaskExecution(
     const skillContent = task.skillVersion.content;
     const skillDir = task.skill.filePath;
 
+    console.log(`[task-engine] starting runtime for taskId="${taskId}"`);
+    console.log(`[task-engine] userInput (first 500 chars):`, task.input.slice(0, 500));
+    console.log(`[task-engine] skillContent (first 300 chars):`, skillContent.slice(0, 300));
+    console.log(`[task-engine] workspaceFiles:`, workspaceFiles);
+
     const stream = runtime.start({
       taskId: task.id,
       skillId: task.skillId,
@@ -177,10 +182,16 @@ export async function startTaskExecution(
       },
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error(`[task-engine] startTaskExecution error for taskId="${taskId}":`, message);
     // Don't overwrite if user already cancelled
     const current = await prisma.task.findUnique({ where: { id: taskId }, select: { status: true } });
-    if (current?.status === "cancelled") return;
-    const message = error instanceof Error ? error.message : "Unknown error";
+    console.log(`[task-engine] current status="${current?.status}" for taskId="${taskId}"`);
+    if (current?.status === "cancelled") {
+      console.log(`[task-engine] task already cancelled, skipping failed status write for taskId="${taskId}"`);
+      return;
+    }
+    console.log(`[task-engine] setting status="failed" for taskId="${taskId}"`);
     await prisma.task.update({
       where: { id: taskId },
       data: { status: "failed", output: `Error: ${message}` },
@@ -312,7 +323,10 @@ export async function resumeTask(
   } catch (error) {
     // Don't overwrite if user already cancelled
     const current = await prisma.task.findUnique({ where: { id: taskId }, select: { status: true } });
-    if (current?.status === "cancelled") return;
+    if (current?.status === "cancelled") {
+      console.log(`[task-engine] resume error but task already cancelled, taskId="${taskId}"`);
+      return;
+    }
     const message = error instanceof Error ? error.message : "Unknown error";
     await prisma.task.update({
       where: { id: taskId },
@@ -322,19 +336,30 @@ export async function resumeTask(
 }
 
 export async function cancelTask(taskId: string): Promise<void> {
+  console.log(`[cancelTask] start, taskId="${taskId}"`);
   const task = await prisma.task.findUnique({ where: { id: taskId } });
-  if (!task) throw new Error("Task not found");
+  if (!task) {
+    console.log(`[cancelTask] task not found: ${taskId}`);
+    throw new Error("Task not found");
+  }
+
+  console.log(`[cancelTask] task status="${task.status}", sessionId="${task.sessionId || 'none'}"`);
 
   // Cancel by taskId (initial start) or sessionId (after resume)
+  console.log(`[cancelTask] calling runtime.cancel("${taskId}")`);
   await runtime.cancel(taskId);
+
   if (task.sessionId) {
+    console.log(`[cancelTask] calling runtime.cancel("${task.sessionId}")`);
     await runtime.cancel(task.sessionId);
   }
 
+  console.log(`[cancelTask] setting status="cancelled" for taskId="${taskId}"`);
   await prisma.task.update({
     where: { id: taskId },
     data: { status: "cancelled" },
   });
+  console.log(`[cancelTask] done, taskId="${taskId}"`);
 }
 
 async function logEvent(
