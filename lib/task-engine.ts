@@ -125,6 +125,11 @@ export async function startTaskExecution(taskId: string): Promise<void> {
               }
             } catch { /* non-critical */ }
           }
+          // Write duration FIRST so report API sees it
+          await prisma.task.update({
+            where: { id: taskId },
+            data: { duration: Date.now() - startTime },
+          });
           await saveOutputAndReport(taskId);
         }
 
@@ -155,6 +160,10 @@ export async function startTaskExecution(taskId: string): Promise<void> {
     }
 
     // Stream ended normally (should not happen, but handle anyway)
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { duration: Date.now() - startTime },
+    });
     await saveOutputAndReport(taskId);
     await prisma.task.update({
       where: { id: taskId },
@@ -246,6 +255,11 @@ export async function resumeTask(
               }
             } catch { /* non-critical */ }
           }
+          // Write duration FIRST so report API sees it
+          await prisma.task.update({
+            where: { id: taskId },
+            data: { duration: previousDuration + (Date.now() - startTime) },
+          });
           await saveOutputAndReport(taskId);
         }
 
@@ -276,6 +290,10 @@ export async function resumeTask(
     }
 
     // Stream ended normally
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { duration: previousDuration + (Date.now() - startTime) },
+    });
     await saveOutputAndReport(taskId);
     await prisma.task.update({
       where: { id: taskId },
