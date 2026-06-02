@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
+import { useQuery } from "@tanstack/react-query";
 import { useOutputScanner, maxXmindVersion, type FileInfo } from "@/hooks/use-output-scanner";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { ExecutionPanel } from "./shared/execution-panel";
@@ -42,12 +43,75 @@ export function GenerateWizard({
   const [wizStep, setWizStep] = useState(0);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [requirementText, setRequirementText] = useState("");
-  const [selectedReq, setSelectedReq] = useState<number | null>(null);
   const [validationMsg, setValidationMsg] = useState("");
 
-  // Mutable refs for mutable mock arrays
-  const fewShotRef = useRef(mockFewShotExamples.map((f) => ({ ...f })));
-  const [fewShot, setFewShot] = useState(fewShotRef.current);
+  // ---- Step 2: 知识库关联 ----
+  const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<Set<string>>(new Set());
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
+
+  interface HistoryOption {
+    id: string;
+    displayName: string;
+    sourcePath?: string;
+    sourceTaskId?: string;
+    mdFileName?: string;
+  }
+
+  const { data: knowledgeData } = useQuery({
+    queryKey: ["knowledge", { type: "knowledge" }],
+    queryFn: () => fetch("/api/knowledge?type=knowledge").then((r) => r.json()),
+  });
+
+  const { data: uploadedHistoryData } = useQuery({
+    queryKey: ["knowledge", { type: "history_uploaded" }],
+    queryFn: () => fetch("/api/knowledge?type=history_uploaded").then((r) => r.json()),
+  });
+
+  const { data: platformHistoryData } = useQuery({
+    queryKey: ["knowledge-history"],
+    queryFn: () => fetch("/api/knowledge/history").then((r) => r.json()),
+  });
+
+  const historyOptions: HistoryOption[] = useMemo(() => {
+    const result: HistoryOption[] = [];
+    const uploaded = (uploadedHistoryData as { items?: { id: string; title: string; content: string }[] }) || {};
+    for (const item of uploaded.items || []) {
+      result.push({
+        id: `knowledge:${item.id}`,
+        displayName: (item.title || "untitled") + ".md",
+        sourcePath: item.content,
+      });
+    }
+    const platform = (platformHistoryData as {
+      items?: { id: string; mdFileName: string }[];
+    }) || {};
+    for (const item of platform.items || []) {
+      if (!item.mdFileName) continue;
+      result.push({
+        id: `task:${item.id}`,
+        displayName: item.mdFileName,
+        sourceTaskId: item.id,
+        mdFileName: item.mdFileName,
+      });
+    }
+    return result;
+  }, [uploadedHistoryData, platformHistoryData]);
+
+  function toggleKnowledge(id: string) {
+    setSelectedKnowledgeIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleHistory(id: string) {
+    setSelectedHistoryIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
 
   // Generation
   const [generating, setGenerating] = useState(false);
@@ -257,7 +321,42 @@ export function GenerateWizard({
         uploadedFiles: uploadedFiles.map((f) => f.path),
       });
       setTaskId(newTaskId);
-      await executeTask.mutateAsync(newTaskId);
+
+      // 收集 referenceFiles
+      const knowledgeItems = (knowledgeData as { items?: { id: string; title: string; content: string }[] } | undefined)?.items || [];
+      const referenceFiles: {
+        sourcePath?: string;
+        sourceTaskId?: string;
+        mdFileName?: string;
+        subdir: string;
+        destName: string;
+      }[] = [];
+
+      for (const id of Array.from(selectedKnowledgeIds)) {
+        const k = knowledgeItems.find((item) => item.id === id);
+        if (k?.content) {
+          referenceFiles.push({
+            sourcePath: k.content,
+            subdir: "knowledge",
+            destName: (k.title || "untitled") + ".md",
+          });
+        }
+      }
+
+      for (const id of Array.from(selectedHistoryIds)) {
+        const h = historyOptions.find((opt) => opt.id === id);
+        if (h) {
+          referenceFiles.push({
+            sourcePath: h.sourcePath,
+            sourceTaskId: h.sourceTaskId,
+            mdFileName: h.mdFileName,
+            subdir: "history",
+            destName: h.displayName,
+          });
+        }
+      }
+
+      await executeTask.mutateAsync({ taskId: newTaskId, referenceFiles });
     } catch {
       setGenStatus("生成失败");
       setGenerating(false);
@@ -377,32 +476,77 @@ export function GenerateWizard({
           </div>
         )}
 
-        {/* Step 1: 关联用例 */}
+        {/* Step 2: 关联用例 */}
         {wizStep === 1 && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              {/* 左侧：业务知识 */}
               <div className="bg-card rounded-xl shadow-sm p-5">
-                <h3 className="font-semibold mb-3 text-sm">最近需求</h3>
-                <div className="space-y-2">
-                  {mockRecentReqs.map((req) => (
-                    <div key={req.id} onClick={() => setSelectedReq(selectedReq === req.id ? null : req.id)}
-                      className={`border rounded-lg px-3 py-2 cursor-pointer ${selectedReq === req.id ? "border-cyan-500 bg-cyan-50" : "border-border hover:border-muted-foreground/30"}`}>
-                      <span className="text-sm font-medium">{req.name}</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">{req.date} · {req.count}个用例</p>
-                    </div>
-                  ))}
+                <h3 className="font-semibold mb-1 text-sm">业务知识</h3>
+                <p className="text-xs text-muted-foreground mb-3">勾选本次生成需要参考的业务规范文档</p>
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {!knowledgeData ? (
+                    <p className="text-xs text-muted-foreground py-4 text-center">加载中...</p>
+                  ) : ((knowledgeData as { items?: { id: string; title: string; businessType: string | null; updatedAt: string }[] }).items?.length || 0) === 0 ? (
+                    <p className="text-xs text-muted-foreground py-4 text-center">暂无业务知识，可前往知识库上传</p>
+                  ) : (
+                    (knowledgeData as { items: { id: string; title: string; businessType: string | null; updatedAt: string }[] }).items.map((item) => (
+                      <label
+                        key={item.id}
+                        className={`flex items-center gap-2 cursor-pointer border rounded-lg px-3 py-2 transition-colors ${
+                          selectedKnowledgeIds.has(item.id)
+                            ? "border-cyan-500 bg-cyan-50 dark:bg-cyan-950/20"
+                            : "border-border hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedKnowledgeIds.has(item.id)}
+                          onChange={() => toggleKnowledge(item.id)}
+                          className="accent-cyan-500 w-3.5 h-3.5 flex-shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm truncate block">{item.title}.md</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(item.updatedAt).toLocaleDateString("zh-CN")}
+                            {item.businessType ? ` · ${item.businessType}` : ""}
+                          </span>
+                        </div>
+                      </label>
+                    ))
+                  )}
                 </div>
               </div>
+
+              {/* 右侧：历史用例范文 */}
               <div className="bg-card rounded-xl shadow-sm p-5">
-                <h3 className="font-semibold mb-3 text-sm">复用历史用例作 few-shot</h3>
-                <div className="space-y-2">
-                  {fewShot.map((ex, i) => (
-                    <label key={i} className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={ex.selected} onChange={() => { const n = [...fewShot]; n[i] = { ...n[i], selected: !ex.selected }; setFewShot(n); }} className="accent-cyan-500 w-3.5 h-3.5" />
-                      <span className="text-sm">{ex.name}</span>
-                      <span className="text-xs text-muted-foreground">({ex.count}条)</span>
-                    </label>
-                  ))}
+                <h3 className="font-semibold mb-1 text-sm">历史用例范文</h3>
+                <p className="text-xs text-muted-foreground mb-3">勾选优秀历史用例作为 few-shot 参考</p>
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {(!uploadedHistoryData && !platformHistoryData) ? (
+                    <p className="text-xs text-muted-foreground py-4 text-center">加载中...</p>
+                  ) : historyOptions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-4 text-center">暂无历史用例</p>
+                  ) : (
+                    historyOptions.map((opt) => (
+                      <label
+                        key={opt.id}
+                        className={`flex items-center gap-2 cursor-pointer border rounded-lg px-3 py-2 transition-colors ${
+                          selectedHistoryIds.has(opt.id)
+                            ? "border-cyan-500 bg-cyan-50 dark:bg-cyan-950/20"
+                            : "border-border hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedHistoryIds.has(opt.id)}
+                          onChange={() => toggleHistory(opt.id)}
+                          className="accent-cyan-500 w-3.5 h-3.5 flex-shrink-0"
+                        />
+                        <span className="text-sm truncate">{opt.displayName}</span>
+                      </label>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -604,12 +748,11 @@ export function GenerateWizard({
         configSummary={{
           source: uploadedFiles.length > 0
             ? uploadedFiles.map((f) => f.name).join(", ")
-            : selectedReq
-            ? "最近需求"
             : requirementText
             ? "文本输入"
             : "未选择",
-          fewShot: `${fewShot.filter((f) => f.selected).length} 份`,
+          knowledge: `${selectedKnowledgeIds.size} 份`,
+          history: `${selectedHistoryIds.size} 份`,
         }}
         foundFiles={(() => {
           const seen = new Set<string>();
