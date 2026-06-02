@@ -31,7 +31,8 @@ export async function ensureSandbox(taskId: string): Promise<void> {
 
 export async function copyFilesToWorkspace(
   taskId: string,
-  filePaths: string[]
+  filePaths: string[],
+  referenceFiles?: { sourcePath: string; subdir: string; destName: string }[]
 ): Promise<string[]> {
   const workspaceDir = getWorkspacePath(taskId);
   await fs.mkdir(workspaceDir, { recursive: true });
@@ -43,6 +44,22 @@ export async function copyFilesToWorkspace(
     await fs.copyFile(filePath, destPath);
     copiedPaths.push(destPath);
   }
+
+  // 新增：reference 文件按子目录复制
+  if (referenceFiles && referenceFiles.length > 0) {
+    for (const ref of referenceFiles) {
+      try {
+        const subDir = path.join(workspaceDir, ref.subdir);
+        await fs.mkdir(subDir, { recursive: true });
+        const dest = path.join(subDir, ref.destName);
+        await fs.copyFile(ref.sourcePath, dest);
+        copiedPaths.push(dest);
+      } catch (err) {
+        console.warn(`Failed to copy reference file "${ref.sourcePath}":`, err);
+      }
+    }
+  }
+
   return copiedPaths;
 }
 
