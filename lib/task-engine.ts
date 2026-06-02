@@ -38,7 +38,10 @@ export async function createTask(
   return task.id;
 }
 
-export async function startTaskExecution(taskId: string): Promise<void> {
+export async function startTaskExecution(
+  taskId: string,
+  referenceFiles?: { sourcePath: string; subdir: string; destName: string }[]
+): Promise<void> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: { skill: true, skillVersion: true },
@@ -64,7 +67,7 @@ export async function startTaskExecution(taskId: string): Promise<void> {
   try {
     let workspaceFiles: string[] = [];
     if (task.inputFiles && task.inputFiles.length > 0) {
-      workspaceFiles = await copyFilesToWorkspace(taskId, task.inputFiles);
+      workspaceFiles = await copyFilesToWorkspace(taskId, task.inputFiles, referenceFiles);
     }
 
     const skillContent = task.skillVersion.content;
