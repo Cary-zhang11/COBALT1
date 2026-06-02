@@ -51,6 +51,22 @@ export default function TaskExecutePage() {
     enabled: !!taskId,
   });
 
+  // Show initial prompt at top when task loads
+  const [initialPromptShown, setInitialPromptShown] = useState(false);
+  useEffect(() => {
+    if (!initialPromptShown && task?.input) {
+      setInitialPromptShown(true);
+      setDisplayMessages((prev) => [
+        {
+          id: "initial-prompt",
+          type: "user_input",
+          content: task.input,
+        },
+        ...prev,
+      ]);
+    }
+  }, [task?.input, initialPromptShown]);
+
   // Append new SSE logs to display
   useEffect(() => {
     const newLogs = logs.slice(prevLogCountRef.current);
@@ -388,12 +404,16 @@ function ChatBubble({ msg }: { msg: DisplayMessage }) {
   }
 
   if (msg.type === "user_input") {
+    const isInitialPrompt = msg.id === "initial-prompt";
     return (
       <div className="flex gap-3 flex-row-reverse">
         <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
           <User className="w-4 h-4 text-gray-600" />
         </div>
-        <div className="px-4 py-2.5 bg-blue-600 text-white rounded-2xl rounded-br-md text-sm whitespace-pre-wrap max-w-[80%]">
+        <div className={`px-4 py-2.5 rounded-2xl rounded-br-md text-sm whitespace-pre-wrap max-w-[80%] ${isInitialPrompt ? "bg-white border text-foreground" : "bg-blue-600 text-white"}`}>
+          {isInitialPrompt && (
+            <div className="text-xs text-muted-foreground mb-1 font-medium">📋 初始 Prompt</div>
+          )}
           {msg.content}
         </div>
       </div>
