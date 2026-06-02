@@ -67,13 +67,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-6 dashboard-charts">
-      <style>{`\
-.dashboard-charts .recharts-wrapper:focus,\
-.dashboard-charts .recharts-wrapper *:focus,\
-.dashboard-charts svg:focus,\
-.dashboard-charts path:focus { outline: none !important; }\
-`}</style>
+    <div className="flex-1 overflow-auto p-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         {[
@@ -101,30 +95,34 @@ export function Dashboard() {
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div className="col-span-2 bg-card rounded-xl shadow-sm p-5">
           <h4 className="font-semibold text-sm mb-4">每日生成量 &amp; 质量分趋势</h4>
-          <ResponsiveContainer width="100%" height={176}>
-            <LineChart data={data.dailyTrend}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Line yAxisId="left" type="monotone" dataKey="count" stroke="#3b82f6" name="生成量" />
-              <Line yAxisId="right" type="monotone" dataKey="avgScore" stroke="#10b981" name="质量分" />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="focus:outline-none">
+            <ResponsiveContainer width="100%" height={176}>
+              <LineChart data={data.dailyTrend}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Line yAxisId="left" type="monotone" dataKey="count" stroke="#3b82f6" name="生成量" />
+                <Line yAxisId="right" type="monotone" dataKey="avgScore" stroke="#10b981" name="质量分" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
         <div className="bg-card rounded-xl shadow-sm p-5">
           <h4 className="font-semibold text-sm mb-4">需求类型分布</h4>
-          <ResponsiveContainer width="100%" height={176}>
-            <PieChart>
-              <Pie data={data.categoryDistribution} dataKey="count" nameKey="category" cx="50%" cy="50%" outerRadius={60} label={({ category }) => category}>
-                {data.categoryDistribution.map((_, i) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="focus:outline-none">
+            <ResponsiveContainer width="100%" height={176}>
+              <PieChart>
+                <Pie data={data.categoryDistribution} dataKey="count" nameKey="category" cx="50%" cy="50%" outerRadius={60} label={({ name }) => name as string}>
+                  {data.categoryDistribution.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
@@ -132,28 +130,32 @@ export function Dashboard() {
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div className="bg-card rounded-xl shadow-sm p-5">
           <h4 className="font-semibold text-sm mb-4">覆盖维度分布</h4>
-          <ResponsiveContainer width="100%" height={176}>
-            <PieChart>
-              <Pie data={data.dimensionCoverage} dataKey="covered" nameKey="name" cx="50%" cy="50%" outerRadius={60} label={({ name }) => name.slice(0, 4)}>
-                {data.dimensionCoverage.map((_, i) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="focus:outline-none">
+            <ResponsiveContainer width="100%" height={176}>
+              <PieChart>
+                <Pie data={data.dimensionCoverage} dataKey="covered" nameKey="name" cx="50%" cy="50%" outerRadius={60} label={({ name }) => (name as string).slice(0, 4)}>
+                  {data.dimensionCoverage.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
         <div className="col-span-2 bg-card rounded-xl shadow-sm p-5">
           <h4 className="font-semibold text-sm mb-4">人员使用 Top 10</h4>
-          <ResponsiveContainer width="100%" height={176}>
-            <BarChart data={data.topUsers} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" tick={{ fontSize: 10 }} />
-              <YAxis type="category" dataKey="userName" width={80} tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#3b82f6" name="生成数" />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="focus:outline-none">
+            <ResponsiveContainer width="100%" height={176}>
+              <BarChart data={data.topUsers} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="userName" width={80} tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar dataKey="count" fill="#3b82f6" name="生成数" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
