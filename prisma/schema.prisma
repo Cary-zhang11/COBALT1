@@ -92,6 +92,7 @@ model Task {
   tweakCount   Int      @default(0)
   tweakHistory Json?
   report       Json?
+  businessType String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -130,7 +131,9 @@ model Knowledge {
   id        String    @id @default(uuid())
   title     String
   content   String    @db.Text
-  tags      String[]  @default([])
+  tags         String[]  @default([])
+  type         String    @default("knowledge")
+  businessType String?
   userId    String
   user      User      @relation(fields: [userId], references: [id])
   refCount  Int       @default(0)
