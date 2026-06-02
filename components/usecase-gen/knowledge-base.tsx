@@ -52,7 +52,6 @@ export function KnowledgeBase() {
   const [platformPreviewTaskId, setPlatformPreviewTaskId] = useState<string | null>(null);
 
   // 上传弹窗
-  const [openAssignMenu, setOpenAssignMenu] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [uploadContext, setUploadContext] = useState<"knowledge" | "history_uploaded">("knowledge");
 
@@ -335,6 +334,7 @@ export function KnowledgeBase() {
                               <span>{item.totalCases} 用例</span>
                               <span>质量分 {item.qualityScore}</span>
                               <span>{item.modules} 模块</span>
+                              <BusinessTypeBadge type={item.businessType} />
                             </div>
                           </div>
                           <div className="text-center flex-shrink-0">
@@ -357,38 +357,23 @@ export function KnowledgeBase() {
                             >
                               <Download className="w-3 h-3" />下载
                             </button>
-                            <div className="relative">
-                              <button
-                                onClick={() => setOpenAssignMenu(openAssignMenu === item.id ? null : item.id)}
-                                className={`text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors ${
-                                  item.businessType
-                                    ? "bg-muted text-muted-foreground hover:bg-muted/60"
-                                    : "border border-border text-muted-foreground hover:border-primary/30"
-                                }`}
-                              >
-                                {item.businessType || "分配类型"} <ChevronDown className="w-3 h-3" />
+                            <div className="relative group">
+                              <button className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30 flex items-center gap-1">
+                                分配类型 <ChevronDown className="w-3 h-3" />
                               </button>
-                              {openAssignMenu === item.id && (
-                                <>
-                                  <div className="fixed inset-0 z-10" onClick={() => setOpenAssignMenu(null)} />
-                                  <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg p-1 z-20 min-w-[80px]">
-                                    {BUSINESS_TYPES.map((bt) => (
-                                      <button
-                                        key={bt}
-                                        onClick={() => {
-                                          assignBusinessTypeMutation.mutate({ taskId: item.id, bt });
-                                          setOpenAssignMenu(null);
-                                        }}
-                                        className={`block w-full text-left px-3 py-1.5 text-xs rounded hover:bg-muted whitespace-nowrap ${
-                                          item.businessType === bt ? "text-primary font-medium" : ""
-                                        }`}
-                                      >
-                                        {bt}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </>
-                              )}
+                              <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg p-1 hidden group-hover:block z-10 min-w-[80px]">
+                                {BUSINESS_TYPES.map((bt) => (
+                                  <button
+                                    key={bt}
+                                    onClick={() => assignBusinessTypeMutation.mutate({ taskId: item.id, bt })}
+                                    className={`block w-full text-left px-3 py-1.5 text-xs rounded hover:bg-muted whitespace-nowrap ${
+                                      item.businessType === bt ? "text-primary font-medium" : ""
+                                    }`}
+                                  >
+                                    {bt}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>
