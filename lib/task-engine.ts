@@ -177,6 +177,9 @@ export async function startTaskExecution(
       },
     });
   } catch (error) {
+    // Don't overwrite if user already cancelled
+    const current = await prisma.task.findUnique({ where: { id: taskId }, select: { status: true } });
+    if (current?.status === "cancelled") return;
     const message = error instanceof Error ? error.message : "Unknown error";
     await prisma.task.update({
       where: { id: taskId },
@@ -307,6 +310,9 @@ export async function resumeTask(
       },
     });
   } catch (error) {
+    // Don't overwrite if user already cancelled
+    const current = await prisma.task.findUnique({ where: { id: taskId }, select: { status: true } });
+    if (current?.status === "cancelled") return;
     const message = error instanceof Error ? error.message : "Unknown error";
     await prisma.task.update({
       where: { id: taskId },
