@@ -8,7 +8,8 @@ export async function GET(req: NextRequest) {
     await getAuthUser(token);
 
     const search = req.nextUrl.searchParams.get("search") || "";
-    const tag = req.nextUrl.searchParams.get("tag") || "";
+    const businessType = req.nextUrl.searchParams.get("businessType") || "";
+    const type = req.nextUrl.searchParams.get("type") || "";
     const page = parseInt(req.nextUrl.searchParams.get("page") || "1", 10);
     const pageSize = 20;
 
@@ -17,8 +18,11 @@ export async function GET(req: NextRequest) {
     if (search) {
       where.title = { contains: search, mode: "insensitive" };
     }
-    if (tag) {
-      where.tags = { has: tag };
+    if (businessType) {
+      where.businessType = businessType;
+    }
+    if (type) {
+      where.type = type;
     }
 
     const [items, total] = await Promise.all([
@@ -27,7 +31,8 @@ export async function GET(req: NextRequest) {
         select: {
           id: true,
           title: true,
-          tags: true,
+          businessType: true,
+          type: true,
           refCount: true,
           createdAt: true,
           updatedAt: true,
