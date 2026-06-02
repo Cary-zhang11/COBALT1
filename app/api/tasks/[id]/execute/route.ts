@@ -83,8 +83,8 @@ export async function POST(
     if (referenceFiles && referenceFiles.length > 0) {
       for (const ref of referenceFiles) {
         try {
-          // 从路径中提取 uuid：uploads/knowledge/{uuid}.md 或 uploads/history/{uuid}.md
-          const knowledgeMatch = ref.sourcePath.match(/uploads\/(knowledge|history)\/([a-f0-9-]+)\.md$/i);
+          // 从路径中提取 uuid：uploads/knowledge/{uuid}.md 或 uploads/history/{uuid}.md（兼容 \ 和 /）
+          const knowledgeMatch = ref.sourcePath.match(/uploads[\\/](knowledge|history)[\\/]([a-f0-9-]+)\.md$/i);
           if (knowledgeMatch) {
             const knowledgeId = knowledgeMatch[2];
             await prisma.knowledge.update({
