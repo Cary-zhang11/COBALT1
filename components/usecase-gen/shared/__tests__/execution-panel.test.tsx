@@ -4,7 +4,8 @@ import { ExecutionPanel } from "../execution-panel";
 
 const defaultConfig = {
   source: "文本输入",
-  fewShot: "1 份",
+  knowledge: "2 份",
+  history: "1 份",
 };
 
 const noop = () => {};

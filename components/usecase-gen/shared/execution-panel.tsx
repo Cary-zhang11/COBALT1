@@ -20,7 +20,8 @@ interface ExecutionPanelProps {
   isTweak?: boolean;
   configSummary: {
     source: string;
-    fewShot: string;
+    knowledge: string;
+    history: string;
   };
   foundFiles: FileInfo[];
   /** Completed stages parsed from [WF:done:xxx] log markers */
@@ -111,7 +112,8 @@ export function ExecutionPanel({
           <div className="bg-muted rounded-lg p-3 space-y-2">
             {[
               ["物料来源", configSummary.source],
-              ["few-shot", configSummary.fewShot],
+              ["参考知识", configSummary.knowledge],
+              ["历史范文", configSummary.history],
               ["输出格式", "XMind + Markdown"],
             ].map(([label, value]) => (
               <div
