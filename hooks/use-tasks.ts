@@ -68,9 +68,16 @@ export function useCreateTask() {
 export function useExecuteTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (taskId: string) => {
-      const res = await fetch(`/api/tasks/${taskId}/execute`, {
+    mutationFn: async (input: {
+      taskId: string;
+      referenceFiles?: { sourcePath?: string; sourceTaskId?: string; mdFileName?: string; subdir: string; destName: string }[];
+    }) => {
+      const res = await fetch(`/api/tasks/${input.taskId}/execute`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          referenceFiles: input.referenceFiles,
+        }),
       });
       if (!res.ok) {
         const err = await res.json();

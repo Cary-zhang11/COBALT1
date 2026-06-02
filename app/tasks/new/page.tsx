@@ -133,7 +133,7 @@ export default function NewTaskPage() {
     });
     uploadedFilesRef.current = [];
 
-    await executeTask.mutateAsync(result.taskId);
+    await executeTask.mutateAsync({ taskId: result.taskId });
     router.push(`/tasks/${result.taskId}/execute`);
   };
 
