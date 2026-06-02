@@ -133,19 +133,19 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       kpi: {
-        totalCases: totalAgg._sum.totalCases || 0,
+        totalCases: totalAgg._sum?.totalCases || 0,
         monthlyActiveUsers: mauResult.length,
-        avgQualityScore: Math.round(avgAgg._avg.qualityScore || 0),
-        avgDuration: Math.round(avgAgg._avg.duration || 0),
+        avgQualityScore: Math.round(avgAgg._avg?.qualityScore || 0),
+        avgDuration: Math.round(avgAgg._avg?.duration || 0),
       },
       dailyTrend,
       categoryDistribution,
       dimensionCoverage,
       topUsers,
       efficiency: {
-        avgScore: Math.round(avgAgg._avg.qualityScore || 0),
-        avgDuration: Math.round(avgAgg._avg.duration || 0),
-        avgTokens: Math.round(avgAgg._avg.tokenUsage || 0),
+        avgScore: Math.round(avgAgg._avg?.qualityScore || 0),
+        avgDuration: Math.round(avgAgg._avg?.duration || 0),
+        avgTokens: Math.round(avgAgg._avg?.tokenUsage || 0),
         editRate: totalCompleted > 0 ? Math.round((editedCount / totalCompleted) * 100) / 100 : 0,
       },
       recentRecords: recent.map((r) => ({
