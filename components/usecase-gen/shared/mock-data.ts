@@ -1,12 +1,5 @@
 import type { UsecaseModule } from "./types";
 
-export interface MockRecentReq {
-  id: number;
-  name: string;
-  date: string;
-  count: number;
-}
-
 export interface MockKPICard {
   label: string;
   value: string;
@@ -37,11 +30,6 @@ export interface MockPromptTemplate {
   content: string;
 }
 
-export const mockRecentReqs: MockRecentReq[] = [
-  { id: 1, name: "用户登录与权限管理 v2.3", date: "2026-05-24", count: 48 },
-  { id: 2, name: "商品详情页改版需求", date: "2026-05-22", count: 32 },
-];
-
 export const mockDefaultTree: UsecaseModule[] = [
   {
     name: "1. 登录模块", open: true, cases: [
@@ -58,12 +46,6 @@ export const mockKPICards: MockKPICard[] = [
   { label: "平均质量分", value: "88.6", trend: 5, color: "text-green-600", bg: "bg-green-50", icon: BarChart3 },
   { label: "平均生成耗时", value: "4.2s", trend: -8, color: "text-amber-600", bg: "bg-amber-50", icon: Timer, reverse: true },
 ];
-
-export interface MockFewShot {
-  name: string;
-  count: number;
-  selected: boolean;
-}
 
 export interface MockCapability {
   name: string;
@@ -87,12 +69,6 @@ export interface MockKBItem {
   tags: string[];
   refs: number;
 }
-
-export const mockFewShotExamples: MockFewShot[] = [
-  { name: "登录鉴权用例集", count: 24, selected: false },
-  { name: "表单验证通用用例", count: 18, selected: true },
-  { name: "异常处理边界用例", count: 31, selected: false },
-];
 
 export const mockCapabilities: MockCapability[] = [
   { name: "业务域知识库", desc: "自动检索业务规则和历史文档", selected: true },

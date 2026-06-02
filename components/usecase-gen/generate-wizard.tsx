@@ -9,9 +9,7 @@ import { OutputFiles } from "./shared/output-files";
 import { AITweakPanel } from "./shared/ai-tweak-panel";
 
 import { ModuleOverviewTable } from "./shared/module-overview-table";
-import {
-  mockRecentReqs, mockFewShotExamples,
-} from "./shared/mock-data";
+
 import type { UsecaseModule, TweakEntry } from "./shared/types";
 import {
   Upload, Loader2, FileText, CheckCircle2, ArrowLeft, ChevronRight,
