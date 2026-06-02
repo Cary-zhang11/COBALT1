@@ -576,8 +576,10 @@ export function GenerateWizard({
                 <p className="text-sm text-muted-foreground">{genStatus || "正在解析需求文档..."}</p>
                 <p className="text-xs text-muted-foreground mt-3">正在扫描输出文件，请稍候...</p>
                 <button
-                  onClick={() => {
-                    cancelTask.mutate(taskId!);
+                  onClick={async () => {
+                    try {
+                      await cancelTask.mutateAsync(taskId!);
+                    } catch { /* fall through */ }
                     scanner.stop();
                     setGenerating(false);
                     setGenStatus("");
@@ -697,8 +699,10 @@ export function GenerateWizard({
                     setGenerating(true);
                     setGenStatus("正在微调用例...");
                   }}
-                  onCancelTweak={() => {
-                    cancelTask.mutate(taskId!);
+                  onCancelTweak={async () => {
+                    try {
+                      await cancelTask.mutateAsync(taskId!);
+                    } catch { /* fall through */ }
                     scanner.stop();
                     setGenerating(false);
                     setGenStatus("");
