@@ -134,9 +134,11 @@ export async function startTaskExecution(
             } catch { /* non-critical */ }
           }
           // Write duration FIRST so report API sees it
+          const elapsed = Date.now() - startTime;
+          console.log(`[task-engine] output_complete: setting duration=${elapsed}ms for taskId="${taskId}"`);
           await prisma.task.update({
             where: { id: taskId },
-            data: { duration: Date.now() - startTime },
+            data: { duration: elapsed },
           });
           await saveOutputAndReport(taskId);
         }
@@ -273,9 +275,11 @@ export async function resumeTask(
             } catch { /* non-critical */ }
           }
           // Write duration FIRST so report API sees it
+          const elapsed = previousDuration + (Date.now() - startTime);
+          console.log(`[task-engine] resume output_complete: setting duration=${elapsed}ms (prev=${previousDuration}) for taskId="${taskId}"`);
           await prisma.task.update({
             where: { id: taskId },
-            data: { duration: previousDuration + (Date.now() - startTime) },
+            data: { duration: elapsed },
           });
           await saveOutputAndReport(taskId);
         }

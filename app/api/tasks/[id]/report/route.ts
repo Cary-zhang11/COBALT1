@@ -138,6 +138,7 @@ export async function GET(
 
     const outputFiles = buildFileEntries(params.id, fileList);
 
+    console.log(`[report] taskId="${params.id}" status="${task.status}" duration=${task.duration} outputFiles=${fileList.length}`);
     return NextResponse.json({
       status: task.status,
       tree: report.tree ?? null,
