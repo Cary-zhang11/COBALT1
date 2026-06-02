@@ -40,6 +40,8 @@ model Knowledge {
 | `type` | 新增 | `"knowledge"` = 业务知识，`"history_uploaded"` = 手动上传历史用例 |
 | `businessType` | 新增 | 业务知识 Tab 可选（允许 null），手动上传 Tab 必选 |
 
+**旧数据兼容：** 现有 Knowledge 为 mock 数据，`content` 语义变更后直接覆盖，无需迁移。
+
 ### Task 表
 
 ```prisma
@@ -88,7 +90,7 @@ uploads/
 |------|------|----------|
 | GET | `/api/knowledge` | `tag` 参数移除，改用 `businessType` + `type` + `search` |
 | POST | `/api/knowledge` | JSON body → FormData（md 文件上传），后端读文件写入磁盘，content 存路径 |
-| GET | `/api/knowledge/:id` | 返回值新增 `businessType`、`type` |
+| GET | `/api/knowledge/:id` | 返回元数据（title、businessType、type、日期等），**不含文件内容** |
 | PUT | `/api/knowledge/:id` | 支持更新 `title`、`content`（编辑后文本写回文件）、`businessType` |
 | DELETE | `/api/knowledge/:id` | 删 DB 记录 + 删磁盘文件（文件不存在时不阻塞） |
 | GET | `/api/knowledge/:id/download` | **新增** — 读磁盘文件，`Content-Disposition: attachment` 触发下载 |
@@ -110,7 +112,11 @@ uploads/
 
 **上传：** 前端 FormData → 后端校验后缀 `.md` + 文件 ≤ 5MB → 写入 `uploads/{knowledge\|history}/{uuid}.md` → DB 记录 content=相对路径，title=原始文件名，type=上下文类型
 
-**下载：** GET `/:id/download` → 读 `content` 路径文件 → `Content-Disposition: attachment; filename="{title}.md"` → 浏览器触发下载
+**预览：** 前端 fetch `GET /:id/download` → 拿 Markdown 文本 → `<ReactMarkdown>` 渲染。与平台生成历史预览机制统一。
+
+**下载：** 浏览器直接访问 `GET /:id/download` → 读 `content` 路径文件 → `Content-Disposition: attachment; filename="{title}.md"` → 浏览器触发下载
+
+**路径安全：** 下载/预览接口需校验 `content` 路径在 `uploads/` 目录内，防止路径穿越攻击（参照 `lib/sandbox.ts` 的 `validatePath` 模式）
 
 **删除：** 删 DB 记录 → `fs.unlink(content路径)` → 文件不存在时 catch 不抛错
 
@@ -150,7 +156,8 @@ uploads/
 - **列表项**：文件名 + 业务类型标签 + 日期 + 引用次数 + 预览 / 下载 / 删除
 - **添加**：底部 "+ 上传 md 文件" 按钮 → 打开共用上传弹窗
 - **上传弹窗**：文件选择（仅 .md）+ 业务类型下拉（可选）+ 标题输入（默认取文件名）
-- **预览**：Markdown 渲染模态框（从磁盘读文件内容）
+- **预览**：Markdown 渲染模态框（调 download 接口取文件内容），顶部有"编辑"按钮
+- **编辑**：预览框内点击"编辑"→ 切换为 textarea 显示 Markdown 源码 → 修改后点"保存"调 PUT 写回磁盘文件 → 切回预览模式
 - **下载**：触发浏览器下载 .md 文件
 
 ### 历史用例 Tab
@@ -168,7 +175,31 @@ uploads/
 - 数据来源：Knowledge 表（type = "history_uploaded"）
 - 筛选项：搜索框 + 全部 / C1C / C1B / C2C / C2B / 数科 / 车小妹（无"未分类"）
 - 列表项：文件名 + 业务类型标签 + 日期 + 预览 / 下载 / 删除
+- 预览：同业务知识，调 download 接口渲染 Markdown + 编辑切换
 - 上传弹窗：和业务知识共用组件，businessType **必选**
+
+### 预览/编辑弹窗（业务知识 & 手动上传历史共用）
+
+```
+阅读模式                           编辑模式
+┌──────────────────────────┐      ┌──────────────────────────┐
+│  xxx.md      [编辑] [✕]  │      │  xxx.md      [预览] [✕]  │
+├──────────────────────────┤      ├──────────────────────────┤
+│                          │      │                          │
+│  ┌──────────────────┐    │      │  ┌──────────────────┐    │
+│  │ Markdown 渲染     │    │ 点击  │ │ # Markdown 源码  │    │
+│  │                  │    │ ──→  │ │                  │    │
+│  │                  │    │      │ │                  │    │
+│  └──────────────────┘    │      │ └──────────────────┘    │
+│                          │      │                          │
+│         [关闭]  [下载]   │      │    [取消]  [保存]        │
+└──────────────────────────┘      └──────────────────────────┘
+```
+
+- 默认进入阅读模式，Markdown 渲染展示
+- 点击"编辑"→ 切换 textarea 编辑 Markdown 源码
+- 点击"保存"→ 调 PUT 写回磁盘文件 → 切回阅读模式
+- 点击"下载"→ 浏览器触发下载 .md 文件
 
 ### 共用上传弹窗
 
@@ -206,7 +237,6 @@ uploads/
 | 文件 | 说明 |
 |------|------|
 | `app/api/knowledge/[id]/download/route.ts` | 知识项下载接口 |
-| `app/api/tasks/[id]/route.ts` 新增 PATCH | Task businessType 更新 |
 | `components/usecase-gen/shared/upload-modal.tsx` | 共用上传弹窗组件 |
 
 ### 修改文件
@@ -217,6 +247,7 @@ uploads/
 | `app/api/knowledge/route.ts` | GET 改用 businessType/type 筛选；POST 改为 FormData + 文件写入 |
 | `app/api/knowledge/[id]/route.ts` | PUT 支持 businessType/content；DELETE 增加删磁盘文件 |
 | `app/api/knowledge/history/route.ts` | 返回增加 businessType，新增筛选参数 |
+| `app/api/tasks/[id]/route.ts` | 新增 PATCH handler，更新 Task.businessType |
 | `components/usecase-gen/knowledge-base.tsx` | 整体重写：标签筛选→业务类型筛选、新增上传/下载、历史拆分两个子 Tab |
 
 ### 现有标签处理
@@ -238,3 +269,5 @@ uploads/
 - PATCH 分配业务类型成功
 - 预览模态框正确渲染 Markdown
 - 旧数据 tags 置空，businessType 为 null，UI 正常展示
+- 预览弹窗编辑模式：textarea 显示源码 → 修改 → 保存 → 文件内容更新
+- 下载接口拒绝路径穿越（content 包含 `../` 等非法路径返回 403）
