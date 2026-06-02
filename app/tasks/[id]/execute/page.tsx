@@ -54,18 +54,18 @@ export default function TaskExecutePage() {
   // Show initial prompt at top when task loads
   const [initialPromptShown, setInitialPromptShown] = useState(false);
   useEffect(() => {
-    if (!initialPromptShown && task?.input) {
+    if (!initialPromptShown && taskData?.task?.input) {
       setInitialPromptShown(true);
       setDisplayMessages((prev) => [
         {
           id: "initial-prompt",
           type: "user_input",
-          content: task.input,
+          content: taskData.task.input,
         },
         ...prev,
       ]);
     }
-  }, [task?.input, initialPromptShown]);
+  }, [taskData?.task?.input, initialPromptShown]);
 
   // Append new SSE logs to display
   useEffect(() => {
