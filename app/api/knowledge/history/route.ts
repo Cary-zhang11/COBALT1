@@ -55,7 +55,14 @@ export async function GET(req: NextRequest) {
         const report = t.report as Record<string, unknown> | null;
         const summary = report?.summary as Record<string, unknown> | undefined;
         const outputFiles = t.outputFiles as string[] | null;
-        const mdFile = outputFiles?.find((f: string) => f.endsWith(".md") && f.includes("测试用例")) || "";
+        const mdFiles = (outputFiles || []).filter((f: string) => f.endsWith(".md") && f.includes("测试用例"));
+        // 取最高版本：按文件名中 _vN 后缀排序，无版本号视为 v0
+        mdFiles.sort((a, b) => {
+          const vA = (a.match(/_v(\d+)/) || [])[1];
+          const vB = (b.match(/_v(\d+)/) || [])[1];
+          return (vB ? parseInt(vB, 10) : 0) - (vA ? parseInt(vA, 10) : 0);
+        });
+        const mdFile = mdFiles[0] || "";
         return {
           id: t.id,
           req: (t.input || "").slice(0, 60),
