@@ -48,7 +48,8 @@ export async function POST(
                 ref.mdFileName || ""
               );
             } else if (ref.sourcePath) {
-              sourcePath = path.resolve(process.cwd(), ref.sourcePath);
+              // Knowledge.content 存的是 "knowledge/{uuid}.md"，resolve 时补上 uploads/ 前缀
+              sourcePath = path.resolve(process.cwd(), "uploads", ref.sourcePath);
             } else {
               console.warn(`[execute] skipping reference: no sourcePath or sourceTaskId`, ref);
               continue;
