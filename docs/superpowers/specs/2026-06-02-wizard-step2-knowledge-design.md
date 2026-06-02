@@ -43,25 +43,28 @@
     │
     ├── 业务知识（Knowledge 表 type=knowledge）
     │     content = "uploads/knowledge/{uuid}.md"
+    │     title → 用作目标文件名（如 "用户认证业务规则.md"）
     │
     ├── 手动上传历史（Knowledge 表 type=history_uploaded）
     │     content = "uploads/history/{uuid}.md"
+    │     title → 用作目标文件名
     │
     └── 平台生成历史（Task 表）
-          outputFiles = "测试用例_v3.md"
-          完整路径 = "sandbox/{taskId}/output/测试用例_v3.md"
+          mdFileName = "测试用例_v3.md"
+          sourceTaskId = task.id
+          完整源路径 = "sandbox/{sourceTaskId}/output/测试用例_v3.md"
     │
     ▼
 startGenerate() 收集勾选项 →
     referenceFiles: [
-      { sourcePath, subdir: "knowledge" | "history" }
+      { sourcePath, subdir, destName }
     ]
     │
     ▼
-createTask({ ..., referenceFiles })
+executeTask({ taskId, referenceFiles })    ← 走 execute，不存 DB
     │
     ▼
-copyFilesToWorkspace() 按子目录复制
+copyFilesToWorkspace() 按子目录复制，用 destName 命名
     │
     ▼
 sandbox/{newTaskId}/workspace/
@@ -98,12 +101,12 @@ export async function copyFilesToWorkspace(
 export async function copyFilesToWorkspace(
   taskId: string,
   filePaths: string[],
-  referenceFiles?: { sourcePath: string; subdir: string }[]
+  referenceFiles?: { sourcePath: string; subdir: string; destName: string }[]
 ): Promise<string[]>
 ```
 
 - `filePaths`：需求文档（平铺到 workspace 根目录），行为不变
-- `referenceFiles`：知识/历史文件，复制到 workspace/{subdir}/{basename}
+- `referenceFiles`：`sourcePath`=源文件路径，`subdir`=目标子目录，`destName`=目标文件名（如 `用户认证业务规则.md`）
 
 **路径安全：** `sourcePath` 需校验在 `uploads/` 或 `sandbox/` 目录内。
 
@@ -116,7 +119,7 @@ export async function copyFilesToWorkspace(
 | `components/usecase-gen/generate-wizard.tsx` | 修改 | Step 2 换掉 mock → 真实 API + 勾选逻辑；`startGenerate()` 传 referenceFiles |
 | `lib/sandbox.ts` | 修改 | `copyFilesToWorkspace` 支持 referenceFiles 子目录参数 |
 | `lib/task-engine.ts` | 修改 | `startTaskExecution` 接收并传入 referenceFiles |
-| `app/api/tasks/[id]/execute/route.ts` | 修改 | POST body 新增 `referenceFiles` 参数 |
+| `app/api/tasks/[id]/execute/route.ts` | 修改 | POST body 新增 `referenceFiles`，负责将 `sourcePath`/`sourceTaskId` 解析为绝对路径后传入 `copyFilesToWorkspace` |
 | `hooks/use-tasks.ts` | 修改 | `useExecuteTask` 支持传入 `referenceFiles` |
 | `components/usecase-gen/shared/mock-data.ts` | 修改 | 删除已不再使用的 `mockRecentReqs`、`mockFewShotExamples` |
 
@@ -134,11 +137,16 @@ const startGenerate = async () => {
   const referenceFiles = [
     ...selectedKnowledge.map(id => {
       const k = knowledgeItems.find(item => item.id === id);
-      return { sourcePath: `uploads/knowledge/${path.basename(k.content)}`, subdir: "knowledge" };
+      return {
+        sourcePath: k.content,                    // "uploads/knowledge/{uuid}.md"
+        subdir: "knowledge" as const,
+        destName: (k.title || "untitled") + ".md", // "用户认证业务规则.md"
+      };
     }),
     ...selectedHistory.map(item => ({
-      sourcePath: item.sourcePath,
+      sourcePath: item.sourcePath,                 // Knowledge: content字段; 平台生成: "sandbox/{item.id}/output/{item.mdFileName}"
       subdir: "history" as const,
+      destName: item.displayName,                  // 展示文件名 (mdFileName 或 title)
     })),
   ];
 
@@ -155,13 +163,17 @@ const startGenerate = async () => {
 
 > **注意：** `referenceFiles` 不存 Task 表，通过 execute API 直接传给 `startTaskExecution()` → `copyFilesToWorkspace()`。生成完成后 reference 文件随沙箱一起被清理。
 
+> **sourcePath 来源：**
+> - 业务知识/手动上传历史：`Knowledge.content`（如 `uploads/knowledge/{uuid}.md`）
+> - 平台生成历史：`getOutputPath(sourceTaskId) + "/" + mdFileName`，在 wizard 中通过 API 获取或由 history API 返回
+
 ### copyFilesToWorkspace() 改动
 
 ```typescript
 export async function copyFilesToWorkspace(
   taskId: string,
   filePaths: string[],
-  referenceFiles?: { sourcePath: string; subdir: string }[]
+  referenceFiles?: { sourcePath: string; subdir: string; destName: string }[]
 ): Promise<string[]> {
   const workspaceDir = getWorkspacePath(taskId);
   await fs.mkdir(workspaceDir, { recursive: true });
@@ -175,12 +187,12 @@ export async function copyFilesToWorkspace(
     copied.push(dest);
   }
 
-  // 新增：reference 文件按子目录复制
+  // 新增：reference 文件按子目录复制，使用 destName 命名
   if (referenceFiles) {
     for (const ref of referenceFiles) {
       const subDir = path.join(workspaceDir, ref.subdir);
       await fs.mkdir(subDir, { recursive: true });
-      const dest = path.join(subDir, path.basename(ref.sourcePath));
+      const dest = path.join(subDir, ref.destName);
       await fs.copyFile(ref.sourcePath, dest);
       copied.push(dest);
     }
@@ -208,7 +220,7 @@ AI skill prompt 中增加一句：
 | 场景 | 处理 |
 |------|------|
 | 勾选文件在生成前被删除 | `startGenerate` 执行时 `fs.copyFile` 失败 → 跳过该文件，记录日志 |
-| 同名文件 | 使用原始文件名，同 subdir 内冲突时加数字后缀 (1)、(2) |
+| 同名文件 | `destName` 用 title/mdFileName 命名，通常不会冲突；万一冲突加 `(2)` 后缀 |
 | 平台生成历史源 sandbox 已清理 | `fs.copyFile` 失败 → 跳过，记录日志 |
 | 用户一个都不选 | referenceFiles 为空数组，正常生成 |
 | 选中文件路径穿越 | `sourcePath` 校验必须含 `uploads/` 或 `sandbox/` 前缀 |
