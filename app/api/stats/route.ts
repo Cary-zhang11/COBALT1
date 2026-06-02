@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const completedFilter = {
-      status: { in: ["completed", "paused"] },
+      status: { in: ["completed"] },
     };
 
     // KPI

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import {
   BarChart3, Users, Target, Clock, Loader2,
 } from "lucide-react";
@@ -44,6 +45,14 @@ function formatDuration(ms: number): string {
 }
 
 export function Dashboard() {
+  // Remove focus outline from recharts clickable elements
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = `.recharts-sector:focus, .recharts-rectangle:focus, .recharts-layer:focus { outline: none !important; }`;
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
+
   const { data, isLoading, error } = useQuery<StatsData>({
     queryKey: ["stats"],
     queryFn: () => fetch("/api/stats").then((r) => r.json()),
@@ -67,8 +76,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-6 dashboard-charts">
-      <style>{`.dashboard-charts .recharts-sector:focus, .dashboard-charts .recharts-rectangle:focus, .dashboard-charts .recharts-wrapper:focus { outline: none !important; }`}</style>
+    <div className="flex-1 overflow-auto p-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         {[

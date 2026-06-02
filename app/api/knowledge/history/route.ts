@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {
-      status: { in: ["completed", "paused"] },
+      status: { in: ["completed"] },
       report: { not: null },
     };
     if (search) {
