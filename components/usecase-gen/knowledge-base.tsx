@@ -34,11 +34,9 @@ interface HistoryItem {
 }
 
 const MAIN_TABS = ["业务知识", "历史用例"];
-const HISTORY_SUB_TABS = ["平台生成", "手动上传"];
 
 export function KnowledgeBase() {
   const [mainTab, setMainTab] = useState(0);
-  const [historySubTab, setHistorySubTab] = useState(0);
   const [search, setSearch] = useState("");
   const [businessTypeFilter, setBusinessTypeFilter] = useState("");
 
@@ -84,7 +82,7 @@ export function KnowledgeBase() {
       if (businessTypeFilter) params.set("businessType", businessTypeFilter);
       return fetch(`/api/knowledge?${params}`).then((r) => r.json());
     },
-    enabled: mainTab === 1 && historySubTab === 1,
+    enabled: mainTab === 1,
   });
 
   // 平台生成历史
@@ -96,7 +94,7 @@ export function KnowledgeBase() {
       if (businessTypeFilter) params.set("businessType", businessTypeFilter);
       return fetch(`/api/knowledge/history?${params}`).then((r) => r.json());
     },
-    enabled: mainTab === 1 && historySubTab === 0,
+    enabled: mainTab === 1,
   });
 
   // ---- Mutations ----
@@ -218,67 +216,6 @@ export function KnowledgeBase() {
     );
   }
 
-  function renderPlatformHistoryItem(item: HistoryItem) {
-    return (
-      <div key={item.id} className="bg-card rounded-xl shadow-sm p-4 flex items-center gap-4">
-        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-          <FileText className="w-5 h-5 text-muted-foreground" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{item.mdFileName}</p>
-          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-            <span>{item.createdAt}</span>
-            <span>{item.userName}</span>
-            <span>{item.totalCases} 用例</span>
-            <span>质量分 {item.qualityScore}</span>
-            <span>{item.modules} 模块</span>
-            <BusinessTypeBadge type={item.businessType} />
-          </div>
-        </div>
-        <div className="text-center flex-shrink-0">
-          <p className="text-lg font-bold text-cyan-500">{item.refCount}</p>
-          <p className="text-xs text-muted-foreground">引用次数</p>
-        </div>
-        <div className="flex gap-2 items-center">
-          <button
-            onClick={() => {
-              setPlatformPreviewFile(item.mdFileName);
-              setPlatformPreviewTaskId(item.id);
-            }}
-            className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30"
-          >
-            预览
-          </button>
-          <button
-            onClick={() => window.open(`/api/tasks/${item.id}/download?file=${encodeURIComponent(item.mdFileName)}`, "_blank")}
-            className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30 flex items-center gap-1"
-          >
-            <Download className="w-3 h-3" />下载
-          </button>
-          {/* 分配业务类型下拉 */}
-          <div className="relative group">
-            <button className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30 flex items-center gap-1">
-              分配类型 <ChevronDown className="w-3 h-3" />
-            </button>
-            <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg p-1 hidden group-hover:block z-10 min-w-[80px]">
-              {BUSINESS_TYPES.map((bt) => (
-                <button
-                  key={bt}
-                  onClick={() => assignBusinessTypeMutation.mutate({ taskId: item.id, bt })}
-                  className={`block w-full text-left px-3 py-1.5 text-xs rounded hover:bg-muted whitespace-nowrap ${
-                    item.businessType === bt ? "text-primary font-medium" : ""
-                  }`}
-                >
-                  {bt}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // ---- Filter sidebar ----
 
   const filterOptionsForKnowledge = ["全部", ...BUSINESS_TYPES];
@@ -340,8 +277,7 @@ export function KnowledgeBase() {
           </div>
 
           {mainTab === 0 && renderFilter(filterOptionsForKnowledge)}
-          {mainTab === 1 && historySubTab === 0 && renderFilter(filterOptionsForHistoryPlatform)}
-          {mainTab === 1 && historySubTab === 1 && renderFilter(filterOptionsForKnowledge)}
+          {mainTab === 1 && renderFilter(filterOptionsForHistoryPlatform)}
         </div>
 
         {/* Content area */}
@@ -373,59 +309,132 @@ export function KnowledgeBase() {
           {/* 历史用例 Tab */}
           {mainTab === 1 && (
             <div>
-              {/* Sub-tabs */}
-              <div className="bg-card rounded-xl shadow-sm p-1 flex gap-1 mb-4 w-fit">
-                {HISTORY_SUB_TABS.map((t, i) => (
-                  <button
-                    key={i}
-                    onClick={() => { setHistorySubTab(i); setBusinessTypeFilter(""); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      historySubTab === i ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
+              {(historyLoading || uploadedLoading) ? (
+                <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" /></div>
+              ) : (
+                <>
+                  {/* 合并列表 */}
+                  <div className="space-y-2">
+                    {/* 平台生成 */}
+                    {(historyData?.items || []).map((item) => {
+                      // 用 prefix 区分 key
+                      return (
+                        <div key={`platform-${item.id}`} className="bg-card rounded-xl shadow-sm p-4 flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium truncate">{item.mdFileName}</p>
+                              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 rounded flex-shrink-0">平台生成</span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                              <span>{item.createdAt}</span>
+                              <span>{item.userName}</span>
+                              <span>{item.totalCases} 用例</span>
+                              <span>质量分 {item.qualityScore}</span>
+                              <span>{item.modules} 模块</span>
+                              <BusinessTypeBadge type={item.businessType} />
+                            </div>
+                          </div>
+                          <div className="text-center flex-shrink-0">
+                            <p className="text-lg font-bold text-cyan-500">{item.refCount || 0}</p>
+                            <p className="text-xs text-muted-foreground">引用次数</p>
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <button
+                              onClick={() => {
+                                setPlatformPreviewFile(item.mdFileName);
+                                setPlatformPreviewTaskId(item.id);
+                              }}
+                              className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30"
+                            >
+                              预览
+                            </button>
+                            <button
+                              onClick={() => window.open(`/api/tasks/${item.id}/download?file=${encodeURIComponent(item.mdFileName)}`, "_blank")}
+                              className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30 flex items-center gap-1"
+                            >
+                              <Download className="w-3 h-3" />下载
+                            </button>
+                            <div className="relative group">
+                              <button className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30 flex items-center gap-1">
+                                分配类型 <ChevronDown className="w-3 h-3" />
+                              </button>
+                              <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg p-1 hidden group-hover:block z-10 min-w-[80px]">
+                                {BUSINESS_TYPES.map((bt) => (
+                                  <button
+                                    key={bt}
+                                    onClick={() => assignBusinessTypeMutation.mutate({ taskId: item.id, bt })}
+                                    className={`block w-full text-left px-3 py-1.5 text-xs rounded hover:bg-muted whitespace-nowrap ${
+                                      item.businessType === bt ? "text-primary font-medium" : ""
+                                    }`}
+                                  >
+                                    {bt}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
 
-              {/* 平台生成 */}
-              {historySubTab === 0 && (
-                <div>
-                  {historyLoading ? (
-                    <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" /></div>
-                  ) : (
-                    <div className="space-y-2">
-                      {(historyData?.items || []).map(renderPlatformHistoryItem)}
-                      {historyData?.items.length === 0 && (
-                        <p className="text-center text-muted-foreground py-8 text-sm">暂无平台生成的用例</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 手动上传 */}
-              {historySubTab === 1 && (
-                <div>
-                  {uploadedLoading ? (
-                    <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" /></div>
-                  ) : (
-                    <>
-                      <div className="space-y-2">
-                        {(uploadedData?.items || []).map(renderKnowledgeItem)}
-                        {uploadedData?.items.length === 0 && (
-                          <p className="text-center text-muted-foreground py-8 text-sm">暂无手动上传的用例</p>
-                        )}
+                    {/* 手动上传 */}
+                    {(uploadedData?.items || []).map((item) => (
+                      <div key={`uploaded-${item.id}`} className="bg-card rounded-xl shadow-sm p-4 flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                          <FileText className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium truncate">{item.title}</p>
+                            <span className="text-xs bg-green-100 text-green-700 px-1.5 rounded flex-shrink-0">手动上传</span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5">
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(item.updatedAt).toLocaleDateString("zh-CN")}
+                            </span>
+                            <BusinessTypeBadge type={item.businessType} />
+                          </div>
+                        </div>
+                        <div className="text-center flex-shrink-0">
+                          <p className="text-lg font-bold text-cyan-500">{item.refCount}</p>
+                          <p className="text-xs text-muted-foreground">引用次数</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openKnowledgePreview(item.id)}
+                            className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30"
+                          >
+                            预览
+                          </button>
+                          <button
+                            onClick={() => window.open(`/api/knowledge/${item.id}/download?download=1`, "_blank")}
+                            className="text-xs border border-border px-2.5 py-1 rounded-lg text-muted-foreground hover:border-primary/30 flex items-center gap-1"
+                          >
+                            <Download className="w-3 h-3" />下载
+                          </button>
+                          <button
+                            onClick={() => deleteMutation.mutate(item.id)}
+                            className="text-xs border border-red-200 text-red-500 px-2.5 py-1 rounded-lg hover:bg-red-50"
+                          >
+                            删除
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => { setUploadContext("history_uploaded"); setShowUpload(true); }}
-                        className="mt-4 w-full border-2 border-dashed border-border rounded-xl py-3 text-sm text-muted-foreground hover:border-cyan-500 hover:text-cyan-500 transition-all flex items-center justify-center gap-2"
-                      >
-                        <Plus className="w-4 h-4" />上传 md 文件
-                      </button>
-                    </>
-                  )}
-                </div>
+                    ))}
+                    {(!historyData?.items || historyData.items.length === 0) && (!uploadedData?.items || uploadedData.items.length === 0) && (
+                      <p className="text-center text-muted-foreground py-8 text-sm">暂无历史用例</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => { setUploadContext("history_uploaded"); setShowUpload(true); }}
+                    className="mt-4 w-full border-2 border-dashed border-border rounded-xl py-3 text-sm text-muted-foreground hover:border-cyan-500 hover:text-cyan-500 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />上传 md 文件
+                  </button>
+                </>
               )}
             </div>
           )}

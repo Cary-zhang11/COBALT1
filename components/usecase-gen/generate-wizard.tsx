@@ -66,7 +66,6 @@ export function GenerateWizard({
     sourcePath?: string;
     sourceTaskId?: string;
     mdFileName?: string;
-    source: string; // "平台生成" | "手动上传"
   }
 
   const { data: knowledgeData } = useQuery({
@@ -115,7 +114,6 @@ export function GenerateWizard({
         id: `knowledge:${item.id}`,
         displayName: (item.title || "untitled") + ".md",
         sourcePath: item.content,
-        source: "手动上传",
       });
     }
     const platform = (platformHistoryData as {
@@ -128,7 +126,6 @@ export function GenerateWizard({
         displayName: item.mdFileName,
         sourceTaskId: item.id,
         mdFileName: item.mdFileName,
-        source: "平台生成",
       });
     }
     return result;
@@ -662,12 +659,7 @@ export function GenerateWizard({
                           onChange={() => toggleHistory(opt.id)}
                           className="accent-cyan-500 w-3.5 h-3.5 flex-shrink-0"
                         />
-                        <div className="min-w-0 flex-1 flex items-center gap-2">
-                          <span className="text-sm truncate">{opt.displayName}</span>
-                          <span className={`text-[10px] px-1 rounded flex-shrink-0 ${
-                            opt.source === "平台生成" ? "bg-blue-100 text-blue-600" : "bg-amber-100 text-amber-600"
-                          }`}>{opt.source}</span>
-                        </div>
+                        <span className="text-sm truncate">{opt.displayName}</span>
                       </label>
                     ))
                   )}

@@ -32,24 +32,10 @@ describe("KnowledgeBase", () => {
     expect(screen.queryByText("标签筛选")).toBeNull();
   });
 
-  it("switches to history tab and shows sub-tabs", () => {
-    renderWithClient(<KnowledgeBase />);
-    fireEvent.click(screen.getByText("历史用例"));
-    expect(screen.getByText("平台生成")).toBeDefined();
-    expect(screen.getByText("手动上传")).toBeDefined();
-  });
-
-  it("shows 未分类 filter option when on 平台生成 sub-tab", () => {
+  it("switches to history tab and shows merged list with 未分类 filter", () => {
     renderWithClient(<KnowledgeBase />);
     fireEvent.click(screen.getByText("历史用例"));
     expect(screen.getByText("未分类")).toBeDefined();
-  });
-
-  it("does not show 未分类 filter when switching to 手动上传 sub-tab", () => {
-    renderWithClient(<KnowledgeBase />);
-    fireEvent.click(screen.getByText("历史用例"));
-    fireEvent.click(screen.getByText("手动上传"));
-    expect(screen.queryByText("未分类")).toBeNull();
   });
 
   it("renders without crashing", () => {
