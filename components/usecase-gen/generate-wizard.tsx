@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
 import { useQuery } from "@tanstack/react-query";
 import { useOutputScanner, maxXmindVersion, type FileInfo } from "@/hooks/use-output-scanner";

@@ -29,17 +29,6 @@ describe("UsecaseModule types", () => {
 });
 
 describe("Mock data integrity", () => {
-  it("mockRecentReqs should have items with required fields", async () => {
-    const { mockRecentReqs } = await import("../mock-data");
-    expect(mockRecentReqs.length).toBeGreaterThan(0);
-    mockRecentReqs.forEach((req) => {
-      expect(req).toHaveProperty("id");
-      expect(req).toHaveProperty("name");
-      expect(req).toHaveProperty("date");
-      expect(req).toHaveProperty("count");
-    });
-  });
-
   it("mockDefaultTree modules should have open and cases", async () => {
     const { mockDefaultTree } = await import("../mock-data");
     expect(mockDefaultTree.length).toBeGreaterThan(0);

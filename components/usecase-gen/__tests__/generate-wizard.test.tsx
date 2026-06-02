@@ -31,14 +31,21 @@ vi.mock("@/hooks/use-task-events", () => ({
   useTaskEvents: () => ({ logs: [], status: "idle", pausedData: null, disconnect: () => {} }),
 }));
 
+vi.mock("@tanstack/react-query", async () => {
+  const actual = await vi.importActual("@tanstack/react-query");
+  return {
+    ...(actual as object),
+    useQuery: () => ({ data: undefined }),
+    useMutation: () => ({ mutateAsync: vi.fn(), mutate: vi.fn(), isPending: false }),
+    useQueryClient: () => ({}),
+  };
+});
+
 import { GenerateWizard } from "../generate-wizard";
 
 const defaultProps = {
   onComplete: vi.fn(),
-  tweakHistoryMap: {},
-  onTweakHistoryUpdate: vi.fn(),
-  usecaseTree: null,
-  skillId: "test-skill-id",
+  skillId: "test-skill-id" as string | undefined,
 };
 
 describe("GenerateWizard", () => {
@@ -71,7 +78,7 @@ describe("GenerateWizard", () => {
     const nextBtn = screen.getByText("下一步：关联用例");
     await userEvent.click(nextBtn);
     // Step 1 content should be visible
-    expect(screen.getByText("复用历史用例作 few-shot")).toBeDefined();
+    expect(screen.getByText("历史用例范文")).toBeDefined();
   });
 
   it("can go back from Step 1 to Step 0", async () => {
