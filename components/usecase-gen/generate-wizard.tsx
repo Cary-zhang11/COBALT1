@@ -264,12 +264,22 @@ export function GenerateWizard({
           setLoadedFiles(fileInfos);
           onCompleteRef.current(tree, summary);
         } else {
-          // Files not ready — start scanner polling
-          if (cancelled) return;
-          setTaskId(initialTaskId);
-          setGenerating(true);
-          setGenStatus("正在加载...");
-          setWizStep(2);
+          // No tree/output yet — check task status
+          const taskStatus = (report as Record<string, unknown>).status as string | undefined;
+          if (taskStatus === "cancelled" || taskStatus === "failed") {
+            // Task ended without output — show result page with empty state
+            setTaskId(initialTaskId);
+            setGenerating(false);
+            setGenStatus("");
+            setWizStep(2);
+          } else {
+            // Files not ready — start scanner polling
+            if (cancelled) return;
+            setTaskId(initialTaskId);
+            setGenerating(true);
+            setGenStatus("正在加载...");
+            setWizStep(2);
+          }
         }
       } catch { /* fall through */ }
     })();

@@ -139,6 +139,7 @@ export async function GET(
     const outputFiles = buildFileEntries(params.id, fileList);
 
     return NextResponse.json({
+      status: task.status,
       tree: report.tree ?? null,
       summary: report.summary ?? { totalCases: 0, qualityScore: 0, modules: 0 },
       rawMarkdown: "",
