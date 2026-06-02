@@ -317,6 +317,21 @@ export function GenerateWizard({
       const names = uploadedFiles.map((f) => f.name).join(", ");
       input = input ? `${input}\n\n[附件: ${names}]` : `上传文件: ${names}`;
     }
+
+    // 拼接参考文件目录说明
+    const hasKnowledge = selectedKnowledgeIds.size > 0;
+    const hasHistory = selectedHistoryIds.size > 0;
+    if (hasKnowledge || hasHistory) {
+      input += "\n\n---\n## 工作目录参考文件说明\n\n";
+      input += "工作目录中除需求文档外，还包含以下参考文件，**你必须使用 Read 工具逐一读取这些文件**：\n\n";
+      if (hasKnowledge) {
+        input += "- **knowledge/** — 业务参考知识文档，包含业务规范、规则、流程说明。**请必须逐一读取其中的所有文件**，将其中的业务规则、术语定义、流程约束作为生成测试用例的依据。\n";
+      }
+      if (hasHistory) {
+        input += "- **history/** — 历史优秀用例范文，作为本次生成的风格和结构参考。**请必须逐一读取其中的所有文件**，参考其用例结构、步骤粒度、优先级划分方式。\n";
+      }
+      input += "\n先读取所有参考文件，再基于需求文档生成测试用例。\n";
+    }
     setWizStep(2);
     setGenerating(true);
     setGenStatus("正在解析需求文档...");
