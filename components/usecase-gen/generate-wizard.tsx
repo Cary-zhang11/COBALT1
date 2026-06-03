@@ -88,6 +88,10 @@ export function GenerateWizard({
   const [historyBusinessType, setHistoryBusinessType] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
 
+  // ---- 业务类型选择 ----
+  const [selectedBusinessType, setSelectedBusinessType] = useState<string>("");
+  const [businessTypeManuallySet, setBusinessTypeManuallySet] = useState(false);
+
   interface HistoryOption {
     id: string;
     displayName: string;
@@ -158,6 +162,23 @@ export function GenerateWizard({
     }
     return result;
   }, [uploadedHistoryData, platformHistoryData]);
+
+  // 从已选知识条目推算 businessType
+  const inferredBusinessType = useMemo(() => {
+    const items = (knowledgeData as { items?: { id: string; businessType: string | null }[] } | undefined)?.items || [];
+    for (const id of selectedKnowledgeIds) {
+      const item = items.find((i) => i.id === id);
+      if (item?.businessType) return item.businessType;
+    }
+    return null;
+  }, [selectedKnowledgeIds, knowledgeData]);
+
+  // 自动同步推算值到 selectedBusinessType（仅当未手选时）
+  useEffect(() => {
+    if (!businessTypeManuallySet) {
+      setSelectedBusinessType(inferredBusinessType || "");
+    }
+  }, [inferredBusinessType, businessTypeManuallySet]);
 
   function toggleKnowledge(id: string) {
     setSelectedKnowledgeIds((prev) => {
@@ -406,6 +427,7 @@ export function GenerateWizard({
         skillId,
         input,
         uploadedFiles: uploadedFiles.map((f) => f.path),
+        businessType: selectedBusinessType || undefined,
       });
       setTaskId(newTaskId);
 
@@ -586,6 +608,33 @@ export function GenerateWizard({
 
         {wizStep === 1 && (
           <div className="space-y-4 w-full">
+            {/* 业务类型选择 */}
+            <div className="bg-card rounded-xl shadow-sm border border-border/60 p-4 flex items-center gap-3 flex-wrap">
+              <label className="text-sm font-medium whitespace-nowrap">业务类型</label>
+              <select
+                value={businessTypeManuallySet ? selectedBusinessType : (inferredBusinessType || "auto")}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "auto") {
+                    setBusinessTypeManuallySet(false);
+                    setSelectedBusinessType(inferredBusinessType || "");
+                  } else {
+                    setBusinessTypeManuallySet(true);
+                    setSelectedBusinessType(val);
+                  }
+                }}
+                className="border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                <option value="auto">自动推算{inferredBusinessType ? `（${inferredBusinessType}）` : ""}</option>
+                {BUSINESS_TYPES.map((bt) => (
+                  <option key={bt} value={bt}>{bt}</option>
+                ))}
+              </select>
+              {!businessTypeManuallySet && !inferredBusinessType && (
+                <span className="text-xs text-muted-foreground">关联知识条目后自动推算</span>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* 左侧：业务知识 */}
               <div className="bg-card rounded-xl shadow-sm border border-border/60 p-5">
