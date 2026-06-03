@@ -65,14 +65,14 @@ export async function GET(req: NextRequest) {
         : 0,
     }));
 
-    // Category distribution
+    // Business type distribution
     const categoryResult = await prisma.task.groupBy({
-      by: ["category"],
+      by: ["businessType"],
       where: completedFilter,
       _count: true,
     });
     const categoryDistribution = categoryResult.map((r) => ({
-      category: r.category || "未分类",
+      category: r.businessType || "未分类",
       count: r._count,
     }));
 
