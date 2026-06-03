@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Star } from "lucide-react";
 
 interface RatingPanelProps {
@@ -15,6 +15,29 @@ export function RatingPanel({ taskId, sectioned }: RatingPanelProps) {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // 回显已有评价
+  useEffect(() => {
+    if (!taskId) return;
+    let cancelled = false;
+    fetch(`/api/tasks/${taskId}/feedback`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed");
+        return res.json();
+      })
+      .then((data: { rating: number | null; comment: string | null }) => {
+        if (cancelled) return;
+        if (data.rating != null) {
+          setRating(data.rating);
+          if (data.comment) setComment(data.comment);
+          setSubmitted(true);
+        }
+      })
+      .catch(() => {
+        // GET 失败 — 降级，保持空白交互状态
+      });
+    return () => { cancelled = true; };
+  }, [taskId]);
 
   if (!taskId) return null;
 
@@ -33,7 +56,20 @@ export function RatingPanel({ taskId, sectioned }: RatingPanelProps) {
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        setSubmitted(true);
+        // 重新 GET 确认服务端数据
+        try {
+          const confirmRes = await fetch(`/api/tasks/${taskId}/feedback`);
+          if (confirmRes.ok) {
+            const confirmed = await confirmRes.json();
+            setRating(confirmed.rating);
+            if (confirmed.comment) setComment(confirmed.comment);
+            setSubmitted(true);
+          } else {
+            setSubmitted(true);
+          }
+        } catch {
+          setSubmitted(true);
+        }
       } else {
         const data = await res.json();
         setError(data.error || "提交失败");
