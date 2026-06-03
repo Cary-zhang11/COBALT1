@@ -68,13 +68,18 @@
 .typing-dot:nth-child(1) { animation-delay: -0.32s; }
 .typing-dot:nth-child(2) { animation-delay: -0.16s; }
 
-/* Remove focus outline from recharts elements */
+/* Remove focus outline from recharts elements (axis ticks, pie sectors, etc.) */
 .recharts-wrapper,
 .recharts-wrapper:focus,
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible,
 .recharts-surface,
 .recharts-surface:focus,
 .recharts-layer,
 .recharts-layer:focus,
+.recharts-wrapper path:focus,
+.recharts-wrapper text:focus,
+.recharts-wrapper tspan:focus,
 svg:focus {
   outline: none !important;
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useTasks } from "@/hooks/use-tasks";
+import { getDisplayStatus } from "@/lib/task-display-status";
 import {
   Loader2, Clock, FileText, AlertCircle, RefreshCw,
 } from "lucide-react";
@@ -32,11 +33,16 @@ const FILTER_CHIPS = [
 type TaskRow = {
   id: string;
   status: string;
+  hasTestcaseOutput?: boolean;
   input: string;
   duration: number | null;
   tweakCount?: number;
   createdAt: string;
 };
+
+function resolveDisplayStatus(task: TaskRow): string {
+  return getDisplayStatus(task.status, task.hasTestcaseOutput === true);
+}
 
 function formatTaskTitle(input: string): string {
   const trimmed = (input || "").trim();
@@ -77,10 +83,11 @@ function formatTaskMeta(task: TaskRow): string {
 
 function taskMatchesStatusFilter(task: TaskRow, filter: string): boolean {
   if (!filter) return true;
+  const display = resolveDisplayStatus(task);
   if (filter === "active") {
-    return task.status === "running" || task.status === "pending";
+    return display === "running" || display === "pending";
   }
-  return task.status === filter;
+  return display === filter;
 }
 
 function taskMatchesSearch(task: TaskRow, query: string): boolean {
@@ -97,7 +104,8 @@ function HistoryListRow({
   task: TaskRow;
   onSelect: () => void;
 }) {
-  const statusConf = STATUS_CONFIG[task.status] || STATUS_CONFIG.pending;
+  const displayStatus = resolveDisplayStatus(task);
+  const statusConf = STATUS_CONFIG[displayStatus] || STATUS_CONFIG.pending;
 
   return (
     <div

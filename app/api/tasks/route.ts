@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
 import { createTask } from "@/lib/task-engine";
+import { taskHasTestcaseOutput } from "@/lib/task-display-status";
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,11 +16,27 @@ export async function GET(req: NextRequest) {
     if (status) where.status = status;
     if (skillId) where.skillId = skillId;
 
-    const tasks = await prisma.task.findMany({
+    const rows = await prisma.task.findMany({
       where,
-      include: { skill: { select: { name: true, description: true } } },
+      select: {
+        id: true,
+        status: true,
+        input: true,
+        duration: true,
+        tweakCount: true,
+        createdAt: true,
+        totalCases: true,
+        outputFiles: true,
+        report: true,
+        skill: { select: { name: true, description: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
+
+    const tasks = rows.map(({ report, totalCases, outputFiles, ...rest }) => ({
+      ...rest,
+      hasTestcaseOutput: taskHasTestcaseOutput({ totalCases, outputFiles, report }),
+    }));
 
     return NextResponse.json({ tasks });
   } catch (error) {

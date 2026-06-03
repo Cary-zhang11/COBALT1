@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  PieChart, Pie, Cell, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, ResponsiveContainer,
 } from "recharts";
 
 interface StatsData {
@@ -49,6 +49,40 @@ interface StatsData {
 }
 
 const PIE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
+
+/** 与 prd-to-tests 技能一致：D1–D7 为核心覆盖维度 */
+const MAIN_DIMENSIONS: { code: string; names: string[] }[] = [
+  { code: "D1", names: ["主流程"] },
+  { code: "D2", names: ["分支流程"] },
+  { code: "D3", names: ["异常与容错", "异常"] },
+  { code: "D4", names: ["边界条件", "边界"] },
+  { code: "D5", names: ["权限与安全", "权限安全", "权限"] },
+  { code: "D6", names: ["兼容性"] },
+  { code: "D7", names: ["性能"] },
+];
+
+function resolveMainDimensionCode(name: string): string | null {
+  const tagged = name.match(/（(D\d+)）/);
+  if (tagged) {
+    const code = tagged[1];
+    return MAIN_DIMENSIONS.some((d) => d.code === code) ? code : null;
+  }
+  for (const dim of MAIN_DIMENSIONS) {
+    if (dim.names.some((n) => name === n || name.startsWith(n))) return dim.code;
+  }
+  return null;
+}
+
+function filterMainDimensions(
+  data: { name: string; covered: number; total: number }[],
+): { name: string; covered: number; total: number }[] {
+  const order = new Map(MAIN_DIMENSIONS.map((d, i) => [d.code, i]));
+  return data
+    .map((item) => ({ item, code: resolveMainDimensionCode(item.name) }))
+    .filter((x): x is { item: typeof data[number]; code: string } => x.code !== null)
+    .sort((a, b) => (order.get(a.code) ?? 99) - (order.get(b.code) ?? 99))
+    .map((x) => x.item);
+}
 
 /** 对齐 preview .ant-stat-card / .ant-chart-card */
 const STAT_CARD =
@@ -258,43 +292,44 @@ function UserRatingCell({
 }
 
 function CoverageBarChart({ data }: { data: { name: string; covered: number; total: number }[] }) {
-  if (data.length === 0) {
+  const visible = filterMainDimensions(data);
+
+  if (visible.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
-        <p className="text-xs text-muted-foreground">暂无覆盖数据</p>
+        <p className="text-xs text-muted-foreground">暂无核心维度覆盖数据</p>
       </div>
     );
   }
 
-  const sorted = [...data].sort((a, b) => {
-    const rateA = a.total > 0 ? a.covered / a.total : 0;
-    const rateB = b.total > 0 ? b.covered / b.total : 0;
-    return rateB - rateA;
-  });
-
   return (
-    <div className="h-full flex flex-col gap-0.5 pt-1">
-      {sorted.map((dim) => {
-        const pct = dim.total > 0 ? Math.round((dim.covered / dim.total) * 100) : 0;
-        const barColor =
-          pct >= 80 ? "bg-emerald-400" :
-          pct >= 50 ? "bg-amber-400" :
-          "bg-red-400";
-        return (
-          <div key={dim.name} className="flex items-center gap-1.5 text-[10px]">
-            <span className="w-10 text-muted-foreground truncate shrink-0" title={dim.name}>
-              {dim.name}
-            </span>
-            <div className="flex-1 h-2 bg-muted/50 rounded-sm overflow-hidden">
-              <div
-                className={`h-full rounded-sm ${barColor} transition-all`}
-                style={{ width: `${Math.max(pct, 4)}%` }}
-              />
+    <div className="h-full flex flex-col min-h-0">
+      <div className="flex-1 min-h-0 flex flex-col gap-1 pt-1 justify-center">
+        {visible.map((dim) => {
+          const pct = dim.total > 0 ? Math.round((dim.covered / dim.total) * 100) : 0;
+          const barColor =
+            pct >= 80 ? "bg-emerald-400" :
+            pct >= 50 ? "bg-amber-400" :
+            "bg-red-400";
+          return (
+            <div key={dim.name} className="flex items-center gap-1.5 text-[10px] shrink-0">
+              <span
+                className="w-[5.5rem] text-muted-foreground truncate shrink-0"
+                title={dim.name}
+              >
+                {dim.name}
+              </span>
+              <div className="flex-1 h-2.5 bg-muted/50 rounded-sm overflow-hidden">
+                <div
+                  className={`h-full rounded-sm ${barColor} transition-all`}
+                  style={{ width: `${Math.max(pct, 4)}%` }}
+                />
+              </div>
+              <span className="w-7 text-right tabular-nums text-muted-foreground shrink-0">{pct}%</span>
             </div>
-            <span className="w-7 text-right tabular-nums text-muted-foreground shrink-0">{pct}%</span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -370,7 +405,7 @@ function DashboardBody({ data }: { data: StatsData }) {
             <h4 className="font-semibold text-sm text-foreground/85">每日生成量 &amp; 质量分趋势</h4>
             <TrendLegend />
           </div>
-          <div className="h-[176px] w-full">
+          <div className="h-[176px] w-full [&_.recharts-wrapper]:outline-none">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data.dailyTrend}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -385,7 +420,7 @@ function DashboardBody({ data }: { data: StatsData }) {
           </div>
         </div>
 
-        <DashboardChartCard title="需求类型分布">
+        <DashboardChartCard title="需求类型分布" bodyClass="overflow-visible">
           <PieChartCentered>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -394,14 +429,20 @@ function DashboardBody({ data }: { data: StatsData }) {
                   dataKey="count"
                   nameKey="category"
                   cx="50%"
-                  cy="50%"
-                  outerRadius={60}
-                  label={({ name }) => name as string}
+                  cy="42%"
+                  outerRadius={52}
+                  label={false}
                 >
                   {data.categoryDistribution.map((_, i) => (
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
                 </Pie>
+                <Legend
+                  layout="horizontal"
+                  verticalAlign="bottom"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
+                />
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>

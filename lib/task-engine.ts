@@ -9,6 +9,30 @@ import path from "path";
 
 const runtime = cliRuntime;
 
+/** output_complete 且已落库测试用例 MD 时记为已完成，否则保持已暂停 */
+function statusFieldsAfterPause(
+  pauseReason: string | undefined,
+  hasTestcaseMd: boolean,
+): Pick<Prisma.TaskUpdateInput, "status" | "pauseReason" | "pausedAt"> {
+  if (pauseReason === "output_complete" && hasTestcaseMd) {
+    return { status: "completed", pauseReason: null, pausedAt: null };
+  }
+  return {
+    status: "paused",
+    pauseReason: pauseReason || "unknown",
+    pausedAt: new Date(),
+  };
+}
+
+function statusFieldsAfterStreamEnd(
+  hasTestcaseMd: boolean,
+): Pick<Prisma.TaskUpdateInput, "status" | "pauseReason" | "pausedAt"> {
+  if (hasTestcaseMd) {
+    return { status: "completed", pauseReason: null, pausedAt: null };
+  }
+  return { status: "paused", pauseReason: "stream_end", pausedAt: new Date() };
+}
+
 export async function createTask(
   userId: string,
   skillId: string,
@@ -115,6 +139,7 @@ export async function startTaskExecution(
       }
 
       if (event.type === "pause") {
+        let hasTestcaseMd = false;
         // On output_complete: rename new files during tweaks, save report for all
         if (event.pauseReason === "output_complete") {
           if (isTweak && preFileNames) {
@@ -142,15 +167,14 @@ export async function startTaskExecution(
             where: { id: taskId },
             data: { duration: elapsed },
           });
-          await saveOutputAndReport(taskId);
+          hasTestcaseMd = await saveOutputAndReport(taskId);
         }
 
+        const terminal = statusFieldsAfterPause(event.pauseReason, hasTestcaseMd);
         await prisma.task.update({
           where: { id: taskId },
           data: {
-            status: "paused",
-            pauseReason: event.pauseReason || "unknown",
-            pausedAt: new Date(),
+            ...terminal,
             output,
             duration: Date.now() - startTime,
           },
@@ -176,11 +200,11 @@ export async function startTaskExecution(
       where: { id: taskId },
       data: { duration: Date.now() - startTime },
     });
-    await saveOutputAndReport(taskId);
+    const hasTestcaseMd = await saveOutputAndReport(taskId);
     await prisma.task.update({
       where: { id: taskId },
       data: {
-        status: "paused",
+        ...statusFieldsAfterStreamEnd(hasTestcaseMd),
         output,
         duration: Date.now() - startTime,
       },
@@ -256,6 +280,7 @@ export async function resumeTask(
       }
 
       if (event.type === "pause") {
+        let hasTestcaseMd = false;
         // On output_complete: rename new files, save report for all
         if (event.pauseReason === "output_complete") {
           if (tweakRound > 0 && preFileNames) {
@@ -283,15 +308,14 @@ export async function resumeTask(
             where: { id: taskId },
             data: { duration: elapsed },
           });
-          await saveOutputAndReport(taskId);
+          hasTestcaseMd = await saveOutputAndReport(taskId);
         }
 
+        const terminal = statusFieldsAfterPause(event.pauseReason, hasTestcaseMd);
         await prisma.task.update({
           where: { id: taskId },
           data: {
-            status: "paused",
-            pauseReason: event.pauseReason || "unknown",
-            pausedAt: new Date(),
+            ...terminal,
             output,
             duration: previousDuration + (Date.now() - startTime),
           },
@@ -317,11 +341,11 @@ export async function resumeTask(
       where: { id: taskId },
       data: { duration: previousDuration + (Date.now() - startTime) },
     });
-    await saveOutputAndReport(taskId);
+    const hasTestcaseMd = await saveOutputAndReport(taskId);
     await prisma.task.update({
       where: { id: taskId },
       data: {
-        status: "paused",
+        ...statusFieldsAfterStreamEnd(hasTestcaseMd),
         output,
         duration: previousDuration + (Date.now() - startTime),
       },
@@ -394,14 +418,17 @@ async function logEvent(
   });
 }
 
-export async function saveOutputAndReport(taskId: string): Promise<void> {
+/** @returns 是否成功找到并落库测试用例 .md */
+export async function saveOutputAndReport(taskId: string): Promise<boolean> {
   const outputDir = getOutputPath(taskId);
   try {
     const files = await collectFilesRelative(outputDir);
     const updates: Record<string, unknown> = { outputFiles: files };
+    let hasTestcaseMd = false;
 
     const mdPath = await findLatestMdFile(outputDir);
     if (mdPath) {
+      hasTestcaseMd = true;
       const mdContent = await fs.readFile(mdPath, "utf-8");
       const parsed = parseTestcaseMarkdown(mdContent);
       updates.report = {
@@ -428,8 +455,9 @@ export async function saveOutputAndReport(taskId: string): Promise<void> {
       where: { id: taskId },
       data: updates as Prisma.TaskUpdateInput,
     });
+    return hasTestcaseMd;
   } catch {
-    // No output files
+    return false;
   }
 }
 

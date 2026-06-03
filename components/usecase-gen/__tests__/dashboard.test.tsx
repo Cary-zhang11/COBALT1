@@ -111,6 +111,32 @@ describe("Dashboard", () => {
     expect(screen.getByText("登录功能")).toBeDefined();
   });
 
+  it("shows only main dimensions (D1–D7) in coverage chart", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          ...mockStats,
+          dimensionCoverage: [
+            { name: "主流程", covered: 8, total: 10 },
+            { name: "性能", covered: 3, total: 10 },
+            { name: "数据展示边界", covered: 1, total: 5 },
+            { name: "第三方交互", covered: 2, total: 5 },
+          ],
+        }),
+      }),
+    );
+    renderWithClient(<Dashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("主流程")).toBeDefined();
+      expect(screen.getByText("性能")).toBeDefined();
+      expect(screen.queryByText("数据展示边界")).toBeNull();
+      expect(screen.queryByText("第三方交互")).toBeNull();
+      expect(screen.queryByText("展开查看")).toBeNull();
+    });
+  });
+
   it("shows placeholder when rating has no comment", async () => {
     const noCommentStats = {
       ...mockStats,

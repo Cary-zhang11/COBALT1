@@ -10,6 +10,7 @@ interface Task {
   duration: number | null;
   tweakCount?: number;
   createdAt: string;
+  hasTestcaseOutput?: boolean;
   skill: { name: string; description: string };
 }
 

@@ -557,7 +557,7 @@ export function GenerateWizard({
                 onClick={() => document.getElementById("wizard-file-input")?.click()}
               >
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-primary font-medium">点击上传</span> 或拖拽文件到此处 · 支持 .docx .pdf .md .txt
+                  <span className="text-primary font-medium">点击上传</span> 或拖拽文件到此处 · 支持 .docx .md .txt
                 </p>
                 <input id="wizard-file-input" type="file" className="hidden" multiple onChange={handleFileUpload} />
               </div>

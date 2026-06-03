@@ -164,6 +164,15 @@ export function useOutputScanner({
           return;
         }
 
+        // Wait for duration to be persisted (race: files may appear on disk
+        // before startTaskExecution writes duration to DB on output_complete)
+        if (report.duration == null) {
+          if (!stopRef.current) {
+            timerRef.current = setTimeout(poll, interval);
+          }
+          return;
+        }
+
         callbacksRef.current.onResult?.(report);
         stop();
       } catch {
