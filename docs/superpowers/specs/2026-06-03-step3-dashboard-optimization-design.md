@@ -8,7 +8,7 @@
 
 | 序号 | 模块 | 改动 | 涉及文件 |
 |------|------|------|---------|
-| 1 | Step3 评价 | 回显已有评价 + 提交后确认刷新 | `RatingPanel`, `app/api/tasks/[id]/route.ts` |
+| 1 | Step3 评价 | 回显已有评价 + 提交后确认刷新 | `RatingPanel`, `app/api/tasks/[id]/feedback/route.ts` |
 | 2 | Step3 覆盖率 | 移除「覆盖率」列 | `ModuleOverviewTable` |
 | 3 | 看板·周同比 | 5 个 KPI 卡片展示真实周同比 | `stats/route.ts`, `Dashboard` |
 | 4 | 看板·类型分布 | stats 改读 businessType + Step2 手选 + 推算写入 | `stats/route.ts`, `generate-wizard.tsx`, `task-engine.ts`, `use-tasks.ts`, `app/api/tasks/route.ts` |
@@ -26,26 +26,29 @@
 1. **无回显**：组件初始化时永远是空白状态，用户从历史记录重新进入 Step3 看不到之前提交的评价
 2. **无确认刷新**：POST 成功后仅本地 `setSubmitted(true)`，未从服务端二次确认
 
-`GET /api/tasks/[id]` 已返回 `feedback: true`（所有评价数组），可直接复用。
-
 ### 设计
+
+**API 改动**：`app/api/tasks/[id]/feedback/route.ts` 新增 `GET` handler，返回当前用户对该任务的最新评价：
+
+```
+GET → 查 TaskFeedback（taskId + userId，取最新一条）
+  → 有数据：{ rating: number, comment: string | null }
+  → 无数据：{ rating: null, comment: null }
+```
 
 **RatingPanel 组件改动：**
 
 ```
-mount → GET /api/tasks/[taskId] → 取 feedback 数组
-  → 过滤当前用户 (userId)  → 取最新一条
-    → 有数据：setRating(rating), setComment(comment), setSubmitted(true)
-    → 无数据：保持空白交互状态
+mount → GET /api/tasks/[taskId]/feedback
+  → rating != null：setRating(rating), setComment(comment), setSubmitted(true)
+  → rating == null：保持空白交互状态
 
 submit → POST /api/tasks/[taskId]/feedback
   → 成功后：重新 GET 确认服务端数据
   → 失败：展示 error message
 ```
 
-**需要传递 userId**：RatingPanel 新增 `userId` prop（由父组件从 auth context 获取并传入）。
-
-**API**：无需新增 endpoint，复用 `GET /api/tasks/[id]`（已有 `feedback: true`）。
+**RatingPanel 组件接口不变**：无需新增 props，auth 由 API 层处理。
 
 ### 边界情况
 
@@ -106,7 +109,8 @@ kpiTrend: {
 
 - **累计用例数（周新增）**：按 `createdAt` 在窗口内筛选，`_sum.totalCases`
 - **月活跃用户（周活跃）**：按 `createdAt` 窗口内 `userId` 去重计数
-- **质量分 / 耗时 / 评分**：按窗口内 `_avg`
+- **质量分 / 耗时**：按窗口内 `_avg`
+- **用户平均评分**：查窗口内已完成任务 → 取 `TaskFeedback` 最新评价 → 计算均值（需跨表关联）
 
 ### 前端改动
 
@@ -163,10 +167,11 @@ const categoryResult = await prisma.task.groupBy({ by: ["businessType"], ... });
 业务类型：[下拉选择]  默认从关联知识推算
 ```
 
-- 下拉选项 = `["C1C", "C1B", "C2C", "C2B", "数科", "车小妹"]`
-- **推算逻辑**：取 `selectedKnowledgeIds` 中第一个有 `businessType` 且不为 null 的知识条目作为默认值
-- **手选优先**：一旦用户手动选择，锁定手选值，忽略推算变化
-- 未选择任何知识条目且无手选 → `businessType` 保持 null
+- 下拉选项 = `["自动推算", "C1C", "C1B", "C2C", "C2B", "数科", "车小妹"]`
+- **推算逻辑**：取 `selectedKnowledgeIds` 中第一个有 `businessType` 且不为 null 的知识条目作为默认值，下拉显示对应选项
+- **手选优先**：用户选择一个具体类型 → `manuallySet = true`，忽略后续推算变化
+- **重置**：用户选择「自动推算」→ `manuallySet = false`，恢复推算值
+- 未关联知识且未手选 → 下拉显示「自动推算」，实际值为空（null）
 
 **c) 写入链路**
 
@@ -267,6 +272,7 @@ const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 | 文件 | 改动类型 | 所属模块 |
 |------|---------|---------|
 | `components/usecase-gen/shared/rating-panel.tsx` | 修改 | Step3 评价 |
+| `app/api/tasks/[id]/feedback/route.ts` | 修改（新增 GET） | Step3 评价 |
 | `components/usecase-gen/shared/module-overview-table.tsx` | 修改 | Step3 覆盖率 |
 | `app/api/stats/route.ts` | 修改 | 看板·周同比 + 类型分布 |
 | `components/usecase-gen/dashboard.tsx` | 修改 | 看板·周同比 |
