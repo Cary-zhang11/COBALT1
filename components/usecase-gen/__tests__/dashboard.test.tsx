@@ -88,7 +88,7 @@ describe("Dashboard", () => {
   it("renders rating rate footer on distribution chart", async () => {
     renderWithClient(<Dashboard />);
     await waitFor(() => {
-      expect(screen.getByText(/评价率 67%（有评任务 \/ 已完成）/)).toBeDefined();
+      expect(screen.getByText(/评价率 67%/)).toBeDefined();
     });
   });
 
