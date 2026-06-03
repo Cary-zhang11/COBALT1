@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("token")?.value;
     const { userId } = await getAuthUser(token);
-    const { skillId, input, uploadedFiles } = await req.json();
+    const { skillId, input, uploadedFiles, businessType } = await req.json();
 
     if (!skillId || !input) {
       return NextResponse.json(
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const taskId = await createTask(userId, skillId, input, uploadedFiles);
+    const taskId = await createTask(userId, skillId, input, uploadedFiles, businessType || null);
     return NextResponse.json({ taskId }, { status: 201 });
   } catch (error) {
     const message =

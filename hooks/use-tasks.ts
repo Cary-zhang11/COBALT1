@@ -47,6 +47,7 @@ export function useCreateTask() {
       skillId: string;
       input: string;
       uploadedFiles?: string[];
+      businessType?: string | null;
     }) => {
       const res = await fetch("/api/tasks", {
         method: "POST",

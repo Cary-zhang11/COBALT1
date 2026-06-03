@@ -13,7 +13,8 @@ export async function createTask(
   userId: string,
   skillId: string,
   input: string,
-  uploadedFiles?: string[]
+  uploadedFiles?: string[],
+  businessType?: string | null
 ): Promise<string> {
   const skill = await prisma.skill.findUnique({
     where: { id: skillId },
@@ -32,6 +33,7 @@ export async function createTask(
       skillVersionId: latestVersion.id,
       input,
       inputFiles: uploadedFiles || [],
+      businessType: businessType || null,
     },
   });
 
