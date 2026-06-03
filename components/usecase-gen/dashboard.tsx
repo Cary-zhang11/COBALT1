@@ -123,7 +123,7 @@ function UserRatingDistributionBars({
 
   const rateFooter = (
     <p className="text-[10px] text-muted-foreground mt-2 pt-2 border-t border-border/50 tabular-nums">
-      评价率 {rate.percent}%（{rate.ratedCount} 评价 / {rate.completedCount} 终态任务）
+      评价率 {rate.percent}%（有评任务 / 已完成）
     </p>
   );
 
