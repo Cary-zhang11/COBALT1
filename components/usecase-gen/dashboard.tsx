@@ -77,11 +77,13 @@ function DashboardChartCard({
   extra,
   children,
   className = "",
+  bodyClass = "",
 }: {
   title: string;
   extra?: string;
   children: ReactNode;
   className?: string;
+  bodyClass?: string;
 }) {
   return (
     <div className={`${CHART_CARD} ${className}`}>
@@ -89,7 +91,7 @@ function DashboardChartCard({
         <span className="font-semibold text-sm text-foreground/85">{title}</span>
         {extra ? <span className="text-xs text-muted-foreground">{extra}</span> : null}
       </div>
-      <div className={CHART_BODY}>{children}</div>
+      <div className={`${CHART_BODY} ${bodyClass}`}>{children}</div>
     </div>
   );
 }
@@ -271,7 +273,7 @@ function CoverageBarChart({ data }: { data: { name: string; covered: number; tot
   });
 
   return (
-    <div className="h-full flex flex-col justify-center gap-1.5">
+    <div className="h-full flex flex-col justify-center gap-1">
       {sorted.map((dim) => {
         const pct = dim.total > 0 ? Math.round((dim.covered / dim.total) * 100) : 0;
         const barColor =
@@ -408,7 +410,7 @@ function DashboardBody({ data }: { data: StatsData }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-        <DashboardChartCard title="覆盖维度分布" extra="覆盖率">
+        <DashboardChartCard title="覆盖维度分布" extra="覆盖率" bodyClass="h-[280px]">
           <CoverageBarChart data={data.dimensionCoverage} />
         </DashboardChartCard>
 
