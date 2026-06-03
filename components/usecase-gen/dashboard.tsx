@@ -295,10 +295,7 @@ function DashboardBody({ data }: { data: StatsData }) {
                   {(() => {
                     const trend = data.kpiTrend[kpi.trendKey];
                     if (trend.changePercent === null) {
-                      if (trend.current === 0 && trend.previous === 0) {
-                        return <span className="text-muted-foreground/70">—</span>;
-                      }
-                      return <span className="text-emerald-600 font-medium">新增</span>;
+                      return <span className="text-muted-foreground/70">—</span>;
                     }
                     const isUp = trend.changePercent > 0;
                     const isDown = trend.changePercent < 0;
