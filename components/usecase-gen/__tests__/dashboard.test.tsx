@@ -22,6 +22,13 @@ const mockStats = {
     { stars: 4, count: 2 },
     { stars: 5, count: 1 },
   ],
+  kpiTrend: {
+    totalCases: { current: 12, previous: 10, changePercent: 20 },
+    monthlyActiveUsers: { current: 3, previous: 2, changePercent: 50 },
+    avgQualityScore: { current: 85, previous: 80, changePercent: 6 },
+    avgDuration: { current: 110000, previous: 120000, changePercent: -8 },
+    avgUserRating: { current: 4, previous: 4, changePercent: 0 },
+  },
   userRatingRate: { percent: 67, ratedCount: 2, completedCount: 3 },
   recentRecords: [
     {

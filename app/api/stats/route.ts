@@ -154,6 +154,131 @@ export async function GET(req: NextRequest) {
       take: 50,
     });
 
+    // ---- 周同比计算 ----
+    const now = new Date();
+    const thisWeekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const lastWeekStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const lastWeekEnd = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    function calcChangePercent(current: number, previous: number): number | null {
+      if (previous === 0) return null;
+      return Math.round(((current - previous) / previous) * 100);
+    }
+
+    const [thisWeekCases, lastWeekCases] = await Promise.all([
+      prisma.task.aggregate({
+        _sum: { totalCases: true },
+        where: { ...completedFilter, createdAt: { gte: thisWeekStart } },
+      }),
+      prisma.task.aggregate({
+        _sum: { totalCases: true },
+        where: { ...completedFilter, createdAt: { gte: lastWeekStart, lt: lastWeekEnd } },
+      }),
+    ]);
+
+    const [thisWeekUsers, lastWeekUsers] = await Promise.all([
+      prisma.task.groupBy({
+        by: ["userId"],
+        where: { ...completedFilter, createdAt: { gte: thisWeekStart } },
+      }),
+      prisma.task.groupBy({
+        by: ["userId"],
+        where: { ...completedFilter, createdAt: { gte: lastWeekStart, lt: lastWeekEnd } },
+      }),
+    ]);
+
+    const [thisWeekAvg, lastWeekAvg] = await Promise.all([
+      prisma.task.aggregate({
+        _avg: { qualityScore: true, duration: true },
+        where: { ...completedFilter, createdAt: { gte: thisWeekStart } },
+      }),
+      prisma.task.aggregate({
+        _avg: { qualityScore: true, duration: true },
+        where: { ...completedFilter, createdAt: { gte: lastWeekStart, lt: lastWeekEnd } },
+      }),
+    ]);
+
+    function avgRatingForWindow(start: Date, end?: Date): number {
+      const taskIdsInWindow = allLatestRatings.length > 0
+        ? (() => {
+            // Use pre-filtered task IDs from the window
+            const ids: string[] = [];
+            for (const [taskId, fb] of latestByTask) {
+              // We need to check if the task is in the window - use a simple approach:
+              // Since we already fetched all completed task IDs, we can filter by createdAt
+              // But we don't have task createdAt in latestByTask map. Use a different approach:
+              ids.push(taskId);
+            }
+            return ids;
+          })()
+        : [];
+      // Simpler approach: use the feedback rows directly, filtering by feedback createdAt
+      // Actually, let's use a simpler approach that matches the other KPIs:
+      // Get tasks in the window, then match their feedback
+      return 0; // placeholder - replaced below
+    }
+
+    // Re-fetch window-specific task IDs for rating computation
+    const [thisWeekTaskRows, lastWeekTaskRows] = await Promise.all([
+      prisma.task.findMany({
+        where: { ...completedFilter, createdAt: { gte: thisWeekStart } },
+        select: { id: true },
+      }),
+      prisma.task.findMany({
+        where: { ...completedFilter, createdAt: { gte: lastWeekStart, lt: lastWeekEnd } },
+        select: { id: true },
+      }),
+    ]);
+
+    function avgRatingForTaskIds(taskIds: string[]): number {
+      if (taskIds.length === 0) return 0;
+      const ratings = taskIds
+        .map((id) => latestByTask.get(id)?.rating)
+        .filter((r): r is number => r != null);
+      if (ratings.length === 0) return 0;
+      return Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10;
+    }
+
+    const thisWeekCaseCount = thisWeekCases._sum?.totalCases || 0;
+    const lastWeekCaseCount = lastWeekCases._sum?.totalCases || 0;
+
+    const kpiTrend = {
+      totalCases: {
+        current: thisWeekCaseCount,
+        previous: lastWeekCaseCount,
+        changePercent: calcChangePercent(thisWeekCaseCount, lastWeekCaseCount),
+      },
+      monthlyActiveUsers: {
+        current: thisWeekUsers.length,
+        previous: lastWeekUsers.length,
+        changePercent: calcChangePercent(thisWeekUsers.length, lastWeekUsers.length),
+      },
+      avgQualityScore: {
+        current: Math.round(thisWeekAvg._avg?.qualityScore || 0),
+        previous: Math.round(lastWeekAvg._avg?.qualityScore || 0),
+        changePercent: calcChangePercent(
+          Math.round(thisWeekAvg._avg?.qualityScore || 0),
+          Math.round(lastWeekAvg._avg?.qualityScore || 0)
+        ),
+      },
+      avgDuration: {
+        current: Math.round(thisWeekAvg._avg?.duration || 0),
+        previous: Math.round(lastWeekAvg._avg?.duration || 0),
+        changePercent: calcChangePercent(
+          Math.round(thisWeekAvg._avg?.duration || 0),
+          Math.round(lastWeekAvg._avg?.duration || 0)
+        ),
+      },
+      avgUserRating: {
+        current: avgRatingForTaskIds(thisWeekTaskRows.map((t) => t.id)),
+        previous: avgRatingForTaskIds(lastWeekTaskRows.map((t) => t.id)),
+        changePercent: calcChangePercent(
+          avgRatingForTaskIds(thisWeekTaskRows.map((t) => t.id)),
+          avgRatingForTaskIds(lastWeekTaskRows.map((t) => t.id))
+        ),
+      },
+    };
+
     return NextResponse.json({
       kpi: {
         totalCases: totalAgg._sum?.totalCases || 0,
@@ -162,6 +287,7 @@ export async function GET(req: NextRequest) {
         avgDuration: Math.round(avgAgg._avg?.duration || 0),
         avgUserRating: avgUserRating(allLatestRatings),
       },
+      kpiTrend,
       dailyTrend,
       categoryDistribution,
       dimensionCoverage,

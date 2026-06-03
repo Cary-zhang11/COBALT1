@@ -28,6 +28,13 @@ interface StatsData {
     ratedCount: number;
     completedCount: number;
   };
+  kpiTrend: {
+    totalCases:        { current: number; previous: number; changePercent: number | null };
+    monthlyActiveUsers:{ current: number; previous: number; changePercent: number | null };
+    avgQualityScore:   { current: number; previous: number; changePercent: number | null };
+    avgDuration:       { current: number; previous: number; changePercent: number | null };
+    avgUserRating:     { current: number; previous: number; changePercent: number | null };
+  };
   recentRecords: {
     time: string;
     user: string;
@@ -258,16 +265,17 @@ function DashboardBody({ data }: { data: StatsData }) {
   );
 
   const kpis = [
-    { label: "累计用例数", value: data.kpi.totalCases.toLocaleString(), icon: BarChart3, bg: "bg-primary/10", iconColor: "text-primary" },
-    { label: "月活跃用户", value: data.kpi.monthlyActiveUsers.toString(), icon: Users, bg: "bg-emerald-100", iconColor: "text-emerald-600" },
-    { label: "AI 平均质量分", value: data.kpi.avgQualityScore.toString(), icon: Target, bg: "bg-amber-100", iconColor: "text-amber-600" },
-    { label: "平均耗时", value: formatDuration(data.kpi.avgDuration), icon: Clock, bg: "bg-violet-100", iconColor: "text-violet-600" },
+    { label: "累计用例数", value: data.kpi.totalCases.toLocaleString(), icon: BarChart3, bg: "bg-primary/10", iconColor: "text-primary", trendKey: "totalCases" as const },
+    { label: "月活跃用户", value: data.kpi.monthlyActiveUsers.toString(), icon: Users, bg: "bg-emerald-100", iconColor: "text-emerald-600", trendKey: "monthlyActiveUsers" as const },
+    { label: "AI 平均质量分", value: data.kpi.avgQualityScore.toString(), icon: Target, bg: "bg-amber-100", iconColor: "text-amber-600", trendKey: "avgQualityScore" as const },
+    { label: "平均耗时", value: formatDuration(data.kpi.avgDuration), icon: Clock, bg: "bg-violet-100", iconColor: "text-violet-600", trendKey: "avgDuration" as const },
     {
       label: "用户平均评分",
       value: data.kpi.avgUserRating > 0 ? data.kpi.avgUserRating.toFixed(1) : "—",
       icon: Star,
       bg: "bg-amber-50",
       iconColor: "text-amber-700",
+      trendKey: "avgUserRating" as const,
     },
   ];
 
@@ -284,7 +292,24 @@ function DashboardBody({ data }: { data: StatsData }) {
                   {kpi.value}
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  <span className="text-muted-foreground/70">—</span>
+                  {(() => {
+                    const trend = data.kpiTrend[kpi.trendKey];
+                    if (trend.changePercent === null) {
+                      if (trend.current === 0 && trend.previous === 0) {
+                        return <span className="text-muted-foreground/70">—</span>;
+                      }
+                      return <span className="text-emerald-600 font-medium">新增</span>;
+                    }
+                    const isUp = trend.changePercent > 0;
+                    const isDown = trend.changePercent < 0;
+                    const colorClass = isUp ? "text-emerald-600" : isDown ? "text-red-500" : "text-muted-foreground";
+                    const arrow = isUp ? "↑" : isDown ? "↓" : "";
+                    return (
+                      <span className={`${colorClass} font-medium`}>
+                        {arrow} {Math.abs(trend.changePercent)}%
+                      </span>
+                    );
+                  })()}
                   <span className="ml-1">周同比</span>
                 </p>
               </div>
