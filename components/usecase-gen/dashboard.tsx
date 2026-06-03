@@ -255,6 +255,48 @@ function UserRatingCell({
   );
 }
 
+function CoverageBarChart({ data }: { data: { name: string; covered: number; total: number }[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <p className="text-xs text-muted-foreground">暂无覆盖数据</p>
+      </div>
+    );
+  }
+
+  const sorted = [...data].sort((a, b) => {
+    const rateA = a.total > 0 ? a.covered / a.total : 0;
+    const rateB = b.total > 0 ? b.covered / b.total : 0;
+    return rateB - rateA;
+  });
+
+  return (
+    <div className="h-full flex flex-col justify-center gap-1.5">
+      {sorted.map((dim) => {
+        const pct = dim.total > 0 ? Math.round((dim.covered / dim.total) * 100) : 0;
+        const barColor =
+          pct >= 80 ? "bg-emerald-400" :
+          pct >= 50 ? "bg-amber-400" :
+          "bg-red-400";
+        return (
+          <div key={dim.name} className="flex items-center gap-2 text-xs">
+            <span className="w-12 text-muted-foreground truncate shrink-0" title={dim.name}>
+              {dim.name}
+            </span>
+            <div className="flex-1 h-[14px] bg-muted/50 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${barColor} transition-all`}
+                style={{ width: `${Math.max(pct, 4)}%` }}
+              />
+            </div>
+            <span className="w-9 text-right tabular-nums text-muted-foreground shrink-0">{pct}%</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function DashboardBody({ data }: { data: StatsData }) {
   const [recordSearch, setRecordSearch] = useState("");
   const [recordFilter, setRecordFilter] = useState<RecordFilter>("all");
@@ -366,27 +408,8 @@ function DashboardBody({ data }: { data: StatsData }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-        <DashboardChartCard title="覆盖维度分布" extra="测试维度">
-          <PieChartCentered>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data.dimensionCoverage}
-                  dataKey="covered"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={60}
-                  label={({ name }) => (name as string).slice(0, 4)}
-                >
-                  {data.dimensionCoverage.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </PieChartCentered>
+        <DashboardChartCard title="覆盖维度分布" extra="覆盖率">
+          <CoverageBarChart data={data.dimensionCoverage} />
         </DashboardChartCard>
 
         <DashboardChartCard title="用户评价分布" extra="近 30 天 · 1–5 星占比">
