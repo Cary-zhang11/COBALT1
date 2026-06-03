@@ -100,7 +100,7 @@ export default function TaskResultPage() {
             <div className="flex items-center gap-1">
               <Clock className="w-3.5 h-3.5 text-muted-foreground" />
               <p className="font-medium text-sm">
-                {task.duration ? `${(task.duration / 1000).toFixed(1)}s` : "—"}
+                {task.duration ? `${(task.duration / 60000).toFixed(1)} 分钟` : "—"}
               </p>
             </div>
           </div>

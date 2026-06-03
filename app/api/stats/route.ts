@@ -124,6 +124,20 @@ export async function GET(req: NextRequest) {
     const latestByTask = latestFeedbackByTaskId(feedbackRows);
     const allLatestRatings = Array.from(latestByTask.values()).map((f) => f.rating);
 
+    const completedTasks = await prisma.task.findMany({
+      where: completedFilter,
+      select: { id: true },
+    });
+    const completedCount = completedTasks.length;
+    const completedIdSet = new Set(completedTasks.map((t) => t.id));
+    const ratedAmongCompleted = [...latestByTask.keys()].filter((id) =>
+      completedIdSet.has(id)
+    ).length;
+    const userRatingRatePercent =
+      completedCount > 0
+        ? Math.round((ratedAmongCompleted / completedCount) * 100)
+        : 0;
+
     const recent = await prisma.task.findMany({
       where: completedFilter,
       select: {
@@ -153,6 +167,11 @@ export async function GET(req: NextRequest) {
       dimensionCoverage,
       topUsers,
       userRatingDistribution: ratingDistribution(allLatestRatings),
+      userRatingRate: {
+        percent: userRatingRatePercent,
+        ratedCount: ratedAmongCompleted,
+        completedCount,
+      },
       recentRecords: recent.map((r) => {
         const fb = latestByTask.get(r.id);
         return {

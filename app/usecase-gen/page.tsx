@@ -82,6 +82,7 @@ function UsecaseGenPageContent() {
                 onSelectTask={(id) => {
                   router.replace(`/usecase-gen?tab=history&taskId=${id}`, { scroll: false });
                 }}
+                onGoToGenerate={() => setActiveTab(0)}
               />
             </div>
           ))}

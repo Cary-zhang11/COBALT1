@@ -25,7 +25,11 @@ export async function GET(req: NextRequest) {
       where.title = { contains: search, mode: "insensitive" };
     }
     if (businessType) {
-      where.businessType = businessType;
+      if (businessType === "unclassified") {
+        where.businessType = null;
+      } else {
+        where.businessType = businessType;
+      }
     }
     if (type) {
       where.type = type;

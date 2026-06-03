@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dashboard } from "../dashboard";
 
@@ -22,6 +22,7 @@ const mockStats = {
     { stars: 4, count: 2 },
     { stars: 5, count: 1 },
   ],
+  userRatingRate: { percent: 67, ratedCount: 2, completedCount: 3 },
   recentRecords: [
     {
       time: "2026/6/1",
@@ -75,6 +76,32 @@ describe("Dashboard", () => {
       expect(screen.getByText("用户评价")).toBeDefined();
       expect(screen.getByText("很好")).toBeDefined();
     });
+  });
+
+  it("renders rating rate footer on distribution chart", async () => {
+    renderWithClient(<Dashboard />);
+    await waitFor(() => {
+      expect(screen.getByText(/评价率 67%（有评任务 \/ 已完成）/)).toBeDefined();
+    });
+  });
+
+  it("filters recent records by search and select", async () => {
+    renderWithClient(<Dashboard />);
+    await waitFor(() => expect(screen.getByText("登录功能")).toBeDefined());
+
+    fireEvent.change(screen.getByPlaceholderText("搜索需求…"), {
+      target: { value: "不存在的需求" },
+    });
+    expect(screen.getByText("无匹配记录")).toBeDefined();
+
+    fireEvent.change(screen.getByPlaceholderText("搜索需求…"), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByLabelText("筛选记录"), { target: { value: "unrated" } });
+    expect(screen.getByText("无匹配记录")).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText("筛选记录"), { target: { value: "rated" } });
+    expect(screen.getByText("登录功能")).toBeDefined();
   });
 
   it("shows placeholder when rating has no comment", async () => {

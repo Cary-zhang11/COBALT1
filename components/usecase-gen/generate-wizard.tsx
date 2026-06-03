@@ -34,10 +34,23 @@ interface UploadedFile {
 const STEPS = ["输入物料", "关联用例", "生成并预览"];
 const BUSINESS_TYPES = ["C1C", "C1B", "C2C", "C2B", "数科", "车小妹"] as const;
 
-function WizardStickyFooter({ children }: { children: ReactNode }) {
+function WizardStickyFooter({
+  children,
+  compact = false,
+}: {
+  children: ReactNode;
+  /** Step1/2：底栏紧跟内容，主区整体垂直居中 */
+  compact?: boolean;
+}) {
   return (
-    <div className="sticky bottom-0 z-20 mt-auto flex-shrink-0 pt-4 bg-gradient-to-t from-background from-85% via-background/80 to-transparent">
-      <div className="bg-card rounded-xl shadow-sm px-5 py-3 flex items-center gap-3">
+    <div
+      className={
+        compact
+          ? "mt-6 flex-shrink-0 z-20"
+          : "sticky bottom-0 z-20 mt-auto flex-shrink-0 pt-4 bg-gradient-to-t from-background from-85% via-background/80 to-transparent"
+      }
+    >
+      <div className="bg-card rounded-xl shadow-sm border border-border/60 px-5 py-3 flex items-center gap-3">
         {children}
       </div>
     </div>
@@ -478,7 +491,7 @@ export function GenerateWizard({
       className={
         wizStep === 2
           ? "flex gap-5 items-start"
-          : "flex gap-6 items-stretch min-h-[min(520px,calc(100vh-12rem))]"
+          : "flex gap-5 items-stretch min-h-[min(520px,calc(100vh-12rem))]"
       }
       data-testid="generate-wizard-root"
     >
@@ -489,7 +502,7 @@ export function GenerateWizard({
             : "flex flex-1 flex-col min-w-0 min-h-full"
         }
       >
-        <div className="flex items-center gap-0 mb-6 bg-card rounded-xl shadow-sm p-4 flex-shrink-0">
+        <div className="flex items-center gap-0 mb-6 bg-card rounded-xl shadow-sm border border-border/60 p-4 flex-shrink-0">
           {STEPS.map((s, i) => (
             <div key={i} className="flex items-center gap-0 flex-1">
               <div className="flex items-center gap-2 flex-1">
@@ -507,16 +520,18 @@ export function GenerateWizard({
           ))}
         </div>
 
-        <div className="flex flex-1 flex-col min-h-0">
+        {wizStep < 2 ? (
+        <div className="flex flex-1 flex-col min-h-0 w-full overflow-y-auto">
+        <div className="my-auto w-full py-2">
         {wizStep === 0 && (
-          <div className="flex-1 space-y-4">
-            <div className="bg-card rounded-xl shadow-sm p-5">
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
+          <div className="space-y-4 w-full">
+            <div className="bg-card rounded-xl shadow-sm border border-border/60 p-5">
+              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                 <Upload className="w-4 h-4 text-primary" />
-                输入需求物料
+                输入需求
               </h3>
               <div
-                className="border-2 border-dashed rounded-lg py-3 px-4 text-center cursor-pointer transition-all border-border hover:border-primary/30 hover:bg-primary/5"
+                className="border-2 border-dashed rounded-xl py-8 px-4 text-center cursor-pointer transition-all border-border hover:border-primary/30 hover:bg-primary/5"
                 onClick={() => document.getElementById("wizard-file-input")?.click()}
               >
                 <p className="text-xs text-muted-foreground">
@@ -539,12 +554,7 @@ export function GenerateWizard({
                   ))}
                 </div>
               )}
-              <div className="flex items-center gap-3 my-4">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground font-medium">或</span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-              <h4 className="text-sm font-medium mb-2">粘贴需求文本</h4>
+              <h4 className="text-sm font-medium mb-2 mt-4">粘贴需求文本</h4>
               <textarea
                 value={requirementText}
                 onChange={(e) => setRequirementText(e.target.value)}
@@ -575,10 +585,10 @@ export function GenerateWizard({
         )}
 
         {wizStep === 1 && (
-          <div className="flex-1 space-y-4">
+          <div className="space-y-4 w-full">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* 左侧：业务知识 */}
-              <div className="bg-card rounded-xl shadow-sm p-5">
+              <div className="bg-card rounded-xl shadow-sm border border-border/60 p-5">
                 <h3 className="font-semibold mb-1 text-sm">业务知识</h3>
                 <p className="text-xs text-muted-foreground mb-3">勾选本次生成需要参考的业务规范文档</p>
 
@@ -624,13 +634,7 @@ export function GenerateWizard({
                           onChange={() => toggleKnowledge(item.id)}
                           className="accent-cyan-500 w-3.5 h-3.5 flex-shrink-0"
                         />
-                        <div className="min-w-0 flex-1">
-                          <span className="text-sm truncate block">{item.title}.md</span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(item.updatedAt).toLocaleDateString("zh-CN")}
-                            {item.businessType ? ` · ${item.businessType}` : ""}
-                          </span>
-                        </div>
+                        <span className="text-sm truncate flex-1 min-w-0">{item.title}</span>
                       </label>
                     ))
                   )}
@@ -648,7 +652,7 @@ export function GenerateWizard({
               </div>
 
               {/* 右侧：历史用例范文 */}
-              <div className="bg-card rounded-xl shadow-sm p-5">
+              <div className="bg-card rounded-xl shadow-sm border border-border/60 p-5">
                 <h3 className="font-semibold mb-1 text-sm">历史用例范文</h3>
                 <p className="text-xs text-muted-foreground mb-3">勾选优秀历史用例作为 few-shot 参考</p>
 
@@ -715,6 +719,70 @@ export function GenerateWizard({
           </div>
         )}
 
+        {wizStep === 0 && (
+          <WizardStickyFooter compact>
+            <div className="flex justify-end w-full">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!uploadedFiles.length && !requirementText.trim()) {
+                    setValidationMsg("请至少上传一个需求文档，或粘贴需求文本");
+                    return;
+                  }
+                  setValidationMsg("");
+                  setKbPage(1);
+                  setKbSearch("");
+                  setKbBusinessType("");
+                  setHistoryPage(1);
+                  setHistorySearch("");
+                  setHistoryBusinessType("");
+                  setWizStep(1);
+                }}
+                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2"
+              >
+                下一步：关联用例
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </WizardStickyFooter>
+        )}
+
+        {wizStep === 1 && (
+          <WizardStickyFooter compact>
+            <div className="flex w-full items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setWizStep(0)}
+              className="border border-border text-muted-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:border-muted-foreground/40 flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              上一步
+            </button>
+            <button
+              type="button"
+              onClick={startGenerate}
+              disabled={generating}
+              className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4" />
+                  开始生成
+                </>
+              )}
+            </button>
+            </div>
+          </WizardStickyFooter>
+        )}
+        </div>
+        </div>
+        ) : (
+        <div className="flex flex-1 flex-col min-h-0">
         {wizStep === 2 && (
           <div className="flex-1 space-y-5">
             {/* Generating state — first generation, no tree yet */}
@@ -921,66 +989,6 @@ export function GenerateWizard({
           </div>
         )}
         </div>
-
-        {wizStep === 0 && (
-          <WizardStickyFooter>
-            <div className="flex justify-end w-full">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!uploadedFiles.length && !requirementText.trim()) {
-                    setValidationMsg("请至少上传一个需求文档，或粘贴需求文本");
-                    return;
-                  }
-                  setValidationMsg("");
-                  setKbPage(1);
-                  setKbSearch("");
-                  setKbBusinessType("");
-                  setHistoryPage(1);
-                  setHistorySearch("");
-                  setHistoryBusinessType("");
-                  setWizStep(1);
-                }}
-                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2"
-              >
-                下一步：关联用例
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </WizardStickyFooter>
-        )}
-
-        {wizStep === 1 && (
-          <WizardStickyFooter>
-            <div className="flex w-full items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setWizStep(0)}
-              className="border border-border text-muted-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:border-muted-foreground/40 flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              上一步
-            </button>
-            <button
-              type="button"
-              onClick={startGenerate}
-              disabled={generating}
-              className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2"
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  生成中...
-                </>
-              ) : (
-                <>
-                  <Wand2 className="w-4 h-4" />
-                  开始生成
-                </>
-              )}
-            </button>
-            </div>
-          </WizardStickyFooter>
         )}
       </div>
 
