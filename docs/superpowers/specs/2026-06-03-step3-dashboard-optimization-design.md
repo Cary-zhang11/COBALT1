@@ -52,9 +52,9 @@ submit → POST /api/tasks/[taskId]/feedback
 
 ### 边界情况
 
-- 评价在 task 详情中已返回，无额外请求失败风险
-- 如果 feedback 数组为空（未被评价过），保持正常的星级交互 UI
-- 如果 GET 失败（网络问题），降级为允许重新提交（后端会创建新记录覆盖）
+- 如果 GET 返回 `rating: null`（未被评价过），保持正常的星级交互 UI
+- 如果 GET 失败（网络异常），降级展示空白交互 UI，允许用户重新提交（`TaskFeedback.create` 始终插入新记录，最新一条生效）
+- POST 成功后重新 GET，确保展示的是服务端实际存储的数据
 
 ---
 
