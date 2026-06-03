@@ -273,7 +273,7 @@ function CoverageBarChart({ data }: { data: { name: string; covered: number; tot
   });
 
   return (
-    <div className="h-full flex flex-col justify-center gap-1">
+    <div className="h-full flex flex-col gap-0.5 pt-1">
       {sorted.map((dim) => {
         const pct = dim.total > 0 ? Math.round((dim.covered / dim.total) * 100) : 0;
         const barColor =
@@ -281,17 +281,17 @@ function CoverageBarChart({ data }: { data: { name: string; covered: number; tot
           pct >= 50 ? "bg-amber-400" :
           "bg-red-400";
         return (
-          <div key={dim.name} className="flex items-center gap-2 text-xs">
-            <span className="w-12 text-muted-foreground truncate shrink-0" title={dim.name}>
+          <div key={dim.name} className="flex items-center gap-1.5 text-[10px]">
+            <span className="w-10 text-muted-foreground truncate shrink-0" title={dim.name}>
               {dim.name}
             </span>
-            <div className="flex-1 h-[14px] bg-muted/50 rounded-full overflow-hidden">
+            <div className="flex-1 h-2 bg-muted/50 rounded-sm overflow-hidden">
               <div
-                className={`h-full rounded-full ${barColor} transition-all`}
+                className={`h-full rounded-sm ${barColor} transition-all`}
                 style={{ width: `${Math.max(pct, 4)}%` }}
               />
             </div>
-            <span className="w-9 text-right tabular-nums text-muted-foreground shrink-0">{pct}%</span>
+            <span className="w-7 text-right tabular-nums text-muted-foreground shrink-0">{pct}%</span>
           </div>
         );
       })}
@@ -410,7 +410,7 @@ function DashboardBody({ data }: { data: StatsData }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-        <DashboardChartCard title="覆盖维度分布" extra="覆盖率" bodyClass="h-[280px]">
+        <DashboardChartCard title="覆盖维度分布" extra="覆盖率">
           <CoverageBarChart data={data.dimensionCoverage} />
         </DashboardChartCard>
 
