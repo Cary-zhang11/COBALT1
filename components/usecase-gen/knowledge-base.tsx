@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Loader2, Download, ChevronDown } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -135,6 +135,7 @@ export function KnowledgeBase() {
 
   const [showUpload, setShowUpload] = useState(false);
   const [uploadContext, setUploadContext] = useState<"knowledge" | "history_uploaded">("knowledge");
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -247,6 +248,19 @@ export function KnowledgeBase() {
     return businessTypeFilter;
   }
 
+  // 点击外部关闭分配类型下拉
+  useEffect(() => {
+    if (!openDropdownId) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-dropdown]")) {
+        setOpenDropdownId(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openDropdownId]);
+
   const platformCount = historyData?.items?.length ?? 0;
   const uploadedCount = uploadedData?.items?.length ?? 0;
   const knowledgeCount = kbData?.total ?? kbData?.items?.length ?? 0;
@@ -339,7 +353,12 @@ export function KnowledgeBase() {
               .filter(Boolean)
               .join(" · ")}
             refCount={item.refCount || 0}
-            badge={<SourceBadge variant="platform" />}
+            badge={
+              <>
+                <SourceBadge variant="platform" />
+                <BusinessTypeBadge type={item.businessType} />
+              </>
+            }
             actions={
               <>
                 <ActionButton
@@ -364,25 +383,33 @@ export function KnowledgeBase() {
                     下载
                   </span>
                 </ActionButton>
-                <div className="relative group">
-                  <ActionButton className="gap-0.5">
+                <div className="relative" data-dropdown>
+                  <ActionButton
+                    className="gap-0.5"
+                    onClick={() => setOpenDropdownId(openDropdownId === item.id ? null : item.id)}
+                  >
                     分配类型
-                    <ChevronDown className="w-3 h-3" />
+                    <ChevronDown className={`w-3 h-3 transition-transform ${openDropdownId === item.id ? "rotate-180" : ""}`} />
                   </ActionButton>
-                  <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg p-1 hidden group-hover:block z-10 min-w-[80px]">
-                    {BUSINESS_TYPES.map((bt) => (
-                      <button
-                        key={bt}
-                        type="button"
-                        onClick={() => assignBusinessTypeMutation.mutate({ taskId: item.id, bt })}
-                        className={`block w-full text-left px-3 py-1.5 text-xs rounded hover:bg-muted whitespace-nowrap ${
-                          item.businessType === bt ? "text-primary font-medium" : ""
-                        }`}
-                      >
-                        {bt}
-                      </button>
-                    ))}
-                  </div>
+                  {openDropdownId === item.id && (
+                    <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg z-20 min-w-[80px]">
+                      {BUSINESS_TYPES.map((bt) => (
+                        <button
+                          key={bt}
+                          type="button"
+                          onClick={() => {
+                            assignBusinessTypeMutation.mutate({ taskId: item.id, bt });
+                            setOpenDropdownId(null);
+                          }}
+                          className={`block w-full text-left px-3 py-1.5 text-xs rounded hover:bg-muted whitespace-nowrap ${
+                            item.businessType === bt ? "text-primary font-medium" : ""
+                          }`}
+                        >
+                          {bt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             }
@@ -453,7 +480,7 @@ export function KnowledgeBase() {
         </aside>
 
         <div className="flex-1 min-w-0">
-          <div className="bg-card rounded-xl border border-border/60 shadow-sm overflow-hidden">
+          <div className="bg-card rounded-xl border border-border/60 shadow-sm">
             <div className="px-4 flex items-center justify-between gap-4 border-b border-border/60 bg-muted/20 min-h-[48px] h-12 box-border">
               <div className="flex items-center gap-1 p-0.5 bg-muted/50 rounded-lg">
                 {MAIN_TABS.map((t, i) => (
