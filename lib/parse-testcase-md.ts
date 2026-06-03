@@ -83,7 +83,7 @@ function extractMeta(markdown: string): ParseMeta {
 
 /**
  * Extract a section by keyword matching instead of hardcoded section numbers.
- * Matches any "## N、keyword" or "## N. keyword" header regardless of the number.
+ * Matches "## N、keyword" or "### N. keyword" (2-3 hashes) regardless of the number.
  */
 function extractSectionByKeyword(
   markdown: string,
@@ -91,7 +91,7 @@ function extractSectionByKeyword(
   endKeyword?: string
 ): string {
   const startPattern = new RegExp(
-    `^##\\s+[一二三四五六七八九十\\d]+[、.]\\s*${startKeyword}`,
+    `^#{2,3}\\s+[一二三四五六七八九十\\d]+[、.]\\s*${startKeyword}`,
     "m"
   );
   const startMatch = markdown.match(startPattern);
@@ -102,7 +102,7 @@ function extractSectionByKeyword(
 
   if (endKeyword) {
     const endPattern = new RegExp(
-      `^##\\s+[一二三四五六七八九十\\d]+[、.]\\s*${endKeyword}`,
+      `^#{2,3}\\s+[一二三四五六七八九十\\d]+[、.]\\s*${endKeyword}`,
       "m"
     );
     const rest = markdown.slice(from + 1);
@@ -280,7 +280,7 @@ function parseDimensionCoverage(markdown: string): DimensionCoverage[] {
   if (!section) return [];
 
   const results: DimensionCoverage[] = [];
-  const lineRegex = /^-\s+(.+?)（(D\d+)）[：:]\s*(是|否)，?(\d+)?个/gm;
+  const lineRegex = /^-\s+(.+?)（(D\d+)）[：:]\s*(是|否)(?:，(\d+)?个)?/gm;
   let match: RegExpExecArray | null;
 
   while ((match = lineRegex.exec(section)) !== null) {
