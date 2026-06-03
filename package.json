@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "seed": "tsx scripts/seed-skills.ts",
     "db:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-db.ps1"
   },

@@ -23,6 +23,11 @@ describe("CaseEditor", () => {
     expect(screen.getByText("暂无生成结果，请先在「生成向导」中生成用例")).toBeDefined();
   });
 
+  it("renders page header when tree present", () => {
+    render(<CaseEditor usecaseTree={mockTree} />);
+    expect(screen.getByText("用例编辑")).toBeDefined();
+  });
+
   it("renders module names in tree", () => {
     render(<CaseEditor usecaseTree={mockTree} />);
     expect(screen.getByText("1. 登录模块")).toBeDefined();

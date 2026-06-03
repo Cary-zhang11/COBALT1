@@ -88,11 +88,11 @@ export function useTaskEvents({
       callbacksRef.current.onPaused?.(data);
     });
 
-    es.addEventListener("error", (e) => {
-      // Server-sent error events carry data (e.g. task not found, db error)
-      if (e.data) {
+    es.addEventListener("error", (e: Event) => {
+      const messageEvent = e as MessageEvent;
+      if (messageEvent.data) {
         try {
-          const data = JSON.parse(e.data);
+          const data = JSON.parse(messageEvent.data as string);
           console.error("[SSE] Server error:", data.message);
           setStatus("error");
           fatalErrorRef.current = true;

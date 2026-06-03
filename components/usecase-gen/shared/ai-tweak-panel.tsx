@@ -13,6 +13,7 @@ interface AITweakPanelProps {
   onCancelTweak: () => void;
   onRecordTweak: (entry: TweakEntry) => void;
   onTweakHistoryUpdate: (history: TweakEntry[]) => void;
+  sectioned?: boolean;
 }
 
 const QUICK_CHIPS = [
@@ -33,6 +34,7 @@ export function AITweakPanel({
   onCancelTweak,
   onRecordTweak,
   onTweakHistoryUpdate,
+  sectioned,
 }: AITweakPanelProps) {
   const [input, setInput] = useState("");
   const [scope, setScope] = useState("all");
@@ -91,9 +93,9 @@ export function AITweakPanel({
     }
   };
 
-  return (
-    <div className="bg-card rounded-xl shadow-sm p-5" data-ai-tweak>
-      <h3 className="font-semibold text-sm mb-3">AI 微调</h3>
+  const body = (
+    <>
+      {!sectioned && <h3 className="font-semibold text-sm mb-3">AI 微调</h3>}
 
       {/* Quick chips */}
       <div className="flex flex-wrap gap-2 mb-3">
@@ -202,6 +204,20 @@ export function AITweakPanel({
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (sectioned) {
+    return (
+      <div data-ai-tweak>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <div id="step3-ai-tweak" className="bg-card rounded-xl shadow-sm p-5" data-ai-tweak>
+      {body}
     </div>
   );
 }

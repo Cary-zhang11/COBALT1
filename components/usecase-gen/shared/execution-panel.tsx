@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { CheckCircle2, Download, MessageSquare, Edit3 } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
+import { CheckCircle2, Download, MessageSquare, Edit3, Star } from "lucide-react";
 import type { FileInfo } from "@/hooks/use-output-scanner";
 
 const WORKFLOW_NODES: { name: string; key: string }[] = [
@@ -24,11 +24,27 @@ interface ExecutionPanelProps {
     history: string;
   };
   foundFiles: FileInfo[];
-  /** Completed stages parsed from [WF:done:xxx] log markers */
   logStages?: Set<string>;
   onDownloadFile: (file: FileInfo) => void;
   onScrollToAITweak: () => void;
+  onScrollToRating: () => void;
   onNavigateToEditor: () => void;
+}
+
+function PanelShell({ children }: { children: ReactNode }) {
+  return (
+    <aside className="w-60 flex-shrink-0 sticky top-6 self-start z-10">
+      {children}
+    </aside>
+  );
+}
+
+function SidebarCard({ children }: { children: ReactNode }) {
+  return (
+    <div className="bg-card rounded-xl border border-border/60 p-4 text-sm max-h-[calc(100vh-8rem)] overflow-y-auto [text-rendering:optimizeLegibility]">
+      {children}
+    </div>
+  );
 }
 
 function deriveNodeStates(
@@ -42,7 +58,6 @@ function deriveNodeStates(
   );
   const hasXmind = foundFiles.some((f) => f.name.endsWith(".xmind"));
 
-  // Step 1: independent state per node
   const nodes = WORKFLOW_NODES.map((node, i) => {
     let state: "wait" | "running" | "done";
     switch (i) {
@@ -67,7 +82,6 @@ function deriveNodeStates(
     return { name: node.name, state };
   });
 
-  // Step 2: cascade — find rightmost done/running, force all left nodes to done
   let rightmostActive = -1;
   for (let i = nodes.length - 1; i >= 0; i--) {
     if (nodes[i].state === "done" || nodes[i].state === "running") {
@@ -84,6 +98,176 @@ function deriveNodeStates(
   return nodes;
 }
 
+function WorkflowTimeline({
+  nodes,
+  title,
+  pulsing,
+}: {
+  nodes: { name: string; state: "wait" | "running" | "done" }[];
+  title: string;
+  pulsing?: boolean;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-semibold text-sm text-foreground">{title}</h4>
+        {pulsing && (
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse inline-block" />
+        )}
+      </div>
+      <div className="flex flex-col space-y-0">
+        {nodes.map((node, i) => (
+          <div key={i} className="flex items-stretch">
+            <div className="flex flex-col items-center mr-2.5">
+              {node.state === "done" ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+              ) : node.state === "running" ? (
+                <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0 shadow-[0_0_0_3px_rgba(99,102,241,0.3)]" />
+              ) : (
+                <div className="w-3 h-3 rounded-full bg-border flex-shrink-0" />
+              )}
+              {i < nodes.length - 1 && (
+                <div
+                  className={`w-px flex-1 my-1 min-h-[12px] ${
+                    node.state === "done" ? "bg-green-200" : "bg-border"
+                  }`}
+                />
+              )}
+            </div>
+            <div
+              className={`pb-2 text-sm leading-snug font-medium ${
+                node.state === "done"
+                  ? "text-green-700"
+                  : node.state === "running"
+                  ? "text-primary"
+                  : "text-muted-foreground opacity-40"
+              }`}
+            >
+              {node.name}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function ConfigPreviewInline({
+  configSummary,
+}: {
+  configSummary: ExecutionPanelProps["configSummary"];
+}) {
+  return (
+    <div className="mt-4 pt-3 border-t border-border">
+      <p className="text-xs font-semibold mb-2 px-1">当前配置预览</p>
+      <div className="bg-muted/60 rounded-lg px-3 py-2.5 space-y-1.5 text-xs leading-snug">
+        {[
+          ["物料来源", configSummary.source],
+          ["参考知识", configSummary.knowledge],
+          ["历史范文", configSummary.history],
+          ["输出格式", "XMind + Markdown"],
+        ].map(([label, value]) => (
+          <div
+            key={label as string}
+            className="grid grid-cols-[4.5rem_1fr] gap-2 items-center min-h-[18px]"
+          >
+            <span className="text-muted-foreground">{label}</span>
+            <span className="font-medium truncate text-right tabular-nums">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DoneBanner() {
+  return (
+    <div className="mt-3 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-2 text-xs leading-snug text-emerald-700">
+      ✓ 执行完成 · 文件已就绪
+    </div>
+  );
+}
+
+function QuickActions({
+  mdFile,
+  xmindFile,
+  onDownloadFile,
+  onScrollToAITweak,
+  onScrollToRating,
+  onNavigateToEditor,
+}: {
+  mdFile: FileInfo | null;
+  xmindFile: FileInfo | null;
+  onDownloadFile: (file: FileInfo) => void;
+  onScrollToAITweak: () => void;
+  onScrollToRating: () => void;
+  onNavigateToEditor: () => void;
+}) {
+  return (
+    <div className="mt-4 pt-3 border-t border-border">
+      <p className="text-xs font-semibold mb-2">快捷操作</p>
+      <div className="space-y-1.5">
+        {mdFile && (
+          <button
+            type="button"
+            onClick={() => onDownloadFile(mdFile)}
+            className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-border hover:bg-muted/40 text-left"
+          >
+            <span className="flex items-center gap-2">
+              <Download className="w-4 h-4 text-primary shrink-0" />
+              下载 Markdown
+            </span>
+          </button>
+        )}
+        {xmindFile && (
+          <button
+            type="button"
+            onClick={() => onDownloadFile(xmindFile)}
+            className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-border hover:bg-muted/40 text-left"
+          >
+            <span className="flex items-center gap-2">
+              <Download className="w-4 h-4 text-primary shrink-0" />
+              下载 XMind
+            </span>
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onScrollToAITweak}
+          className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-border hover:bg-muted/40 text-left"
+        >
+          <span className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-primary shrink-0" />
+            AI 微调
+          </span>
+          <span className="text-xs text-muted-foreground shrink-0">↓主区</span>
+        </button>
+        <button
+          type="button"
+          onClick={onScrollToRating}
+          className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-amber-200/80 bg-amber-50/50 hover:bg-amber-50 text-left"
+        >
+          <span className="flex items-center gap-2">
+            <Star className="w-4 h-4 text-primary shrink-0" />
+            评价
+          </span>
+          <span className="text-xs text-muted-foreground shrink-0">↓主区</span>
+        </button>
+        <button
+          type="button"
+          onClick={onNavigateToEditor}
+          className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-border hover:bg-muted/40 text-left"
+        >
+          <span className="flex items-center gap-2">
+            <Edit3 className="w-4 h-4 text-primary shrink-0" />
+            编辑
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ExecutionPanel({
   generating,
   wizStep,
@@ -94,6 +278,7 @@ export function ExecutionPanel({
   logStages,
   onDownloadFile,
   onScrollToAITweak,
+  onScrollToRating,
   onNavigateToEditor,
 }: ExecutionPanelProps) {
   const nodes = useMemo(
@@ -101,89 +286,7 @@ export function ExecutionPanel({
     [foundFiles, generating, logStages]
   );
 
-  // Mode 1: Config Preview (wizStep < 2)
-  if (wizStep < 2) {
-    return (
-      <div className="w-56 flex-shrink-0">
-        <div className="bg-card rounded-xl shadow-sm p-4 sticky top-20">
-          <h4 className="font-semibold text-sm text-foreground mb-3">
-            当前配置预览
-          </h4>
-          <div className="bg-muted rounded-lg p-3 space-y-2">
-            {[
-              ["物料来源", configSummary.source],
-              ["参考知识", configSummary.knowledge],
-              ["历史范文", configSummary.history],
-              ["输出格式", "XMind + Markdown"],
-            ].map(([label, value]) => (
-              <div
-                key={label as string}
-                className="flex items-center justify-between text-xs"
-              >
-                <span className="text-muted-foreground">{label}</span>
-                <span className="font-medium max-w-[120px] truncate whitespace-nowrap">
-                  {value}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Mode 2: Progress Dots (wizStep === 2 && generating && not tweak)
-  if (wizStep === 2 && generating && !isTweak) {
-    return (
-      <div className="w-56 flex-shrink-0">
-        <div className="bg-card rounded-xl shadow-sm p-4 sticky top-20">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse inline-block" />
-            <span className="text-xs font-semibold text-foreground">生成中</span>
-          </div>
-          <div className="flex flex-col">
-            {nodes.map((node, i) => (
-              <div key={i} className="flex items-stretch">
-                {/* Dot + vertical line column */}
-                <div className="flex flex-col items-center mr-2.5">
-                  {node.state === "done" ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                  ) : node.state === "running" ? (
-                    <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0 shadow-[0_0_0_3px_rgba(99,102,241,0.3)]" />
-                  ) : (
-                    <div className="w-3 h-3 rounded-full bg-border flex-shrink-0" />
-                  )}
-                  {i < nodes.length - 1 && (
-                    <div
-                      className={`w-px flex-1 my-1 ${
-                        node.state === "done" ? "bg-green-200" : "bg-border"
-                      }`}
-                    />
-                  )}
-                </div>
-                {/* Label */}
-                <div
-                  className={`pb-2 text-xs font-medium transition-opacity ${
-                    node.state === "done"
-                      ? "text-green-700"
-                      : node.state === "running"
-                      ? "text-primary"
-                      : "text-muted-foreground opacity-40"
-                  }`}
-                >
-                  {node.name}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Mode 3: Quick Actions (wizStep === 2 && !generating)
-  if (wizStep === 2 && !generating && (foundFiles.length > 0 || hasResult)) {
-    // Find latest-version files by version suffix
+  const pickLatestFiles = () => {
     const mdFiles = foundFiles
       .filter((f) => f.name.includes("测试用例") && f.name.endsWith(".md"))
       .sort((a, b) => {
@@ -198,54 +301,65 @@ export function ExecutionPanel({
         const vb = parseInt(b.name.match(/_v(\d+)\.xmind$/)?.[1] || "0", 10);
         return vb - va;
       });
-    const mdFile = mdFiles[0] || null;
-    const xmindFile = xmindFiles[0] || null;
+    return { mdFile: mdFiles[0] || null, xmindFile: xmindFiles[0] || null };
+  };
 
+  if (wizStep < 2) {
     return (
-      <div className="w-56 flex-shrink-0">
-        <div className="bg-card rounded-xl shadow-sm p-4 sticky top-20">
-          <h4 className="font-semibold text-sm text-foreground mb-3">
-            快捷操作
-          </h4>
-          <div className="space-y-2">
-            {mdFile && (
-              <button
-                onClick={() => onDownloadFile(mdFile)}
-                className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-muted/30 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5 text-primary" />
-                下载 Markdown
-              </button>
-            )}
-            {xmindFile && (
-              <button
-                onClick={() => onDownloadFile(xmindFile)}
-                className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-muted/30 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5 text-primary" />
-                下载 XMind
-              </button>
-            )}
-            <button
-              onClick={onScrollToAITweak}
-              className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-muted/30 transition-colors"
-            >
-              <MessageSquare className="w-3.5 h-3.5 text-primary" />
-              AI 微调
-            </button>
-            <button
-              onClick={onNavigateToEditor}
-              className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-muted/30 transition-colors"
-            >
-              <Edit3 className="w-3.5 h-3.5 text-primary" />
-              去编辑用例
-            </button>
-          </div>
-        </div>
-      </div>
+      <PanelShell>
+        <SidebarCard>
+          <WorkflowTimeline nodes={nodes} title="执行轨迹" />
+          <ConfigPreviewInline configSummary={configSummary} />
+        </SidebarCard>
+      </PanelShell>
     );
   }
 
-  // Fallback: nothing to show yet
-  return <div className="w-56 flex-shrink-0" />;
+  if (wizStep === 2 && generating && !isTweak) {
+    return (
+      <PanelShell>
+        <SidebarCard>
+          <WorkflowTimeline nodes={nodes} title="生成中" pulsing />
+        </SidebarCard>
+      </PanelShell>
+    );
+  }
+
+  if (wizStep === 2 && !generating && (foundFiles.length > 0 || hasResult)) {
+    const { mdFile, xmindFile } = pickLatestFiles();
+    return (
+      <PanelShell>
+        <SidebarCard>
+          <WorkflowTimeline nodes={nodes} title="执行轨迹" />
+          <DoneBanner />
+          <QuickActions
+            mdFile={mdFile}
+            xmindFile={xmindFile}
+            onDownloadFile={onDownloadFile}
+            onScrollToAITweak={onScrollToAITweak}
+            onScrollToRating={onScrollToRating}
+            onNavigateToEditor={onNavigateToEditor}
+          />
+        </SidebarCard>
+      </PanelShell>
+    );
+  }
+
+  if (wizStep === 2 && generating && isTweak) {
+    return (
+      <PanelShell>
+        <SidebarCard>
+          <WorkflowTimeline nodes={nodes} title="微调中" pulsing />
+        </SidebarCard>
+      </PanelShell>
+    );
+  }
+
+  return (
+    <PanelShell>
+      <SidebarCard>
+        <WorkflowTimeline nodes={nodes} title="执行轨迹" />
+      </SidebarCard>
+    </PanelShell>
+  );
 }

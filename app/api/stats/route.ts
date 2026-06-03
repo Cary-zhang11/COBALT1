@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
+import {
+  avgUserRating,
+  ratingDistribution,
+  latestFeedbackByTaskId,
+} from "@/lib/stats-user-rating";
 
 export async function GET(req: NextRequest) {
   try {
@@ -70,7 +78,7 @@ export async function GET(req: NextRequest) {
 
     // Dimension coverage
     const tasksWithDimensions = await prisma.task.findMany({
-      where: { ...completedFilter, dimensionCoverage: { not: null } },
+      where: { ...completedFilter, dimensionCoverage: { not: Prisma.DbNull } },
       select: { dimensionCoverage: true },
     });
     const dimMap = new Map<string, { covered: number; total: number }>();
@@ -109,16 +117,17 @@ export async function GET(req: NextRequest) {
       count: r._count,
     }));
 
-    // Efficiency
-    const totalCompleted = await prisma.task.count({ where: completedFilter });
-    const editedCount = await prisma.task.count({
-      where: { ...completedFilter, tweakCount: { gt: 0 } },
+    const feedbackRows = await prisma.taskFeedback.findMany({
+      select: { taskId: true, rating: true, comment: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
     });
+    const latestByTask = latestFeedbackByTaskId(feedbackRows);
+    const allLatestRatings = Array.from(latestByTask.values()).map((f) => f.rating);
 
-    // Recent records
     const recent = await prisma.task.findMany({
       where: completedFilter,
       select: {
+        id: true,
         createdAt: true,
         input: true,
         totalCases: true,
@@ -137,26 +146,27 @@ export async function GET(req: NextRequest) {
         monthlyActiveUsers: mauResult.length,
         avgQualityScore: Math.round(avgAgg._avg?.qualityScore || 0),
         avgDuration: Math.round(avgAgg._avg?.duration || 0),
+        avgUserRating: avgUserRating(allLatestRatings),
       },
       dailyTrend,
       categoryDistribution,
       dimensionCoverage,
       topUsers,
-      efficiency: {
-        avgScore: Math.round(avgAgg._avg?.qualityScore || 0),
-        avgDuration: Math.round(avgAgg._avg?.duration || 0),
-        avgTokens: Math.round(avgAgg._avg?.tokenUsage || 0),
-        editRate: totalCompleted > 0 ? Math.round((editedCount / totalCompleted) * 100) / 100 : 0,
-      },
-      recentRecords: recent.map((r) => ({
-        time: r.createdAt.toLocaleDateString("zh-CN"),
-        user: r.user?.name || "未知",
-        req: (r.input || "").slice(0, 60),
-        count: r.totalCases || 0,
-        score: r.qualityScore || 0,
-        tokens: r.tokenUsage || 0,
-        category: r.category || "未分类",
-      })),
+      userRatingDistribution: ratingDistribution(allLatestRatings),
+      recentRecords: recent.map((r) => {
+        const fb = latestByTask.get(r.id);
+        return {
+          time: r.createdAt.toLocaleDateString("zh-CN"),
+          user: r.user?.name || "未知",
+          req: (r.input || "").slice(0, 60),
+          count: r.totalCases || 0,
+          score: r.qualityScore || 0,
+          tokens: r.tokenUsage || 0,
+          category: r.category || "未分类",
+          userRating: fb?.rating ?? null,
+          userComment: fb?.comment ?? null,
+        };
+      }),
     });
   } catch (error) {
     console.error("Stats error:", error);

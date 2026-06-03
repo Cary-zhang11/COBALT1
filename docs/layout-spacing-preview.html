@@ -37,10 +37,29 @@
     .struct-tag.old { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
     .struct-tag.proto { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
     .struct-tag.fix { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    /* 向导方案 A：主区 min-h + flex 列，底栏贴主区底部（非漂在空白中间） */
+    .wizard-step-row {
+      min-height: min(520px, calc(100vh - 12rem));
+    }
+    .wizard-main-col {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0%;
+      min-width: 0;
+      min-height: 100%;
+    }
+    .wizard-main-body {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
     .sticky-footer {
-      position: sticky; bottom: 0; z-index: 20;
-      background: linear-gradient(to top, #fff 80%, transparent);
-      padding-top: 12px; margin-top: 8px;
+      flex-shrink: 0;
+      margin-top: auto;
+      position: sticky;
+      bottom: 0;
+      z-index: 20;
+      background: linear-gradient(to top, #fff 85%, transparent);
+      padding-top: 16px;
     }
     .callout { font-size: 11px; padding: 8px 12px; border-radius: 0 8px 8px 0; margin-bottom: 12px; border-left-width: 3px; }
     .callout-green { border-color: #10b981; background: #ecfdf5; color: #047857; }
@@ -175,9 +194,12 @@
     function stickyFooter(left, right) {
       if (isOld()) return `<div class="flex ${left ? "justify-between" : "justify-end"} gap-3 mt-4">${left || ""}${right}</div>`;
       return `<div class="sticky-footer">
-        <span class="struct-tag new">sticky 底栏 · 三步同结构</span>
         <div class="bg-card border rounded-xl shadow-sm px-5 py-3 flex items-center ${left ? "justify-between" : "justify-end"} gap-3">${left || ""}${right}</div>
       </div>`;
+    }
+
+    function wizardMainBody(stepIndex, html) {
+      return `<div class="wizard-main-body space-y-4">${html}</div>`;
     }
 
     /** 右栏：单壳常驻 — Step1/2 轨迹+配置；Step3 轨迹+快捷操作 */
@@ -233,9 +255,21 @@
         <div class="mt-4 pt-3 border-t border-border">
           <p class="text-xs font-semibold mb-2">快捷操作</p>
           <div class="space-y-1.5">
-            ${["下载 Markdown", "AI 微调", "编辑"].map(t =>
-              `<button class="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:bg-muted/40 text-left">${t}</button>`
-            ).join("")}
+            ${[
+              ["下载 Markdown", ""],
+              ["AI 微调", ""],
+              ["评价", "scroll 至主区「本次生成评价」"],
+              ["编辑", ""],
+            ].map(([t, hint]) => {
+              const onClick = t === "评价"
+                ? ` onclick="document.getElementById('step3-rating')?.scrollIntoView({behavior:'smooth',block:'start'})"`
+                : t === "AI 微调"
+                  ? ` onclick="document.getElementById('step3-ai-tweak')?.scrollIntoView({behavior:'smooth',block:'start'})"`
+                  : "";
+              return `<button type="button"${onClick} class="w-full flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:bg-muted/40 text-left ${t === "评价" ? "border-amber-200/80 bg-amber-50/50" : ""}" title="${hint}">
+                <span>${t}</span>${t === "评价" || t === "AI 微调" ? '<span class="text-[9px] text-muted-foreground">↓主区</span>' : ""}
+              </button>`;
+            }).join("")}
           </div>
           <p class="text-[10px] text-muted-foreground mt-2 pt-2 border-t">Token: 4,238</p>
         </div>` : "";
@@ -285,8 +319,11 @@
         ${calloutText ? callout(calloutText, calloutType || "green") : ""}
         <div class="${guide(shell.cls + " mx-auto w-full", shell.label)}">
           ${stepBar(stepIndex)}
-          <div class="flex gap-5 items-start min-h-[min(480px,calc(100vh-11rem))]">
-            <div class="flex-1 min-w-0 space-y-4">${mainInner}${stickyFooter(footerLeft, footerRight)}</div>
+          <div class="${guide("flex gap-5 items-stretch wizard-step-row", "方案A min-h")}">
+            <div class="${guide("wizard-main-col", "主列 flex-col")}">
+              ${wizardMainBody(stepIndex, mainInner)}
+              ${stickyFooter(footerLeft, footerRight)}
+            </div>
             ${executionPanel(stepIndex, panelState)}
           </div>
         </div>`;
@@ -325,13 +362,13 @@
           <tr><td><code>generate-wizard.tsx</code> Step3</td><td>
             统一 section 壳 · KPI <code>tabular-nums</code>（AI 质量评分）· 微调默认展开<br/>
             输出文件：每行 <code>预览|编辑|下载</code> · 无独立底栏 CTA<br/>
-            <strong>评价</strong>：输出文件与 AI 微调之间 · 用户 1–5 星（<code>RatingPanel</code> / <code>POST …/feedback</code>）· 右栏不放评价
+            <strong>评价</strong>：微调后、模块表前 · 主区 <code>RatingPanel</code> · 右栏快捷操作可跳转「评价」
           </td></tr>
           <tr><td><code>execution-panel.tsx</code></td><td>
             ① 单壳结构，禁止互斥 <code>return</code><br/>
             ② <strong>Step1/2</strong>：执行轨迹（wait）+ 当前配置预览<br/>
             ③ <strong>Step3 生成中</strong>：执行轨迹 running/done<br/>
-            ④ <strong>Step3 完成</strong>：轨迹全 done + 快捷操作<br/>
+            ④ <strong>Step3 完成</strong>：轨迹全 done + 快捷操作（含<strong>评价</strong>→滚动主区）<br/>
             ⑤ <code>w-60</code>，文案 <code>max-w-[160px]</code>，<code>sticky top-6</code>
           </td></tr>
         </table>
@@ -342,16 +379,16 @@
           <tr><td>历史记录</td><td>Page Header + 列表行（<strong>无状态图标</strong>，仅右侧文字标签）</td></tr>
           <tr><td>日志列表</td><td>与历史同结构 · 去掉左侧 Icon 色块</td></tr>
           <tr><td>用例编辑</td><td><code>max-w-7xl</code> · Page Header（模块/用例/P0–P2）· 左树 <code>w-72</code> · 右详情表单 · 底栏保存/放弃 · +原型 Tab</td></tr>
-          <tr><td>数据看板</td><td><code>#dashboard-user-rating-table</code>：<strong>用户评价</strong>列 = 星级 + 补充说明（<code>comment</code> 截断）· 不落 KPI/分布图</td></tr>
+          <tr><td>数据看板</td><td>用户评价三处：<strong>KPI「用户平均评分」</strong> · <strong>图表「用户评价分布」</strong> · <strong>表格「用户评价」列</strong>（星级 + <code>comment</code> 截断）；趋势图保持现网 · 删效率统计条</td></tr>
         </table>
 
         <h2 class="text-sm font-bold">明确不改</h2>
-        <p class="text-xs text-muted-foreground">login/register · tasks 相关页 · Sidebar · 弹窗组件 · 业务逻辑/API</p>
+        <p class="text-xs text-muted-foreground">login/register · tasks 相关页 · Sidebar · 弹窗组件 · 生成/执行主流程不改（看板可扩展 <code>GET /api/stats</code> 只读字段）</p>
 
         <h2 class="text-sm font-bold">默认决策（D1–D7）</h2>
         <ul class="text-xs space-y-1 list-disc pl-4 text-muted-foreground">
           <li>D1 内容居中 <code>mx-auto</code></li>
-          <li>D2 右栏保留，<code>w-64</code>，三步常驻</li>
+          <li>D2 右栏保留，<code>w-60</code>，三步常驻（与 Sidebar <code>w-64</code> 区分）</li>
           <li>D3 阶段 A+B+C 全做</li>
           <li>D4 日志/历史 <code>max-w-4xl</code></li>
           <li>D5 知识库左栏 <code>w-52</code></li>
@@ -398,7 +435,7 @@
       }
 
       return wizardShell(0, body, "", btnPrimary("下一步：关联用例 →"), "wait", {
-        calloutText: isOld() ? "现状：全宽 · 右栏非 sticky" : isProto() ? "+原型：大上传区" : "v1.2：三步统一 max-w-7xl · 右栏 sticky",
+        calloutText: isOld() ? "现状：全宽 · 按钮紧跟短内容 · 下方大片空白" : isProto() ? "+原型：大上传区" : "v1.2 + 方案A：底栏贴主区底部（见虚线留白区）",
         calloutType: isOld() ? "red" : isProto() ? "blue" : "green",
       });
     }
@@ -438,7 +475,7 @@
       const body = `<div class="grid ${grid} gap-4">${kbCard}${historyCard}</div>`;
 
       return wizardShell(1, body, isNew() ? btnPrimary("← 上一步", true) : "", btnPrimary("开始生成"), "wait", {
-        calloutText: isOld() ? "现状：全宽" : "v1.2：max-w-7xl · 无已选汇总条 · 历史范文保留搜索筛选（与现网一致）",
+        calloutText: isOld() ? "现状：全宽 · 无底栏贴底" : "v1.2 + 方案A：双栏列表 max-h-64 滚动 · 底栏同上",
         calloutType: isOld() ? "red" : "green",
       });
     }
@@ -457,8 +494,8 @@
     }
 
     function sectionCard(title, icon, body, opts = {}) {
-      const { meta = "", collapsed = false, collapsedHint = "点击标题展开", chevron = true } = opts;
-      return `<div class="bg-card border rounded-xl shadow-sm overflow-hidden">
+      const { meta = "", collapsed = false, collapsedHint = "点击标题展开", chevron = true, id = "" } = opts;
+      return `<div${id ? ` id="${id}"` : ""} class="bg-card border rounded-xl shadow-sm overflow-hidden">
         ${sectionHead(title, icon, meta, { collapsed, chevron })}
         ${collapsed
           ? `<div class="px-5 py-3 text-xs text-muted-foreground border-t border-border/50">${collapsedHint}</div>`
@@ -521,7 +558,7 @@
         `<button type="button" class="text-lg leading-none ${n <= 4 ? "text-amber-400" : "text-muted-foreground/30"}" title="${n} 星">★</button>`
       ).join("");
       const body = `<div class="space-y-3">
-          <p class="text-[10px] text-muted-foreground"><span class="struct-tag new">仅 Step3 完成态</span> 与 KPI「质量评分」区分：此处为用户主观评价</p>
+          <p class="text-[10px] text-muted-foreground"><span class="struct-tag new">微调后评价</span> 与 KPI「质量评分」区分；可对微调后的结果打分（提交覆盖/取最新一条）</p>
           <div class="flex flex-wrap items-center gap-3">
             <span class="text-xs text-muted-foreground whitespace-nowrap">整体满意度</span>
             <div class="flex items-center gap-0.5">${stars}</div>
@@ -533,7 +570,7 @@
             <p class="text-[10px] text-muted-foreground mt-1.5">提交后写入 <code>TaskFeedback.comment</code> · 看板「最近生成记录」<strong>用户评价</strong>列第二行展示（非 KPI/图表）</p>
           </div>
         </div>`;
-      return sectionCard("本次生成评价", "⭐", body, { chevron: false });
+      return sectionCard("本次生成评价", "⭐", body, { chevron: false, id: "step3-rating" });
     }
 
     /** 现状：独立底栏「去编辑用例」 */
@@ -574,6 +611,7 @@
       return sectionCard("AI 微调", "✨", body, {
         collapsed,
         collapsedHint: '点击标题展开 · 已有 <strong class="text-foreground">1</strong> 条微调记录',
+        id: "step3-ai-tweak",
       });
     }
 
@@ -637,17 +675,17 @@
           </div>
           ${step3KpiCards(true)}
           ${step3OutputFiles("new")}
-          ${step3Rating()}
           ${step3AiTweak(tweakCollapsed)}
+          ${step3Rating()}
           ${step3ModuleTable(false)}
         </div>`;
       }
       return `<div class="${gap}">
         ${step3KpiCards(true)}
         ${step3OutputFiles("new")}
-        ${step3Rating()}
-        <p class="text-[10px] text-muted-foreground px-1"><span class="struct-tag fix">v1.2</span> 输出文件 → 评价 → AI 微调 → 模块表</p>
         ${step3AiTweak(tweakCollapsed)}
+        ${step3Rating()}
+        <p class="text-[10px] text-muted-foreground px-1"><span class="struct-tag fix">v1.2</span> 输出文件 → AI 微调 → 评价 → 模块表</p>
         ${step3ModuleTable(false)}
       </div>`;
     }
@@ -670,7 +708,7 @@
         headerActions = "";
       } else {
         body = step3MainBody("new");
-        calloutText = "v1.2：输出文件 → 用户评价（1–5 星）→ AI 微调 · 右栏无评价 · sticky";
+        calloutText = "v1.2：主区 文件→微调→评价→模块表 · 右栏快捷操作含「评价」跳转 · sticky";
         calloutType = "green";
         headerActions = "";
       }
@@ -1103,7 +1141,7 @@
 
     const NOTES = {
       old: { overview: "当前问题汇总见总览表「现状」列", "wizard-s1": "Step条在左栏 · 右栏仅配置 · 双卡片", "wizard-s2": "无右栏 · 双列无断点", "wizard-s3": "右栏变快捷按钮 · 主CTA在底部", history: "小标题", editor: "disabled 工具栏", dashboard: "无页头", logs: "p-8" },
-      new: { overview: "v1.2 · 三步同宽+右栏sticky · 看板Ant Pro", "wizard-s1": "max-w-7xl · 右栏 sticky", "wizard-s2": "双栏搜索筛选 · 无已选汇总", "wizard-s3": "评价在输出文件后 · 微调展开", history: "无状态图标 · 右标签", editor: "树+详情+保存条", dashboard: "用户评分 KPI+分布+表格列", logs: "无状态图标 · 同历史" },
+      new: { overview: "v1.2 · 三步同宽+右栏sticky · 看板Ant Pro", "wizard-s1": "方案A：主区flex-1+底栏贴底", "wizard-s2": "方案A + 双栏列表滚动", "wizard-s3": "微调后评价 · 右栏快捷含评价", history: "无状态图标 · 右标签", editor: "树+详情+保存条", dashboard: "用户评分 KPI+分布+表格列", logs: "无状态图标 · 同历史" },
       proto: { overview: "+原型增强", "wizard-s1": "大拖拽", "wizard-s2": "同骨架", "wizard-s3": "五段式", history: "—", editor: "Tab", dashboard: "Ant Pro + 环比", logs: "—" },
     };
 

@@ -246,7 +246,7 @@ export function KnowledgeBase() {
   // ---- Main render ----
 
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div>
       {/* Main Tab bar */}
       <div className="bg-card rounded-xl shadow-sm p-1 flex gap-1 mb-4 w-fit">
         {MAIN_TABS.map((t, i) => (

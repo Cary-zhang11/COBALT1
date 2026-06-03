@@ -92,15 +92,13 @@ export function HistoryList({ skillId, onSelectTask }: HistoryListProps) {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold">
-          历史记录
-          <span className="ml-1.5 text-xs text-muted-foreground font-normal">
-            ({tasks.length})
-          </span>
-        </h3>
-      </div>
+    <div>
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">历史记录</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          查看并继续未完成的生成任务 · 共 {tasks.length} 条
+        </p>
+      </header>
 
       <div className="space-y-2">
         {tasks.map((task) => {

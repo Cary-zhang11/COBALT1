@@ -13,9 +13,9 @@ export function ModuleOverviewTable({ modules, totalCases }: ModuleOverviewTable
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <div className="bg-card rounded-xl shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl shadow-sm border border-border/60 overflow-hidden">
       <div
-        className="px-5 py-3 flex items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors"
+        className="px-5 py-3 flex items-center justify-between gap-2 border-b bg-muted/20 min-h-[44px] cursor-pointer hover:bg-muted/30 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <h3 className="font-semibold text-sm">

@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -8,7 +8,7 @@ async function migrate() {
   const tasks = await prisma.task.findMany({
     where: {
       totalCases: null,
-      report: { not: null },
+      report: { not: Prisma.DbNull },
     },
     select: { id: true, report: true },
   });

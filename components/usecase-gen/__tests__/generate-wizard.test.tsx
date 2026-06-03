@@ -61,11 +61,17 @@ describe("GenerateWizard", () => {
     expect(screen.getByText("生成并预览")).toBeDefined();
   });
 
-  it("renders step 1 upload area and textarea", () => {
+  it("renders step 0 single card with upload and paste", () => {
     render(<GenerateWizard {...defaultProps} />);
-    expect(screen.getByText("上传需求文档")).toBeDefined();
+    expect(screen.getByText("输入需求物料")).toBeDefined();
     expect(screen.getByPlaceholderText("将需求描述、用户故事或功能说明粘贴到此处...")).toBeDefined();
     expect(screen.getByText("下一步：关联用例")).toBeDefined();
+  });
+
+  it("wizard root has no nested overflow-auto scroll container", () => {
+    render(<GenerateWizard {...defaultProps} />);
+    const root = screen.getByTestId("generate-wizard-root");
+    expect(root.className).not.toMatch(/overflow-auto/);
   });
 
   it("navigates to Step 1 when clicking '下一步'", async () => {
@@ -92,7 +98,7 @@ describe("GenerateWizard", () => {
     await userEvent.click(screen.getByText("下一步：关联用例"));
     // Go back to Step 0
     await userEvent.click(screen.getByText("上一步"));
-    expect(screen.getByText("上传需求文档")).toBeDefined();
+    expect(screen.getByText("输入需求物料")).toBeDefined();
   });
 
   it("shows generate button in Step 1", async () => {

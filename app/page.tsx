@@ -27,7 +27,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-8">
+    <div className="flex-1 overflow-auto p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -47,7 +47,6 @@ export default function DashboardPage() {
           <div className="space-y-3">
             {tasks.map((task) => {
               const config = statusConfig[task.status] || statusConfig.pending;
-              const Icon = config.icon;
               return (
                 <div
                   key={task.id}
@@ -60,9 +59,6 @@ export default function DashboardPage() {
                   }}
                   className="flex items-center gap-4 p-4 bg-card border rounded-xl hover:shadow-md transition-all cursor-pointer"
                 >
-                  <div className={`p-2 rounded-lg ${config.color}`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{task.skill.name}</p>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">

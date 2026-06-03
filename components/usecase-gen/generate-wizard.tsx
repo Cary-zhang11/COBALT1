@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
 import { useQuery } from "@tanstack/react-query";
 import { useOutputScanner, maxXmindVersion, type FileInfo } from "@/hooks/use-output-scanner";
@@ -8,14 +8,15 @@ import { useTaskEvents } from "@/hooks/use-task-events";
 import { ExecutionPanel } from "./shared/execution-panel";
 import { OutputFiles } from "./shared/output-files";
 import { AITweakPanel } from "./shared/ai-tweak-panel";
-
+import { RatingPanel } from "./shared/rating-panel";
 import { ModuleOverviewTable } from "./shared/module-overview-table";
+import { WizardSection } from "./shared/wizard-section";
 
 import type { UsecaseModule, TweakEntry } from "./shared/types";
 import {
   Upload, Loader2, FileText, CheckCircle2, ArrowLeft, ChevronRight,
-  Wand2, AlertTriangle, RefreshCw, Edit3, BarChart3,
-  Clock, Target, FileCheck, ArrowRight,
+  Wand2, AlertTriangle, RefreshCw, BarChart3,
+  Clock, Target, FileCheck, Star, Sparkles,
 } from "lucide-react";
 
 interface GenerateWizardProps {
@@ -33,6 +34,16 @@ interface UploadedFile {
 const STEPS = ["输入物料", "关联用例", "生成并预览"];
 const BUSINESS_TYPES = ["C1C", "C1B", "C2C", "C2B", "数科", "车小妹"] as const;
 
+function WizardStickyFooter({ children }: { children: ReactNode }) {
+  return (
+    <div className="sticky bottom-0 z-20 mt-auto flex-shrink-0 pt-4 bg-gradient-to-t from-background from-85% via-background/80 to-transparent">
+      <div className="bg-card rounded-xl shadow-sm px-5 py-3 flex items-center gap-3">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function GenerateWizard({
   initialTaskId, onComplete, skillId, onNavigateToTab,
 }: GenerateWizardProps) {
@@ -41,7 +52,11 @@ export function GenerateWizard({
   const resumeTask = useResumeTask();
   const cancelTask = useCancelTask();
   // Wizard
-  const [wizStep, setWizStep] = useState(0);
+  const [wizStep, setWizStepState] = useState(0);
+  const setWizStep = useCallback((step: number) => {
+    setWizStepState(step);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [requirementText, setRequirementText] = useState("");
   const [validationMsg, setValidationMsg] = useState("");
@@ -423,6 +438,15 @@ export function GenerateWizard({
     }
   };
 
+  const mergedOutputFiles = useMemo(() => {
+    const seen = new Set<string>();
+    return [...scanner.foundFiles, ...loadedFiles].filter((f) => {
+      if (seen.has(f.relativePath)) return false;
+      seen.add(f.relativePath);
+      return true;
+    });
+  }, [scanner.foundFiles, loadedFiles]);
+
   if (!skillId) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -438,12 +462,34 @@ export function GenerateWizard({
     );
   }
 
+  const step3OutputCount = useMemo(
+    () =>
+      mergedOutputFiles.filter(
+        (f) =>
+          !f.name.includes("_source") &&
+          !f.name.includes("archive/") &&
+          (f.name.endsWith(".md") || f.name.endsWith(".xmind"))
+      ).length,
+    [mergedOutputFiles]
+  );
+
   return (
-    <div className="flex gap-6 overflow-auto min-h-0">
-      {/* Left: Wizard */}
-      <div className="flex-1 min-w-0 overflow-auto">
-        {/* Step Bar */}
-        <div className="flex items-center gap-0 mb-6 bg-card rounded-xl shadow-sm p-4">
+    <div
+      className={
+        wizStep === 2
+          ? "flex gap-5 items-start"
+          : "flex gap-6 items-stretch min-h-[min(520px,calc(100vh-12rem))]"
+      }
+      data-testid="generate-wizard-root"
+    >
+      <div
+        className={
+          wizStep === 2
+            ? "flex flex-1 flex-col min-w-0"
+            : "flex flex-1 flex-col min-w-0 min-h-full"
+        }
+      >
+        <div className="flex items-center gap-0 mb-6 bg-card rounded-xl shadow-sm p-4 flex-shrink-0">
           {STEPS.map((s, i) => (
             <div key={i} className="flex items-center gap-0 flex-1">
               <div className="flex items-center gap-2 flex-1">
@@ -461,11 +507,14 @@ export function GenerateWizard({
           ))}
         </div>
 
-        {/* Step 1 */}
+        <div className="flex flex-1 flex-col min-h-0">
         {wizStep === 0 && (
-          <div className="space-y-4">
+          <div className="flex-1 space-y-4">
             <div className="bg-card rounded-xl shadow-sm p-5">
-              <h3 className="font-semibold mb-3 flex items-center gap-2"><Upload className="w-4 h-4 text-primary" />上传需求文档</h3>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Upload className="w-4 h-4 text-primary" />
+                输入需求物料
+              </h3>
               <div
                 className="border-2 border-dashed rounded-lg py-3 px-4 text-center cursor-pointer transition-all border-border hover:border-primary/30 hover:bg-primary/5"
                 onClick={() => document.getElementById("wizard-file-input")?.click()}
@@ -490,10 +539,12 @@ export function GenerateWizard({
                   ))}
                 </div>
               )}
-            </div>
-
-            <div className="bg-card rounded-xl shadow-sm p-5">
-              <h3 className="font-semibold mb-3 flex items-center gap-2"><Wand2 className="w-4 h-4 text-primary" />或直接粘贴需求文本/链接</h3>
+              <div className="flex items-center gap-3 my-4">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground font-medium">或</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+              <h4 className="text-sm font-medium mb-2">粘贴需求文本</h4>
               <textarea
                 value={requirementText}
                 onChange={(e) => setRequirementText(e.target.value)}
@@ -520,28 +571,12 @@ export function GenerateWizard({
                 <span>⚠️</span> {validationMsg}
               </p>
             )}
-            <div className="flex justify-end">
-              <button onClick={() => {
-                if (!uploadedFiles.length && !requirementText.trim()) {
-                  setValidationMsg("请至少上传一个需求文档，或粘贴需求文本");
-                  return;
-                }
-                setValidationMsg("");
-                setKbPage(1); setKbSearch(""); setKbBusinessType("");
-                setHistoryPage(1); setHistorySearch(""); setHistoryBusinessType("");
-                setWizStep(1);
-              }}
-                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2">
-                下一步：关联用例<ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
           </div>
         )}
 
-        {/* Step 2: 关联用例 */}
         {wizStep === 1 && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="flex-1 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* 左侧：业务知识 */}
               <div className="bg-card rounded-xl shadow-sm p-5">
                 <h3 className="font-semibold mb-1 text-sm">业务知识</h3>
@@ -677,22 +712,11 @@ export function GenerateWizard({
                 )}
               </div>
             </div>
-            <div className="flex justify-between">
-              <button onClick={() => setWizStep(0)}
-                className="border border-border text-muted-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:border-muted-foreground/40 flex items-center gap-2">
-                <ArrowLeft className="w-4 h-4" />上一步
-              </button>
-              <button onClick={startGenerate} disabled={generating}
-                className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2">
-                {generating ? <><Loader2 className="w-4 h-4 animate-spin" />生成中...</> : <><Wand2 className="w-4 h-4" />开始生成</>}
-              </button>
-            </div>
           </div>
         )}
 
-        {/* Step 2：生成结果 */}
         {wizStep === 2 && (
-          <div className="space-y-5">
+          <div className="flex-1 space-y-5">
             {/* Generating state — first generation, no tree yet */}
             {generating && !usecaseTree && (
               <div className="bg-card rounded-xl shadow-sm p-10 text-center">
@@ -747,107 +771,136 @@ export function GenerateWizard({
             {/* Result display */}
             {usecaseTree && usecaseTree.length > 0 && genStatus !== "生成失败" && (
               <>
-                {/* KPI Cards */}
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-primary" />
-                  数据概览
-                </h3>
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-card rounded-xl shadow-sm p-5 flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium">生成模块</p>
-                      <p className="text-3xl font-bold mt-1 text-primary">{genStats?.modules || usecaseTree.length}</p>
-                      <p className="text-xs text-muted-foreground mt-1">功能模块</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><BarChart3 className="w-5 h-5 text-primary" /></div>
+                <WizardSection
+                  title="数据概览"
+                  icon={<BarChart3 className="w-4 h-4 text-primary flex-shrink-0" />}
+                >
+                  <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                    {[
+                      {
+                        label: "生成模块",
+                        value: genStats?.modules || usecaseTree.length,
+                        sub: "功能模块",
+                        valCls: "text-primary",
+                        icon: <BarChart3 className="w-4 h-4 text-primary" />,
+                        iconBg: "bg-primary/10",
+                      },
+                      {
+                        label: "用例总数",
+                        value: genStats?.totalCases || usecaseTree.reduce((s, m) => s + m.cases.length, 0),
+                        sub: "条测试用例",
+                        valCls: "text-foreground",
+                        icon: <FileCheck className="w-4 h-4 text-emerald-600" />,
+                        iconBg: "bg-emerald-100",
+                      },
+                      {
+                        label: "质量评分",
+                        value: genStats?.qualityScore ?? "-",
+                        sub: "AI 综合评估",
+                        valCls:
+                          (genStats?.qualityScore || 0) >= 80
+                            ? "text-emerald-600"
+                            : (genStats?.qualityScore || 0) >= 60
+                            ? "text-amber-500"
+                            : "text-red-500",
+                        icon: <Target className="w-4 h-4 text-amber-600" />,
+                        iconBg: "bg-amber-100",
+                      },
+                      {
+                        label: "生成耗时",
+                        value: genStats?.duration != null ? (genStats.duration / 60000).toFixed(1) : "-",
+                        sub: "分钟",
+                        valCls: "text-foreground",
+                        icon: <Clock className="w-4 h-4 text-violet-600" />,
+                        iconBg: "bg-violet-100",
+                      },
+                    ].map((kpi) => (
+                      <div
+                        key={kpi.label}
+                        className="border border-border/60 rounded-xl p-4 flex items-stretch justify-between gap-3 min-h-[96px]"
+                      >
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <p className="text-xs text-muted-foreground font-medium leading-4 h-4 truncate">
+                            {kpi.label}
+                          </p>
+                          <p className={`text-2xl font-bold tabular-nums leading-none mt-2 ${kpi.valCls}`}>
+                            {kpi.value}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-auto pt-2 leading-4">{kpi.sub}</p>
+                        </div>
+                        <div
+                          className={`w-9 h-9 rounded-xl ${kpi.iconBg} flex items-center justify-center flex-shrink-0 self-start`}
+                        >
+                          {kpi.icon}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="bg-card rounded-xl shadow-sm p-5 flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium">用例总数</p>
-                      <p className="text-3xl font-bold mt-1 text-foreground">{genStats?.totalCases || usecaseTree.reduce((s, m) => s + m.cases.length, 0)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">条测试用例</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center"><FileCheck className="w-5 h-5 text-emerald-600" /></div>
-                  </div>
-                  <div className="bg-card rounded-xl shadow-sm p-5 flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium">质量评分</p>
-                      <p className={`text-3xl font-bold mt-1 ${(genStats?.qualityScore || 0) >= 80 ? "text-emerald-600" : (genStats?.qualityScore || 0) >= 60 ? "text-amber-500" : "text-red-500"}`}>{genStats?.qualityScore || "-"}</p>
-                      <p className="text-xs text-muted-foreground mt-1">AI 综合评估</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center"><Target className="w-5 h-5 text-amber-600" /></div>
-                  </div>
-                  <div className="bg-card rounded-xl shadow-sm p-5 flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium">生成耗时</p>
-                      <p className="text-3xl font-bold mt-1 text-foreground">{genStats?.duration != null ? (genStats.duration / 60000).toFixed(1) : "-"}</p>
-                      <p className="text-xs text-muted-foreground mt-1">分钟</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center"><Clock className="w-5 h-5 text-violet-600" /></div>
-                  </div>
-                </div>
+                </WizardSection>
 
-                {/* Output files */}
-                <OutputFiles
-                  taskId={taskId}
-                  files={(() => {
-                    const seen = new Set<string>();
-                    return [...scanner.foundFiles, ...loadedFiles].filter((f) => {
-                      if (seen.has(f.relativePath)) return false;
-                      seen.add(f.relativePath);
-                      return true;
-                    });
-                  })()}
-                />
+                <WizardSection
+                  title="输出文件"
+                  icon={<FileText className="w-4 h-4 text-primary flex-shrink-0" />}
+                  meta={step3OutputCount > 0 ? `${step3OutputCount} 个` : undefined}
+                >
+                  <OutputFiles
+                    sectioned
+                    taskId={taskId}
+                    files={mergedOutputFiles}
+                    onEditMarkdown={() => onNavigateToTab?.(2)}
+                  />
+                </WizardSection>
 
-                {/* Go to editor button */}
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => onNavigateToTab?.(2)}
-                    className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm flex items-center gap-2 transition-all hover:bg-primary/90"
+                <WizardSection
+                  id="step3-ai-tweak"
+                  title="AI 微调"
+                  icon={<Sparkles className="w-4 h-4 text-primary flex-shrink-0" />}
+                >
+                  <AITweakPanel
+                    sectioned
+                    taskId={taskId}
+                    generating={generating && !!usecaseTree && usecaseTree.length > 0}
+                    modules={usecaseTree.map((m) => m.name)}
+                    tweakHistory={tweakHistory}
+                    onTweakStarted={() => {
+                      const baseline = maxXmindVersion([...scanner.foundFiles, ...loadedFiles]);
+                      setXmindBaseline(baseline);
+                      preTweakTreeRef.current = usecaseTree;
+                      setLoadedFiles([]);
+                      setGenerating(true);
+                      setGenStatus("正在微调用例...");
+                    }}
+                    onCancelTweak={async () => {
+                      try {
+                        await cancelTask.mutateAsync(taskId!);
+                      } catch { /* fall through */ }
+                      scanner.stop();
+                      setGenerating(false);
+                      setGenStatus("");
+                    }}
+                    onRecordTweak={(entry) => {
+                      setTweakHistory((prev) => [...prev, entry]);
+                    }}
+                    onTweakHistoryUpdate={(history) => {
+                      setTweakHistory(history);
+                    }}
+                  />
+                </WizardSection>
+
+                {taskId && (
+                  <WizardSection
+                    id="step3-rating"
+                    title="本次生成评价"
+                    icon={<Star className="w-4 h-4 text-primary flex-shrink-0" />}
                   >
-                    <Edit3 className="w-4 h-4" />
-                    去编辑用例
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
+                    <RatingPanel sectioned taskId={taskId} />
+                  </WizardSection>
+                )}
 
-                {/* AI Tweak */}
-                <AITweakPanel
-                  taskId={taskId}
-                  generating={generating && !!usecaseTree && usecaseTree.length > 0}
-                  modules={usecaseTree.map((m) => m.name)}
-                  tweakHistory={tweakHistory}
-                  onTweakStarted={() => {
-                    const baseline = maxXmindVersion([...scanner.foundFiles, ...loadedFiles]);
-                    setXmindBaseline(baseline);
-                    preTweakTreeRef.current = usecaseTree;
-                    setLoadedFiles([]);
-                    setGenerating(true);
-                    setGenStatus("正在微调用例...");
-                  }}
-                  onCancelTweak={async () => {
-                    try {
-                      await cancelTask.mutateAsync(taskId!);
-                    } catch { /* fall through */ }
-                    scanner.stop();
-                    setGenerating(false);
-                    setGenStatus("");
-                  }}
-                  onRecordTweak={(entry) => {
-                    setTweakHistory((prev) => [...prev, entry]);
-                  }}
-                  onTweakHistoryUpdate={(history) => {
-                    setTweakHistory(history);
-                  }}
-                />
-
-                {/* Module table */}
                 <ModuleOverviewTable
                   modules={usecaseTree}
                   totalCases={usecaseTree.reduce((s, m) => s + m.cases.length, 0)}
                 />
-
               </>
             )}
 
@@ -867,9 +920,70 @@ export function GenerateWizard({
             )}
           </div>
         )}
+        </div>
+
+        {wizStep === 0 && (
+          <WizardStickyFooter>
+            <div className="flex justify-end w-full">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!uploadedFiles.length && !requirementText.trim()) {
+                    setValidationMsg("请至少上传一个需求文档，或粘贴需求文本");
+                    return;
+                  }
+                  setValidationMsg("");
+                  setKbPage(1);
+                  setKbSearch("");
+                  setKbBusinessType("");
+                  setHistoryPage(1);
+                  setHistorySearch("");
+                  setHistoryBusinessType("");
+                  setWizStep(1);
+                }}
+                className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2"
+              >
+                下一步：关联用例
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </WizardStickyFooter>
+        )}
+
+        {wizStep === 1 && (
+          <WizardStickyFooter>
+            <div className="flex w-full items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setWizStep(0)}
+              className="border border-border text-muted-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:border-muted-foreground/40 flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              上一步
+            </button>
+            <button
+              type="button"
+              onClick={startGenerate}
+              disabled={generating}
+              className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground px-6 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4" />
+                  开始生成
+                </>
+              )}
+            </button>
+            </div>
+          </WizardStickyFooter>
+        )}
       </div>
 
-      {/* Right: Execution Panel */}
       <ExecutionPanel
         taskId={taskId}
         generating={generating}
@@ -885,14 +999,7 @@ export function GenerateWizard({
           knowledge: `${selectedKnowledgeIds.size} 份`,
           history: `${selectedHistoryIds.size} 份`,
         }}
-        foundFiles={(() => {
-          const seen = new Set<string>();
-          return [...scanner.foundFiles, ...loadedFiles].filter((f) => {
-            if (seen.has(f.relativePath)) return false;
-            seen.add(f.relativePath);
-            return true;
-          });
-        })()}
+        foundFiles={mergedOutputFiles}
         logStages={logStages}
         onDownloadFile={(file) => {
           if (!taskId) return;
@@ -905,7 +1012,10 @@ export function GenerateWizard({
           document.body.removeChild(a);
         }}
         onScrollToAITweak={() => {
-          document.querySelector("[data-ai-tweak]")?.scrollIntoView({ behavior: "smooth" });
+          document.getElementById("step3-ai-tweak")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+        onScrollToRating={() => {
+          document.getElementById("step3-rating")?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
         onNavigateToEditor={() => onNavigateToTab?.(2)}
       />

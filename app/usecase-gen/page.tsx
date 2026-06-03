@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { GenerateWizard } from "@/components/usecase-gen/generate-wizard";
@@ -13,21 +13,18 @@ import type { UsecaseModule } from "@/components/usecase-gen/shared/types";
 const TAB_KEYS = ["generate", "history", "editor", "dashboard", "knowledge"];
 const TAB_INDEX: Record<string, number> = Object.fromEntries(TAB_KEYS.map((k, i) => [k, i]));
 
-export default function UsecaseGenPage() {
+function UsecaseGenPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // URL is the single source of truth for navigation state
   const [activeTab, setActiveTabState] = useState(() => {
     const tab = searchParams.get("tab");
     return tab && TAB_INDEX[tab] !== undefined ? TAB_INDEX[tab] : 0;
   });
-  // taskId lives in URL, not useState — eliminates all stale-state bugs
   const taskId = searchParams.get("taskId") || null;
 
   const [usecaseTree, setUsecaseTree] = useState<UsecaseModule[] | null>(null);
 
-  // Sync URL → state (sidebar clicks / bookmark / back button)
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab && TAB_INDEX[tab] !== undefined) {
@@ -35,7 +32,10 @@ export default function UsecaseGenPage() {
     }
   }, [searchParams]);
 
-  // Sync state → URL (tab bar clicks / wizard internal navigation)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
+
   const setActiveTab = useCallback((i: number) => {
     setActiveTabState(i);
     router.replace(`/usecase-gen?tab=${TAB_KEYS[i]}`, { scroll: false });
@@ -47,17 +47,19 @@ export default function UsecaseGenPage() {
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex-1 overflow-auto p-6">
         {activeTab === 0 && (
-          <GenerateWizard
-            key="generate"
-            initialTaskId={null}
-            onComplete={(tree) => setUsecaseTree(tree)}
-            skillId={skillId}
-            onNavigateToTab={setActiveTab}
-          />
+          <div className="max-w-7xl mx-auto w-full">
+            <GenerateWizard
+              key="generate"
+              initialTaskId={null}
+              onComplete={(tree) => setUsecaseTree(tree)}
+              skillId={skillId}
+              onNavigateToTab={setActiveTab}
+            />
+          </div>
         )}
-        {activeTab === 1 && (
-          taskId ? (
-            <div>
+        {activeTab === 1 &&
+          (taskId ? (
+            <div className="max-w-7xl mx-auto w-full">
               <button
                 onClick={() => router.replace("/usecase-gen?tab=history", { scroll: false })}
                 className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
@@ -74,20 +76,45 @@ export default function UsecaseGenPage() {
               />
             </div>
           ) : (
-            <HistoryList
-              skillId={skillId}
-              onSelectTask={(id) => {
-                router.replace(`/usecase-gen?tab=history&taskId=${id}`, { scroll: false });
-              }}
-            />
-          )
-        )}
+            <div className="max-w-4xl mx-auto w-full">
+              <HistoryList
+                skillId={skillId}
+                onSelectTask={(id) => {
+                  router.replace(`/usecase-gen?tab=history&taskId=${id}`, { scroll: false });
+                }}
+              />
+            </div>
+          ))}
         {activeTab === 2 && (
-          <CaseEditor usecaseTree={usecaseTree} />
+          <div className="max-w-7xl mx-auto w-full">
+            <CaseEditor usecaseTree={usecaseTree} />
+          </div>
         )}
-        {activeTab === 3 && <Dashboard />}
-        {activeTab === 4 && <KnowledgeBase />}
+        {activeTab === 3 && (
+          <div className="max-w-7xl mx-auto w-full">
+            <Dashboard />
+          </div>
+        )}
+        {activeTab === 4 && (
+          <div className="max-w-7xl mx-auto w-full">
+            <KnowledgeBase />
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+export default function UsecaseGenPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex items-center justify-center p-6 text-sm text-muted-foreground">
+          加载中...
+        </div>
+      }
+    >
+      <UsecaseGenPageContent />
+    </Suspense>
   );
 }

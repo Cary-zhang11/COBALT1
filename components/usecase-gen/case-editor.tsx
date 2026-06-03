@@ -14,9 +14,14 @@ export function CaseEditor({ usecaseTree }: CaseEditorProps) {
   const [selectedCase, setSelectedCase] = useState<UsecaseCase | null>(null);
   const [showSaveTip, setShowSaveTip] = useState(false);
 
+  const totalCases = modules.reduce((s, m) => s + m.cases.length, 0);
+  const p0 = modules.flatMap((m) => m.cases).filter((c) => c.priority === "P0").length;
+  const p1 = modules.flatMap((m) => m.cases).filter((c) => c.priority === "P1").length;
+  const p2 = modules.flatMap((m) => m.cases).filter((c) => c.priority === "P2").length;
+
   if (!usecaseTree || usecaseTree.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center py-16">
         <div className="text-center">
           <Wand2 className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-30" />
           <p className="text-sm text-muted-foreground">暂无生成结果，请先在「生成向导」中生成用例</p>
@@ -42,14 +47,23 @@ export function CaseEditor({ usecaseTree }: CaseEditorProps) {
 
   return (
     <div className="flex flex-col flex-1">
-      {/* Toolbar */}
-      <div className="bg-card rounded-xl shadow-sm px-4 py-3 flex items-center justify-between mb-4 flex-shrink-0">
-        <div className="flex items-center gap-2">
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">用例编辑</h1>
+        <p className="text-sm text-muted-foreground mt-1">编辑 AI 生成的测试用例，保存后可反哺知识库</p>
+      </header>
+
+      <div className="bg-card rounded-xl shadow-sm px-4 py-3 flex items-center justify-between mb-4 flex-shrink-0 flex-wrap gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <button disabled className="border border-border text-muted-foreground px-3 py-1.5 rounded-lg text-xs cursor-not-allowed">版本对比</button>
           <button disabled className="border border-border text-muted-foreground px-3 py-1.5 rounded-lg text-xs cursor-not-allowed flex items-center gap-1"><Download className="w-3.5 h-3.5" />导出 XMind</button>
           <button disabled className="border border-border text-muted-foreground px-3 py-1.5 rounded-lg text-xs cursor-not-allowed flex items-center gap-1"><Download className="w-3.5 h-3.5" />导出 Excel</button>
         </div>
-        <span className="text-xs text-muted-foreground">共 {modules.reduce((s, m) => s + m.cases.length, 0)} 个用例</span>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span>共 {totalCases} 个用例</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />P0 {p0}</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400" />P1 {p1}</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted-foreground/40" />P2 {p2}</span>
+        </div>
       </div>
 
       <div className="flex gap-4 flex-1 min-h-0">
