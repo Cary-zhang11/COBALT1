@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useOutputScanner, maxXmindVersion, type FileInfo } from "@/hooks/use-output-scanner";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { ExecutionPanel } from "./shared/execution-panel";
@@ -33,6 +33,20 @@ interface UploadedFile {
 
 const STEPS = ["输入物料", "关联用例", "生成并预览"];
 const BUSINESS_TYPES = ["C1C", "C1B", "C2C", "C2B", "数科", "车小妹"] as const;
+const WIZARD_LIST_PAGE_SIZE = 5;
+
+type WizardListPage = {
+  items: unknown[];
+  total: number;
+};
+
+function wizardListNextPage(
+  lastPage: WizardListPage,
+  allPages: WizardListPage[],
+): number | undefined {
+  const loaded = allPages.reduce((n, p) => n + (p.items?.length ?? 0), 0);
+  return loaded < (lastPage.total ?? 0) ? allPages.length + 1 : undefined;
+}
 
 function WizardStickyFooter({
   children,
@@ -81,12 +95,9 @@ export function GenerateWizard({
   // 左侧 — 业务知识筛选
   const [kbSearch, setKbSearch] = useState("");
   const [kbBusinessType, setKbBusinessType] = useState("");
-  const [kbPage, setKbPage] = useState(1);
-
   // 右侧 — 历史用例筛选
   const [historySearch, setHistorySearch] = useState("");
   const [historyBusinessType, setHistoryBusinessType] = useState("");
-  const [historyPage, setHistoryPage] = useState(1);
 
   // ---- 业务类型选择 ----
   const [selectedBusinessType, setSelectedBusinessType] = useState<string>("");
@@ -100,78 +111,112 @@ export function GenerateWizard({
     mdFileName?: string;
   }
 
-  const { data: knowledgeData } = useQuery({
-    queryKey: ["knowledge", { type: "knowledge", search: kbSearch, businessType: kbBusinessType, page: kbPage }],
-    queryFn: () => {
+  const kbListQuery = useInfiniteQuery({
+    queryKey: ["knowledge", "wizard", "knowledge", kbSearch, kbBusinessType],
+    queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams();
       params.set("type", "knowledge");
-      params.set("pageSize", "5");
-      params.set("page", String(kbPage));
+      params.set("pageSize", String(WIZARD_LIST_PAGE_SIZE));
+      params.set("page", String(pageParam));
       if (kbSearch) params.set("search", kbSearch);
       if (kbBusinessType) params.set("businessType", kbBusinessType);
-      return fetch(`/api/knowledge?${params}`).then((r) => r.json());
+      const res = await fetch(`/api/knowledge?${params}`);
+      if (!res.ok) throw new Error("Failed to load knowledge");
+      return res.json() as Promise<WizardListPage & { items: { id: string; title: string; businessType: string | null; updatedAt: string }[] }>;
     },
+    initialPageParam: 1,
+    getNextPageParam: wizardListNextPage,
   });
 
-  const { data: uploadedHistoryData } = useQuery({
-    queryKey: ["knowledge", { type: "history_uploaded", search: historySearch, businessType: historyBusinessType, page: historyPage }],
-    queryFn: () => {
+  const uploadedHistoryQuery = useInfiniteQuery({
+    queryKey: ["knowledge", "wizard", "history_uploaded", historySearch, historyBusinessType],
+    queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams();
       params.set("type", "history_uploaded");
-      params.set("pageSize", "5");
-      params.set("page", String(historyPage));
+      params.set("pageSize", String(WIZARD_LIST_PAGE_SIZE));
+      params.set("page", String(pageParam));
       if (historySearch) params.set("search", historySearch);
       if (historyBusinessType) params.set("businessType", historyBusinessType);
-      return fetch(`/api/knowledge?${params}`).then((r) => r.json());
+      const res = await fetch(`/api/knowledge?${params}`);
+      if (!res.ok) throw new Error("Failed to load uploaded history");
+      return res.json() as Promise<WizardListPage & { items: { id: string; title: string; content: string }[] }>;
     },
+    initialPageParam: 1,
+    getNextPageParam: wizardListNextPage,
   });
 
-  const { data: platformHistoryData } = useQuery({
-    queryKey: ["knowledge-history", { search: historySearch, businessType: historyBusinessType, page: historyPage }],
-    queryFn: () => {
+  const platformHistoryQuery = useInfiniteQuery({
+    queryKey: ["knowledge-history", "wizard", historySearch, historyBusinessType],
+    queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams();
-      params.set("pageSize", "5");
-      params.set("page", String(historyPage));
+      params.set("pageSize", String(WIZARD_LIST_PAGE_SIZE));
+      params.set("page", String(pageParam));
       if (historySearch) params.set("search", historySearch);
       if (historyBusinessType) params.set("businessType", historyBusinessType);
-      return fetch(`/api/knowledge/history?${params}`).then((r) => r.json());
+      const res = await fetch(`/api/knowledge/history?${params}`);
+      if (!res.ok) throw new Error("Failed to load platform history");
+      return res.json() as Promise<WizardListPage & { items: { id: string; mdFileName: string }[] }>;
     },
+    initialPageParam: 1,
+    getNextPageParam: wizardListNextPage,
   });
+
+  type KbItem = { id: string; title: string; businessType: string | null; updatedAt: string };
+  const kbItems = useMemo(
+    () => kbListQuery.data?.pages.flatMap((p) => (p.items as KbItem[]) ?? []) ?? [],
+    [kbListQuery.data],
+  );
+  const kbTotal = kbListQuery.data?.pages[0]?.total ?? 0;
 
   const historyOptions: HistoryOption[] = useMemo(() => {
     const result: HistoryOption[] = [];
-    const uploaded = (uploadedHistoryData as { items?: { id: string; title: string; content: string }[] }) || {};
-    for (const item of uploaded.items || []) {
+    const seen = new Set<string>();
+    const uploadedItems =
+      uploadedHistoryQuery.data?.pages.flatMap(
+        (p) => (p.items as { id: string; title: string; content: string }[]) ?? [],
+      ) ?? [];
+    for (const item of uploadedItems) {
+      const id = `knowledge:${item.id}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
       result.push({
-        id: `knowledge:${item.id}`,
+        id,
         displayName: (item.title || "untitled") + ".md",
         sourcePath: item.content,
       });
     }
-    const platform = (platformHistoryData as {
-      items?: { id: string; mdFileName: string }[];
-    }) || {};
-    for (const item of platform.items || []) {
+    const platformItems =
+      platformHistoryQuery.data?.pages.flatMap(
+        (p) => (p.items as { id: string; mdFileName: string }[]) ?? [],
+      ) ?? [];
+    for (const item of platformItems) {
       if (!item.mdFileName) continue;
+      const id = `task:${item.id}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
       result.push({
-        id: `task:${item.id}`,
+        id,
         displayName: item.mdFileName,
         sourceTaskId: item.id,
         mdFileName: item.mdFileName,
       });
     }
     return result;
-  }, [uploadedHistoryData, platformHistoryData]);
+  }, [uploadedHistoryQuery.data, platformHistoryQuery.data]);
+
+  const historyTotal =
+    (uploadedHistoryQuery.data?.pages[0]?.total ?? 0) +
+    (platformHistoryQuery.data?.pages[0]?.total ?? 0);
 
   // 从已选知识条目推算 businessType
   const inferredBusinessType = useMemo(() => {
-    const items = (knowledgeData as { items?: { id: string; businessType: string | null }[] } | undefined)?.items || [];
+    const items = kbItems;
     for (const id of selectedKnowledgeIds) {
       const item = items.find((i) => i.id === id);
       if (item?.businessType) return item.businessType;
     }
     return null;
-  }, [selectedKnowledgeIds, knowledgeData]);
+  }, [selectedKnowledgeIds, kbItems]);
 
   // 自动同步推算值到 selectedBusinessType（仅当未手选时）
   useEffect(() => {
@@ -432,7 +477,7 @@ export function GenerateWizard({
       setTaskId(newTaskId);
 
       // 收集 referenceFiles
-      const knowledgeItems = (knowledgeData as { items?: { id: string; title: string; content: string }[] } | undefined)?.items || [];
+      const knowledgeItems = kbItems;
       const referenceFiles: {
         sourcePath?: string;
         sourceTaskId?: string;
@@ -647,12 +692,12 @@ export function GenerateWizard({
                     type="text"
                     placeholder="搜索..."
                     value={kbSearch}
-                    onChange={(e) => { setKbSearch(e.target.value); setKbPage(1); }}
+                    onChange={(e) => setKbSearch(e.target.value)}
                     className="flex-1 border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
                   />
                   <select
                     value={kbBusinessType}
-                    onChange={(e) => { setKbBusinessType(e.target.value); setKbPage(1); }}
+                    onChange={(e) => setKbBusinessType(e.target.value)}
                     className="border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
                   >
                     <option value="">全部</option>
@@ -663,12 +708,12 @@ export function GenerateWizard({
                 </div>
 
                 <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                  {!knowledgeData ? (
+                  {kbListQuery.isLoading && kbItems.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-4 text-center">加载中...</p>
-                  ) : ((knowledgeData as { total?: number; items?: { id: string; title: string; businessType: string | null; updatedAt: string }[] }).items?.length || 0) === 0 ? (
+                  ) : kbItems.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-4 text-center">暂无业务知识，可前往知识库上传</p>
                   ) : (
-                    (knowledgeData as { items: { id: string; title: string; businessType: string | null; updatedAt: string }[] }).items.map((item) => (
+                    kbItems.map((item) => (
                       <label
                         key={item.id}
                         className={`flex items-center gap-2 cursor-pointer border rounded-lg px-3 py-2 transition-colors ${
@@ -689,13 +734,16 @@ export function GenerateWizard({
                   )}
                 </div>
 
-                {/* 加载更多 */}
-                {((knowledgeData as { total?: number })?.total || 0) > kbPage * 5 && (
+                {kbListQuery.hasNextPage && (
                   <button
-                    onClick={() => setKbPage((p) => p + 1)}
-                    className="mt-2 w-full text-xs text-muted-foreground hover:text-primary py-1 transition-colors"
+                    type="button"
+                    disabled={kbListQuery.isFetchingNextPage}
+                    onClick={() => kbListQuery.fetchNextPage()}
+                    className="mt-2 w-full text-xs text-muted-foreground hover:text-primary py-1 transition-colors disabled:opacity-50"
                   >
-                    共 {(knowledgeData as { total: number }).total} 条，加载更多 →
+                    {kbListQuery.isFetchingNextPage
+                      ? "加载中..."
+                      : `共 ${kbTotal} 条，加载更多 →`}
                   </button>
                 )}
               </div>
@@ -711,12 +759,12 @@ export function GenerateWizard({
                     type="text"
                     placeholder="搜索..."
                     value={historySearch}
-                    onChange={(e) => { setHistorySearch(e.target.value); setHistoryPage(1); }}
+                    onChange={(e) => setHistorySearch(e.target.value)}
                     className="flex-1 border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
                   />
                   <select
                     value={historyBusinessType}
-                    onChange={(e) => { setHistoryBusinessType(e.target.value); setHistoryPage(1); }}
+                    onChange={(e) => setHistoryBusinessType(e.target.value)}
                     className="border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
                   >
                     <option value="">全部</option>
@@ -727,7 +775,8 @@ export function GenerateWizard({
                 </div>
 
                 <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                  {(!uploadedHistoryData && !platformHistoryData) ? (
+                  {(uploadedHistoryQuery.isLoading || platformHistoryQuery.isLoading) &&
+                  historyOptions.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-4 text-center">加载中...</p>
                   ) : historyOptions.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-4 text-center">暂无历史用例</p>
@@ -753,14 +802,27 @@ export function GenerateWizard({
                   )}
                 </div>
 
-                {/* 加载更多 — 两个 API total 相加 */}
-                {(((uploadedHistoryData as { total?: number })?.total || 0) +
-                  ((platformHistoryData as { total?: number })?.total || 0)) > historyPage * 5 && (
+                {(uploadedHistoryQuery.hasNextPage || platformHistoryQuery.hasNextPage) && (
                   <button
-                    onClick={() => setHistoryPage((p) => p + 1)}
-                    className="mt-2 w-full text-xs text-muted-foreground hover:text-primary py-1 transition-colors"
+                    type="button"
+                    disabled={
+                      uploadedHistoryQuery.isFetchingNextPage ||
+                      platformHistoryQuery.isFetchingNextPage
+                    }
+                    onClick={() => {
+                      if (uploadedHistoryQuery.hasNextPage) {
+                        void uploadedHistoryQuery.fetchNextPage();
+                      }
+                      if (platformHistoryQuery.hasNextPage) {
+                        void platformHistoryQuery.fetchNextPage();
+                      }
+                    }}
+                    className="mt-2 w-full text-xs text-muted-foreground hover:text-primary py-1 transition-colors disabled:opacity-50"
                   >
-                    共 {((uploadedHistoryData as { total: number })?.total || 0) + ((platformHistoryData as { total: number })?.total || 0)} 条，加载更多 →
+                    {uploadedHistoryQuery.isFetchingNextPage ||
+                    platformHistoryQuery.isFetchingNextPage
+                      ? "加载中..."
+                      : `共 ${historyTotal} 条，加载更多 →`}
                   </button>
                 )}
               </div>
@@ -779,10 +841,8 @@ export function GenerateWizard({
                     return;
                   }
                   setValidationMsg("");
-                  setKbPage(1);
                   setKbSearch("");
                   setKbBusinessType("");
-                  setHistoryPage(1);
                   setHistorySearch("");
                   setHistoryBusinessType("");
                   setWizStep(1);

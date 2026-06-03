@@ -29,6 +29,49 @@ export function useTasks(status?: string, skillId?: string) {
   });
 }
 
+export type TasksPageParams = {
+  skillId?: string;
+  search?: string;
+  displayStatus?: string;
+  page: number;
+  pageSize?: number;
+};
+
+export type TasksPageResult = {
+  tasks: Task[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export function useTasksPage(params: TasksPageParams) {
+  const pageSize = params.pageSize ?? 20;
+  return useQuery<TasksPageResult>({
+    queryKey: [
+      "tasks",
+      "page",
+      params.skillId,
+      params.search,
+      params.displayStatus,
+      params.page,
+      pageSize,
+    ],
+    queryFn: async () => {
+      const qs = new URLSearchParams();
+      qs.set("page", String(params.page));
+      qs.set("pageSize", String(pageSize));
+      if (params.skillId) qs.set("skillId", params.skillId);
+      if (params.search?.trim()) qs.set("search", params.search.trim());
+      if (params.displayStatus) qs.set("displayStatus", params.displayStatus);
+      const res = await fetch(`/api/tasks?${qs}`);
+      if (!res.ok) throw new Error("Failed to fetch tasks");
+      return res.json();
+    },
+    enabled: !!params.skillId,
+    placeholderData: (prev) => prev,
+  });
+}
+
 export function useTask(id: string) {
   return useQuery({
     queryKey: ["task", id],

@@ -10,9 +10,14 @@ import { FilePreviewModal } from "./shared/file-preview";
 const BUSINESS_TYPES = ["C1C", "C1B", "C2C", "C2B", "数科", "车小妹"] as const;
 const MAIN_TABS = ["业务知识", "历史用例"] as const;
 const FILTER_OPTIONS = ["全部", ...BUSINESS_TYPES, "unclassified"] as const;
+const KB_LIST_PAGE_SIZE = 20;
 
 const ACTION_BTN =
   "inline-flex items-center justify-center h-7 px-2.5 text-xs font-medium leading-none rounded-md whitespace-nowrap shrink-0 border transition-colors";
+
+/** 历史用例行：预览 | 下载 | 分配类型/删除 三列左对齐（列宽贴按钮，间距与原先 flex gap-1.5 接近） */
+const ROW_ACTION_GRID =
+  "grid grid-cols-[2.875rem_3.625rem_5rem] items-center gap-x-1.5 flex-shrink-0 justify-items-start";
 
 interface KnowledgeItem {
   id: string;
@@ -91,6 +96,58 @@ function RefCountBadge({ count }: { count: number }) {
   );
 }
 
+function ListPaginationBar({
+  page,
+  totalPages,
+  total,
+  pageItemCount,
+  onPrev,
+  onNext,
+  disabled,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  pageItemCount: number;
+  onPrev: () => void;
+  onNext: () => void;
+  disabled?: boolean;
+}) {
+  if (totalPages <= 1 && page <= 1) return null;
+
+  return (
+    <div className="px-4 py-2.5 border-t border-border/60 bg-muted/10 flex items-center justify-between gap-3 shrink-0 text-xs text-muted-foreground">
+      <span className="tabular-nums">
+        第 {page} / {totalPages} 页
+        {total > 0 && (
+          <span className="text-muted-foreground/80">
+            {" "}
+            · 本页 {pageItemCount} 条 · 共 {total} 条
+          </span>
+        )}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          disabled={page <= 1 || disabled}
+          onClick={onPrev}
+          className="h-7 px-2.5 rounded-md border border-border bg-background hover:bg-muted/60 disabled:opacity-40 disabled:pointer-events-none"
+        >
+          上一页
+        </button>
+        <button
+          type="button"
+          disabled={page >= totalPages || disabled}
+          onClick={onNext}
+          className="h-7 px-2.5 rounded-md border border-border bg-background hover:bg-muted/60 disabled:opacity-40 disabled:pointer-events-none"
+        >
+          下一页
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function KnowledgeListRow({
   title,
   meta,
@@ -114,7 +171,7 @@ function KnowledgeListRow({
         </div>
         <p className="text-xs text-muted-foreground mt-0.5 truncate">{meta}</p>
       </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">{actions}</div>
+      <div className={ROW_ACTION_GRID}>{actions}</div>
     </div>
   );
 }
@@ -136,8 +193,13 @@ export function KnowledgeBase() {
   const [showUpload, setShowUpload] = useState(false);
   const [uploadContext, setUploadContext] = useState<"knowledge" | "history_uploaded">("knowledge");
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
 
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [search, businessTypeFilter, mainTab]);
 
   const { data: kbData, isLoading: kbLoading } = useQuery<{ items: KnowledgeItem[]; total: number }>({
     queryKey: ["knowledge", { type: "knowledge", businessType: businessTypeFilter, search }],
@@ -151,27 +213,39 @@ export function KnowledgeBase() {
     enabled: mainTab === 0,
   });
 
-  const { data: uploadedData, isLoading: uploadedLoading } = useQuery<{ items: KnowledgeItem[]; total: number }>({
-    queryKey: ["knowledge", { type: "history_uploaded", businessType: businessTypeFilter, search }],
+  const { data: uploadedData, isLoading: uploadedLoading, isFetching: uploadedFetching } = useQuery<{
+    items: KnowledgeItem[];
+    total: number;
+  }>({
+    queryKey: ["knowledge", { type: "history_uploaded", businessType: businessTypeFilter, search, historyPage }],
     queryFn: () => {
       const params = new URLSearchParams();
       params.set("type", "history_uploaded");
+      params.set("page", String(historyPage));
+      params.set("pageSize", String(KB_LIST_PAGE_SIZE));
       if (search) params.set("search", search);
       if (businessTypeFilter) params.set("businessType", businessTypeFilter);
       return fetch(`/api/knowledge?${params}`).then((r) => r.json());
     },
     enabled: mainTab === 1,
+    placeholderData: (prev) => prev,
   });
 
-  const { data: historyData, isLoading: historyLoading } = useQuery<{ items: HistoryItem[]; total: number }>({
-    queryKey: ["knowledge-history", { businessType: businessTypeFilter, search }],
+  const { data: historyData, isLoading: historyLoading, isFetching: historyFetching } = useQuery<{
+    items: HistoryItem[];
+    total: number;
+  }>({
+    queryKey: ["knowledge-history", { businessType: businessTypeFilter, search, historyPage }],
     queryFn: () => {
       const params = new URLSearchParams();
+      params.set("page", String(historyPage));
+      params.set("pageSize", String(KB_LIST_PAGE_SIZE));
       if (search) params.set("search", search);
       if (businessTypeFilter) params.set("businessType", businessTypeFilter);
       return fetch(`/api/knowledge/history?${params}`).then((r) => r.json());
     },
     enabled: mainTab === 1,
+    placeholderData: (prev) => prev,
   });
 
   const deleteMutation = useMutation({
@@ -261,16 +335,30 @@ export function KnowledgeBase() {
     return () => document.removeEventListener("mousedown", handler);
   }, [openDropdownId]);
 
-  const platformCount = historyData?.items?.length ?? 0;
-  const uploadedCount = uploadedData?.items?.length ?? 0;
-  const knowledgeCount = kbData?.total ?? kbData?.items?.length ?? 0;
-  const historyCount = (historyData?.total ?? 0) + (uploadedData?.total ?? 0);
+  const platformItems = historyData?.items ?? [];
+  const uploadedItems = uploadedData?.items ?? [];
+  const platformTotal = historyData?.total ?? 0;
+  const uploadedTotal = uploadedData?.total ?? 0;
+  const historyPageItemCount = platformItems.length + uploadedItems.length;
+  const historyTotal = platformTotal + uploadedTotal;
+  const historyTotalPages = Math.max(
+    1,
+    Math.ceil(platformTotal / KB_LIST_PAGE_SIZE),
+    Math.ceil(uploadedTotal / KB_LIST_PAGE_SIZE),
+  );
+  const safeHistoryPage = Math.min(historyPage, historyTotalPages);
 
-  const listTotal = mainTab === 0 ? knowledgeCount : historyCount;
+  useEffect(() => {
+    if (historyPage > historyTotalPages) setHistoryPage(historyTotalPages);
+  }, [historyPage, historyTotalPages]);
+
+  const knowledgeCount = kbData?.total ?? kbData?.items?.length ?? 0;
+
+  const listTotal = mainTab === 0 ? knowledgeCount : historyTotal;
   const listMeta =
     mainTab === 0
       ? filterSummary()
-      : `${filterSummary()} · 平台 ${platformCount} · 手动 ${uploadedCount}`;
+      : `${filterSummary()} · 平台 ${platformTotal} · 手动 ${uploadedTotal}`;
 
   const isLoading = mainTab === 0 ? kbLoading : historyLoading || uploadedLoading;
   const isEmpty =
@@ -278,8 +366,8 @@ export function KnowledgeBase() {
       ? !kbLoading && (kbData?.items?.length ?? 0) === 0
       : !historyLoading &&
         !uploadedLoading &&
-        platformCount === 0 &&
-        uploadedCount === 0;
+        platformTotal === 0 &&
+        uploadedTotal === 0;
 
   const uploadLabel = mainTab === 0 ? "上传知识" : "上传范文";
   const emptyUploadLabel = mainTab === 0 ? "上传业务知识文档" : "上传历史用例范文";
@@ -292,13 +380,16 @@ export function KnowledgeBase() {
         </ActionButton>
         <ActionButton
           onClick={() => window.open(`/api/knowledge/${item.id}/download?download=1`, "_blank")}
+          className="gap-1"
         >
-          <span className="inline-flex items-center gap-1">
-            <Download className="w-3.5 h-3.5" />
-            下载
-          </span>
+          <Download className="w-3.5 h-3.5 shrink-0" />
+          下载
         </ActionButton>
-        <ActionButton onClick={() => deleteMutation.mutate(item.id)} variant="danger">
+        <ActionButton
+          onClick={() => deleteMutation.mutate(item.id)}
+          variant="danger"
+          className="w-full justify-start"
+        >
           删除
         </ActionButton>
       </>
@@ -345,7 +436,7 @@ export function KnowledgeBase() {
 
     return (
       <>
-        {(historyData?.items || []).map((item) => (
+        {platformItems.map((item) => (
           <KnowledgeListRow
             key={`platform-${item.id}`}
             title={item.mdFileName}
@@ -377,19 +468,18 @@ export function KnowledgeBase() {
                       "_blank"
                     )
                   }
+                  className="gap-1"
                 >
-                  <span className="inline-flex items-center gap-1">
-                    <Download className="w-3.5 h-3.5" />
-                    下载
-                  </span>
+                  <Download className="w-3.5 h-3.5 shrink-0" />
+                  下载
                 </ActionButton>
-                <div className="relative" data-dropdown>
+                <div className="relative w-full min-w-0" data-dropdown>
                   <ActionButton
-                    className="gap-0.5"
+                    className="gap-0.5 w-full justify-between px-2"
                     onClick={() => setOpenDropdownId(openDropdownId === item.id ? null : item.id)}
                   >
                     分配类型
-                    <ChevronDown className={`w-3 h-3 transition-transform ${openDropdownId === item.id ? "rotate-180" : ""}`} />
+                    <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${openDropdownId === item.id ? "rotate-180" : ""}`} />
                   </ActionButton>
                   {openDropdownId === item.id && (
                     <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg z-20 min-w-[80px]">
@@ -415,7 +505,7 @@ export function KnowledgeBase() {
             }
           />
         ))}
-        {(uploadedData?.items || []).map((item) => (
+        {uploadedItems.map((item) => (
           <KnowledgeListRow
             key={`uploaded-${item.id}`}
             title={item.title}
@@ -521,6 +611,17 @@ export function KnowledgeBase() {
               </div>
             </div>
             {renderListBody()}
+            {mainTab === 1 && (
+              <ListPaginationBar
+                page={safeHistoryPage}
+                totalPages={historyTotalPages}
+                total={historyTotal}
+                pageItemCount={historyPageItemCount}
+                disabled={historyLoading || uploadedLoading || historyFetching || uploadedFetching}
+                onPrev={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                onNext={() => setHistoryPage((p) => Math.min(historyTotalPages, p + 1))}
+              />
+            )}
           </div>
         </div>
       </div>

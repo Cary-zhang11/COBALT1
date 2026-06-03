@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { useTasks } from "@/hooks/use-tasks";
+import { useEffect, useState, type ReactNode } from "react";
+import { useTasksPage } from "@/hooks/use-tasks";
 import { getDisplayStatus } from "@/lib/task-display-status";
 import {
   Loader2, Clock, FileText, AlertCircle, RefreshCw,
@@ -21,6 +21,8 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   failed: { label: "失败", className: "bg-red-50 text-red-700 border-red-200" },
   cancelled: { label: "已取消", className: "bg-slate-50 text-slate-500 border-slate-200" },
 };
+
+const HISTORY_PAGE_SIZE = 20;
 
 const FILTER_CHIPS = [
   { label: "全部", value: "" },
@@ -79,22 +81,6 @@ function formatTaskMeta(task: TaskRow): string {
   const dur =
     task.duration != null ? formatDuration(task.duration) : "—";
   return `${formatDate(task.createdAt)} · ${dur}`;
-}
-
-function taskMatchesStatusFilter(task: TaskRow, filter: string): boolean {
-  if (!filter) return true;
-  const display = resolveDisplayStatus(task);
-  if (filter === "active") {
-    return display === "running" || display === "pending";
-  }
-  return display === filter;
-}
-
-function taskMatchesSearch(task: TaskRow, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  const title = formatTaskTitle(task.input).toLowerCase();
-  return title.includes(q) || (task.input || "").toLowerCase().includes(q);
 }
 
 function HistoryListRow({
@@ -162,17 +148,36 @@ export function HistoryList({
   onGoToGenerate,
 }: HistoryListProps) {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const { data, isLoading, error, refetch, isFetching } = useTasks(undefined, skillId);
-  const tasks = data?.tasks || [];
+  const [page, setPage] = useState(1);
 
-  const filteredTasks = useMemo(
-    () =>
-      tasks.filter(
-        (t) => taskMatchesStatusFilter(t, statusFilter) && taskMatchesSearch(t, search),
-      ),
-    [tasks, statusFilter, search],
-  );
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, skillId]);
+
+  const { data, isLoading, error, refetch, isFetching } = useTasksPage({
+    skillId,
+    search: debouncedSearch,
+    displayStatus: statusFilter || undefined,
+    page,
+    pageSize: HISTORY_PAGE_SIZE,
+  });
+
+  const tasks = data?.tasks ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const safePage = Math.min(page, totalPages);
 
   if (!skillId) {
     return (
@@ -223,10 +228,7 @@ export function HistoryList({
       </div>
       <div className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
         <span className="tabular-nums whitespace-nowrap">
-          共 <strong className="text-foreground">{filteredTasks.length}</strong> 条
-          {filteredTasks.length !== tasks.length && (
-            <span className="text-muted-foreground/80"> / {tasks.length}</span>
-          )}
+          共 <strong className="text-foreground">{total}</strong> 条
         </span>
         <button
           type="button"
@@ -278,7 +280,7 @@ export function HistoryList({
     );
   }
 
-  if (tasks.length === 0) {
+  if (total === 0 && !isLoading && !debouncedSearch && !statusFilter) {
     return (
       <div>
         {pageHeader}
@@ -307,12 +309,12 @@ export function HistoryList({
       <HistoryListShell>
         {toolbar}
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {filteredTasks.length === 0 ? (
+          {tasks.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-muted-foreground">
               无匹配任务，请调整搜索或筛选条件
             </div>
           ) : (
-            filteredTasks.map((task) => (
+            tasks.map((task) => (
               <HistoryListRow
                 key={task.id}
                 task={task}
@@ -321,9 +323,34 @@ export function HistoryList({
             ))
           )}
         </div>
-        <div className="px-4 py-2.5 border-t border-border/60 bg-muted/10 text-xs text-muted-foreground text-center shrink-0 tabular-nums">
-          已展示 {filteredTasks.length} 条
-          {filteredTasks.length < tasks.length ? `（共 ${tasks.length} 条）` : ""}
+        <div className="px-4 py-2.5 border-t border-border/60 bg-muted/10 flex items-center justify-between gap-3 shrink-0 text-xs text-muted-foreground">
+          <span className="tabular-nums">
+            第 {safePage} / {totalPages} 页
+            {total > 0 && (
+              <span className="text-muted-foreground/80">
+                {" "}
+                · 本页 {tasks.length} 条
+              </span>
+            )}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={safePage <= 1 || isFetching}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-7 px-2.5 rounded-md border border-border bg-background hover:bg-muted/60 disabled:opacity-40 disabled:pointer-events-none"
+            >
+              上一页
+            </button>
+            <button
+              type="button"
+              disabled={safePage >= totalPages || isFetching}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              className="h-7 px-2.5 rounded-md border border-border bg-background hover:bg-muted/60 disabled:opacity-40 disabled:pointer-events-none"
+            >
+              下一页
+            </button>
+          </div>
         </div>
       </HistoryListShell>
     </div>

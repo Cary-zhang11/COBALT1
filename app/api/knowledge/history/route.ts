@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
     const search = req.nextUrl.searchParams.get("search") || "";
     const businessType = req.nextUrl.searchParams.get("businessType") || "";
     const page = parseInt(req.nextUrl.searchParams.get("page") || "1", 10);
-    const pageSize = 20;
+    const pageSizeRaw = parseInt(req.nextUrl.searchParams.get("pageSize") || "20", 10);
+    const pageSize = Math.min(50, Math.max(1, Number.isFinite(pageSizeRaw) ? pageSizeRaw : 20));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {
@@ -78,6 +79,8 @@ export async function GET(req: NextRequest) {
         };
       }),
       total,
+      page,
+      pageSize,
     });
   } catch (error) {
     console.error("History error:", error);

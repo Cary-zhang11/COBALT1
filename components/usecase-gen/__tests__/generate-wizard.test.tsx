@@ -31,11 +31,20 @@ vi.mock("@/hooks/use-task-events", () => ({
   useTaskEvents: () => ({ logs: [], status: "idle", pausedData: null, disconnect: () => {} }),
 }));
 
+const emptyInfiniteQuery = {
+  data: undefined,
+  isLoading: false,
+  isFetchingNextPage: false,
+  hasNextPage: false,
+  fetchNextPage: vi.fn(),
+};
+
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual("@tanstack/react-query");
   return {
     ...(actual as object),
     useQuery: () => ({ data: undefined }),
+    useInfiniteQuery: () => emptyInfiniteQuery,
     useMutation: () => ({ mutateAsync: vi.fn(), mutate: vi.fn(), isPending: false }),
     useQueryClient: () => ({}),
   };

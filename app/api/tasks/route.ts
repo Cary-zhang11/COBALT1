@@ -3,6 +3,41 @@ import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
 import { createTask } from "@/lib/task-engine";
 import { taskHasTestcaseOutput } from "@/lib/task-display-status";
+import { buildTaskListWhere } from "@/lib/task-list-query";
+
+const TASK_LIST_SELECT = {
+  id: true,
+  status: true,
+  input: true,
+  duration: true,
+  tweakCount: true,
+  createdAt: true,
+  totalCases: true,
+  outputFiles: true,
+  report: true,
+  skill: { select: { name: true, description: true } },
+} as const;
+
+function mapTaskRows(
+  rows: {
+    report: unknown;
+    totalCases: number | null;
+    outputFiles: string[];
+    id: string;
+    status: string;
+    input: string;
+    duration: number | null;
+    tweakCount: number;
+    createdAt: Date;
+    skill: { name: string; description: string };
+  }[],
+) {
+  return rows.map(({ report, totalCases, outputFiles, ...rest }) => ({
+    ...rest,
+    createdAt: rest.createdAt.toISOString(),
+    hasTestcaseOutput: taskHasTestcaseOutput({ totalCases, outputFiles, report }),
+  }));
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,35 +45,49 @@ export async function GET(req: NextRequest) {
     const { userId } = await getAuthUser(token);
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
-    const skillId = searchParams.get("skillId");
+    const skillId = searchParams.get("skillId") || undefined;
+    const displayStatus = searchParams.get("displayStatus") || undefined;
+    const search = searchParams.get("search") || undefined;
+    const pageRaw = searchParams.get("page");
+    const pageSizeRaw = parseInt(searchParams.get("pageSize") || "20", 10);
+    const pageSize = Math.min(50, Math.max(1, Number.isFinite(pageSizeRaw) ? pageSizeRaw : 20));
 
-    const where: Record<string, unknown> = { userId };
-    if (status) where.status = status;
-    if (skillId) where.skillId = skillId;
+    const where = buildTaskListWhere({
+      userId,
+      skillId,
+      status: status || undefined,
+      displayStatus,
+      search,
+    });
+
+    if (pageRaw) {
+      const page = Math.max(1, parseInt(pageRaw, 10) || 1);
+      const [rows, total] = await Promise.all([
+        prisma.task.findMany({
+          where,
+          select: TASK_LIST_SELECT,
+          orderBy: { createdAt: "desc" },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
+        prisma.task.count({ where }),
+      ]);
+
+      return NextResponse.json({
+        tasks: mapTaskRows(rows),
+        total,
+        page,
+        pageSize,
+      });
+    }
 
     const rows = await prisma.task.findMany({
       where,
-      select: {
-        id: true,
-        status: true,
-        input: true,
-        duration: true,
-        tweakCount: true,
-        createdAt: true,
-        totalCases: true,
-        outputFiles: true,
-        report: true,
-        skill: { select: { name: true, description: true } },
-      },
+      select: TASK_LIST_SELECT,
       orderBy: { createdAt: "desc" },
     });
 
-    const tasks = rows.map(({ report, totalCases, outputFiles, ...rest }) => ({
-      ...rest,
-      hasTestcaseOutput: taskHasTestcaseOutput({ totalCases, outputFiles, report }),
-    }));
-
-    return NextResponse.json({ tasks });
+    return NextResponse.json({ tasks: mapTaskRows(rows) });
   } catch (error) {
     console.error("Tasks list error:", error);
     return NextResponse.json(
