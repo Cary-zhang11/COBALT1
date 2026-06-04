@@ -511,28 +511,67 @@ export function GenerateWizard({
                 }).catch((err) => console.error("Reconcile PATCH failed:", err));
               }
             } else if (stillRunning && taskStatus === "running") {
-              // Tweak is in progress.
-              const currentMd = maxMdVersion(reconFiles);
-              const currentXmind = maxXmindVersion(reconFiles);
-              // If output for this round already exists on disk (CLI finished
-              // while user was away), resolve immediately.
-              if (currentMd >= stillRunning.round && currentXmind >= stillRunning.round && reconTree) {
-                setTweakHistory((prev) =>
-                  prev.map((e) =>
-                    e.round === stillRunning.round ? { ...e, status: "done" as const } : e
-                  )
-                );
-              } else {
-                // Start scanner. Use round-1 as baseline, NOT current max.
-                // Current max may already include partial output from this
-                // tweak (e.g. MD v10 generated but XMind not yet), which would
-                // cause the scanner to wait forever for a version > baseline.
-                const preVersion = Math.max(-1, stillRunning.round - 1);
-                setXmindBaseline(preVersion);
-                setMdBaseline(preVersion);
-                setGenerating(true);
-                setGenStatus("正在微调用例...");
-              }
+              // Tweak in progress. Poll report until P0 marks it done.
+              // Trust the DB — no scanner/file-detection needed.
+              setGenerating(true);
+              setGenStatus("正在微调用例...");
+
+              const pollUntilDone = async () => {
+                if (cancelled) return;
+                try {
+                  const res = await fetch(`/api/tasks/${initialTaskId}/report`);
+                  if (!res.ok || cancelled) return;
+                  const r = await res.json();
+                  if (cancelled) return;
+
+                  const rTree = r.tree as UsecaseModule[] | null;
+                  if (rTree) {
+                    setUsecaseTree(rTree);
+                    const rFiles: FileInfo[] = (r.outputFiles || []).map(
+                      (f: { name: string; path: string }) => {
+                        let relativePath = f.name;
+                        try {
+                          const url = new URL(f.path, "http://x");
+                          const fileParam = url.searchParams.get("file");
+                          if (fileParam) relativePath = decodeURIComponent(fileParam);
+                        } catch { /* fallback */ }
+                        return { name: f.name, relativePath };
+                      }
+                    );
+                    setLoadedFiles(rFiles);
+                    const rSummary = r.summary;
+                    setGenStats({
+                      totalCases: rSummary?.totalCases || 0,
+                      qualityScore: rSummary?.qualityScore || 0,
+                      modules: rSummary?.modules || 0,
+                      duration: (r as Record<string, unknown>).duration as number || 0,
+                    });
+                    onCompleteRef.current(rTree, rSummary);
+                  }
+
+                  const rTweakHistory = (r.tweakHistory as TweakEntry[]) || [];
+                  if (rTweakHistory.length > 0) {
+                    setTweakHistory(rTweakHistory);
+                  }
+
+                  const stillRunningNow = rTweakHistory.some(
+                    (e: TweakEntry) => e.status === "running"
+                  );
+                  const taskStatusNow = (r as Record<string, unknown>).status as string;
+
+                  if (!stillRunningNow || taskStatusNow !== "running") {
+                    setGenerating(false);
+                    setGenStatus("");
+                    return;
+                  }
+                } catch { /* retry next poll */ }
+
+                if (!cancelled) {
+                  setTimeout(pollUntilDone, 3000);
+                }
+              };
+
+              pollUntilDone();
             }
           } catch { /* reconcile failed silently */ }
         }
