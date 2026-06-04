@@ -323,12 +323,15 @@ export async function resumeTask(
               data: { duration: elapsed },
             });
           }
-          hasTestcaseMd = await saveOutputAndReport(taskId);
+          // Mark tweak done BEFORE saveOutputAndReport so that the report
+          // endpoint (which re-reads tweakHistory) always sees "done" when
+          // the scanner detects new output files.
           if (isTweakResume) {
             await markTweakEntryDone(taskId, runningEntry!.round).catch((err) =>
               console.error("[task-engine] markTweakEntryDone failed:", err)
             );
           }
+          hasTestcaseMd = await saveOutputAndReport(taskId);
         }
 
         // Non-output_complete pause during tweak → mark failed
@@ -377,12 +380,12 @@ export async function resumeTask(
         data: { duration: streamElapsed },
       });
     }
-    const hasTestcaseMd = await saveOutputAndReport(taskId);
     if (isTweakResume) {
       await markTweakEntryDone(taskId, runningEntry!.round).catch((err) =>
         console.error("[task-engine] markTweakEntryDone (stream-end) failed:", err)
       );
     }
+    const hasTestcaseMd = await saveOutputAndReport(taskId);
     await prisma.task.update({
       where: { id: taskId },
       data: {
