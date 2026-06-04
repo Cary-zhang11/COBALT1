@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resumeTask } from "@/lib/task-engine";
+import { sanitizeEntry, type TweakEntry } from "@/lib/tweak-history";
 import { Prisma } from "@prisma/client";
 
 export async function POST(
@@ -45,13 +46,13 @@ export async function POST(
 
     // Build tweak history entry
     const existingHistory = (task.tweakHistory as Array<Record<string, unknown>>) || [];
-    const newEntry = {
+    const newEntry = sanitizeEntry({
       round: tweakRound,
       instruction,
       time: new Date().toLocaleString("zh-CN"),
       delta: scope ? `模块: ${scope}` : "全部模块",
       status: "running",
-    };
+    }) as unknown as Record<string, unknown>;
     existingHistory.push(newEntry);
 
     // Update task: increment tweak count, save history, set running
@@ -128,7 +129,7 @@ export async function PATCH(
       }
     }
 
-    history[idx] = { ...history[idx], ...updates };
+    history[idx] = sanitizeEntry({ ...history[idx], ...updates } as TweakEntry) as unknown as Record<string, unknown>;
     await prisma.task.update({
       where: { id: taskId },
       data: { tweakHistory: history as Prisma.InputJsonValue },

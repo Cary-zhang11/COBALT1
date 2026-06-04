@@ -23,6 +23,17 @@ export function findRunningTweakEntry(
   return running[0];
 }
 
+/** Strip null chars which PostgreSQL rejects in JSON/text fields */
+export function sanitizeEntry(e: TweakEntry): TweakEntry {
+  return {
+    ...e,
+    instruction: e.instruction?.replace(/\x00/g, "") ?? "",
+    time: e.time?.replace(/\x00/g, "") ?? "",
+    delta: e.delta?.replace(/\x00/g, "") ?? "",
+    summary: e.summary?.replace(/\x00/g, ""),
+  };
+}
+
 /**
  * 将指定 round 的 tweakHistory 条目标为 "done"。
  * 使用 spread 保留已有字段（如前端已写入的 summary）。
@@ -39,9 +50,11 @@ export async function markTweakEntryDone(
   if (!task?.tweakHistory) return;
 
   const history = (task.tweakHistory as unknown as TweakEntry[]).map((e) =>
-    e.round === round
-      ? { ...e, status: "done" as const, ...(summary !== undefined ? { summary } : {}) }
-      : e
+    sanitizeEntry(
+      e.round === round
+        ? { ...e, status: "done" as const, ...(summary !== undefined ? { summary } : {}) }
+        : e
+    )
   );
 
   await prisma.task.update({
@@ -66,9 +79,11 @@ export async function markTweakEntryFailed(
   if (!task?.tweakHistory) return;
 
   const history = (task.tweakHistory as unknown as TweakEntry[]).map((e) =>
-    e.round === round
-      ? { ...e, status: "failed" as const, ...(error ? { summary: error } : {}) }
-      : e
+    sanitizeEntry(
+      e.round === round
+        ? { ...e, status: "failed" as const, ...(error ? { summary: error } : {}) }
+        : e
+    )
   );
 
   await prisma.task.update({
