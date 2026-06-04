@@ -96,7 +96,7 @@ export default function TaskResultPage() {
             <p className="font-medium text-sm">{task.skill?.name}</p>
           </div>
           <div className="p-4 bg-card border rounded-xl">
-            <p className="text-xs text-muted-foreground mb-1">耗时</p>
+            <p className="text-xs text-muted-foreground mb-1">耗时（首次）</p>
             <div className="flex items-center gap-1">
               <Clock className="w-3.5 h-3.5 text-muted-foreground" />
               <p className="font-medium text-sm">

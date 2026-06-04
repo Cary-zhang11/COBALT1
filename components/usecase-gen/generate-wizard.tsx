@@ -984,7 +984,7 @@ export function GenerateWizard({
                         iconBg: "bg-amber-100",
                       },
                       {
-                        label: "生成耗时",
+                        label: "生成耗时（首次）",
                         value: genStats?.duration != null ? (genStats.duration / 60000).toFixed(1) : "-",
                         sub: "分钟",
                         valCls: "text-foreground",

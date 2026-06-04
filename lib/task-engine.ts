@@ -160,23 +160,25 @@ export async function startTaskExecution(
               }
             } catch { /* non-critical */ }
           }
-          // Write duration FIRST so report API sees it
-          const elapsed = Date.now() - startTime;
-          console.log(`[task-engine] output_complete: setting duration=${elapsed}ms for taskId="${taskId}"`);
-          await prisma.task.update({
-            where: { id: taskId },
-            data: { duration: elapsed },
-          });
+          if (!isTweak) {
+            const elapsed = Date.now() - startTime;
+            console.log(`[task-engine] output_complete: setting duration=${elapsed}ms for taskId="${taskId}"`);
+            await prisma.task.update({
+              where: { id: taskId },
+              data: { duration: elapsed },
+            });
+          }
           hasTestcaseMd = await saveOutputAndReport(taskId);
         }
 
         const terminal = statusFieldsAfterPause(event.pauseReason, hasTestcaseMd);
+        const elapsed = Date.now() - startTime;
         await prisma.task.update({
           where: { id: taskId },
           data: {
             ...terminal,
             output,
-            duration: Date.now() - startTime,
+            ...(isTweak ? {} : { duration: elapsed }),
           },
         });
         return;
@@ -188,7 +190,7 @@ export async function startTaskExecution(
           data: {
             status: "failed",
             output,
-            duration: Date.now() - startTime,
+            ...(isTweak ? {} : { duration: Date.now() - startTime }),
           },
         });
         return;
@@ -196,17 +198,20 @@ export async function startTaskExecution(
     }
 
     // Stream ended normally (should not happen, but handle anyway)
-    await prisma.task.update({
-      where: { id: taskId },
-      data: { duration: Date.now() - startTime },
-    });
+    const streamElapsed = Date.now() - startTime;
+    if (!isTweak) {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { duration: streamElapsed },
+      });
+    }
     const hasTestcaseMd = await saveOutputAndReport(taskId);
     await prisma.task.update({
       where: { id: taskId },
       data: {
         ...statusFieldsAfterStreamEnd(hasTestcaseMd),
         output,
-        duration: Date.now() - startTime,
+        ...(isTweak ? {} : { duration: streamElapsed }),
       },
     });
   } catch (error) {
@@ -269,7 +274,8 @@ export async function resumeTask(
   let sequence = (await prisma.taskLog.count({ where: { taskId } })) + 1;
   let output = task.output || "";
   const startTime = Date.now();
-  const previousDuration = task.duration || 0;
+  /** 微调后 tweakCount 已递增；仅首次生成流程写入 duration */
+  const skipDurationUpdate = (task.tweakCount || 0) > 0;
   try {
     for await (const event of stream) {
       sequence++;
@@ -301,23 +307,25 @@ export async function resumeTask(
               }
             } catch { /* non-critical */ }
           }
-          // Write duration FIRST so report API sees it
-          const elapsed = previousDuration + (Date.now() - startTime);
-          console.log(`[task-engine] resume output_complete: setting duration=${elapsed}ms (prev=${previousDuration}) for taskId="${taskId}"`);
-          await prisma.task.update({
-            where: { id: taskId },
-            data: { duration: elapsed },
-          });
+          if (!skipDurationUpdate) {
+            const elapsed = Date.now() - startTime;
+            console.log(`[task-engine] resume output_complete: setting duration=${elapsed}ms for taskId="${taskId}"`);
+            await prisma.task.update({
+              where: { id: taskId },
+              data: { duration: elapsed },
+            });
+          }
           hasTestcaseMd = await saveOutputAndReport(taskId);
         }
 
         const terminal = statusFieldsAfterPause(event.pauseReason, hasTestcaseMd);
+        const resumeElapsed = Date.now() - startTime;
         await prisma.task.update({
           where: { id: taskId },
           data: {
             ...terminal,
             output,
-            duration: previousDuration + (Date.now() - startTime),
+            ...(skipDurationUpdate ? {} : { duration: resumeElapsed }),
           },
         });
         return;
@@ -329,7 +337,7 @@ export async function resumeTask(
           data: {
             status: "failed",
             output,
-            duration: previousDuration + (Date.now() - startTime),
+            ...(skipDurationUpdate ? {} : { duration: Date.now() - startTime }),
           },
         });
         return;
@@ -337,17 +345,20 @@ export async function resumeTask(
     }
 
     // Stream ended normally
-    await prisma.task.update({
-      where: { id: taskId },
-      data: { duration: previousDuration + (Date.now() - startTime) },
-    });
+    const streamElapsed = Date.now() - startTime;
+    if (!skipDurationUpdate) {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { duration: streamElapsed },
+      });
+    }
     const hasTestcaseMd = await saveOutputAndReport(taskId);
     await prisma.task.update({
       where: { id: taskId },
       data: {
         ...statusFieldsAfterStreamEnd(hasTestcaseMd),
         output,
-        duration: previousDuration + (Date.now() - startTime),
+        ...(skipDurationUpdate ? {} : { duration: streamElapsed }),
       },
     });
   } catch (error) {

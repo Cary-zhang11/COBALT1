@@ -74,7 +74,7 @@ function formatDate(dateStr: string): string {
 
 /** task.duration 为毫秒，与看板/向导 KPI 一致 */
 function formatDuration(ms: number): string {
-  return `${(ms / 60000).toFixed(1)} 分钟`;
+  return `${(ms / 60000).toFixed(1)} 分钟（首次）`;
 }
 
 function formatTaskMeta(task: TaskRow): string {
