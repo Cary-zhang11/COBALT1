@@ -495,6 +495,12 @@ export function GenerateWizard({
                   }),
                 }).catch((err) => console.error("Reconcile PATCH failed:", err));
               }
+            } else if (stillRunning && taskStatus === "running") {
+              // Tweak is genuinely in progress — start scanner to detect new files
+              setXmindBaseline(maxXmindVersion(reconFiles));
+              setMdBaseline(maxMdVersion(reconFiles));
+              setGenerating(true);
+              setGenStatus("正在微调用例...");
             }
           } catch { /* reconcile failed silently */ }
         }
