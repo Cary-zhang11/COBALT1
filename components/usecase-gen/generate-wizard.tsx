@@ -468,13 +468,16 @@ export function GenerateWizard({
               setTweakHistory(reconTweakHistory);
             }
 
-            // Fallback: if still running but MD file exists, mark done locally + PATCH
+            // Fallback: if still running but MD file exists, mark done locally + PATCH.
+            // Only auto-resolve when task is NOT actively running — "running" means
+            // the tweak is still in progress and P0 will handle it when it completes.
             const stillRunning = reconTweakHistory
               .filter((e: TweakEntry) => e.status === "running")
               .sort((a: TweakEntry, b: TweakEntry) => b.round - a.round)[0];
-            if (stillRunning && reconTree) {
+            const taskStatus = (reconReport as Record<string, unknown>).status as string | undefined;
+            if (stillRunning && reconTree && taskStatus !== "running") {
               const currentMdVersion = maxMdVersion(reconFiles);
-              if (currentMdVersion >= stillRunning.round || (currentMdVersion >= 0 && reconTree)) {
+              if (currentMdVersion >= stillRunning.round || currentMdVersion >= 0) {
                 // Local update
                 setTweakHistory((prev) =>
                   prev.map((e) =>
