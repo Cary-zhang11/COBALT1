@@ -4,6 +4,7 @@ import { cliRuntime } from "./claude-cli-runtime";
 import { getWorkspacePath, getOutputPath, copyFilesToWorkspace } from "./sandbox";
 import type { AgentEvent } from "./agent-runtime";
 import { parseTestcaseMarkdown } from "./parse-testcase-md";
+import { findRunningTweakEntry, markTweakEntryDone, markTweakEntryFailed, type TweakEntry } from "./tweak-history";
 import fs from "fs/promises";
 import path from "path";
 
@@ -276,6 +277,13 @@ export async function resumeTask(
   const startTime = Date.now();
   /** 微调后 tweakCount 已递增；仅首次生成流程写入 duration */
   const skipDurationUpdate = (task.tweakCount || 0) > 0;
+
+  // Resolve tweakHistory: if a running entry exists for the current tweakCount,
+  // this is a tweak resume — update it on completion/error.
+  const tweakHistory = (task.tweakHistory as unknown as TweakEntry[]) || [];
+  const runningEntry = findRunningTweakEntry(tweakHistory);
+  const isTweakResume = runningEntry !== undefined && runningEntry.round === tweakRound;
+
   try {
     for await (const event of stream) {
       sequence++;
@@ -316,6 +324,18 @@ export async function resumeTask(
             });
           }
           hasTestcaseMd = await saveOutputAndReport(taskId);
+          if (isTweakResume) {
+            await markTweakEntryDone(taskId, runningEntry!.round).catch((err) =>
+              console.error("[task-engine] markTweakEntryDone failed:", err)
+            );
+          }
+        }
+
+        // Non-output_complete pause during tweak → mark failed
+        if (event.pauseReason !== "output_complete" && isTweakResume) {
+          await markTweakEntryFailed(taskId, runningEntry!.round, `pause: ${event.pauseReason}`).catch((err) =>
+            console.error("[task-engine] markTweakEntryFailed (non-output_complete) failed:", err)
+          );
         }
 
         const terminal = statusFieldsAfterPause(event.pauseReason, hasTestcaseMd);
@@ -332,6 +352,11 @@ export async function resumeTask(
       }
 
       if (event.type === "error") {
+        if (isTweakResume) {
+          await markTweakEntryFailed(taskId, runningEntry!.round, "stream error").catch((err) =>
+            console.error("[task-engine] markTweakEntryFailed (error) failed:", err)
+          );
+        }
         await prisma.task.update({
           where: { id: taskId },
           data: {
@@ -353,6 +378,11 @@ export async function resumeTask(
       });
     }
     const hasTestcaseMd = await saveOutputAndReport(taskId);
+    if (isTweakResume) {
+      await markTweakEntryDone(taskId, runningEntry!.round).catch((err) =>
+        console.error("[task-engine] markTweakEntryDone (stream-end) failed:", err)
+      );
+    }
     await prisma.task.update({
       where: { id: taskId },
       data: {
@@ -367,6 +397,11 @@ export async function resumeTask(
     if (current?.status === "cancelled") {
       console.log(`[task-engine] resume error but task already cancelled, taskId="${taskId}"`);
       return;
+    }
+    if (isTweakResume) {
+      await markTweakEntryFailed(taskId, runningEntry!.round, error instanceof Error ? error.message : "Unknown error").catch((err) =>
+        console.error("[task-engine] markTweakEntryFailed (catch) failed:", err)
+      );
     }
     const message = error instanceof Error ? error.message : "Unknown error";
     await prisma.task.update({
@@ -400,6 +435,18 @@ export async function cancelTask(taskId: string): Promise<void> {
     where: { id: taskId },
     data: { status: "cancelled" },
   });
+
+  // If cancelling during a tweak, mark the running entry as failed
+  if ((task.tweakCount || 0) > 0) {
+    const history = (task.tweakHistory as unknown as TweakEntry[]) || [];
+    const running = findRunningTweakEntry(history);
+    if (running) {
+      await markTweakEntryFailed(taskId, running.round, "cancelled").catch((err) =>
+        console.error("[cancelTask] markTweakEntryFailed failed:", err)
+      );
+    }
+  }
+
   console.log(`[cancelTask] done, taskId="${taskId}"`);
 }
 

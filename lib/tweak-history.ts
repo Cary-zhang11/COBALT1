@@ -38,7 +38,7 @@ export async function markTweakEntryDone(
   });
   if (!task?.tweakHistory) return;
 
-  const history = (task.tweakHistory as TweakEntry[]).map((e) =>
+  const history = (task.tweakHistory as unknown as TweakEntry[]).map((e) =>
     e.round === round
       ? { ...e, status: "done" as const, ...(summary !== undefined ? { summary } : {}) }
       : e
@@ -46,7 +46,7 @@ export async function markTweakEntryDone(
 
   await prisma.task.update({
     where: { id: taskId },
-    data: { tweakHistory: history as Prisma.InputJsonValue },
+    data: { tweakHistory: history as unknown as Prisma.InputJsonValue },
   });
 }
 
@@ -65,7 +65,7 @@ export async function markTweakEntryFailed(
   });
   if (!task?.tweakHistory) return;
 
-  const history = (task.tweakHistory as TweakEntry[]).map((e) =>
+  const history = (task.tweakHistory as unknown as TweakEntry[]).map((e) =>
     e.round === round
       ? { ...e, status: "failed" as const, ...(error ? { summary: error } : {}) }
       : e
@@ -73,6 +73,6 @@ export async function markTweakEntryFailed(
 
   await prisma.task.update({
     where: { id: taskId },
-    data: { tweakHistory: history as Prisma.InputJsonValue },
+    data: { tweakHistory: history as unknown as Prisma.InputJsonValue },
   });
 }
