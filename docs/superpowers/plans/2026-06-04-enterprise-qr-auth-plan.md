@@ -63,12 +63,15 @@ model User {
 
 - [ ] **Step 4: 更新 .env 环境变量**
 
-在 `.env` 末尾添加：
+在 `.env` 中修改和添加：
 
 ```env
+AUTH_ENABLED=true
 ADMIN_USERS=jingjiejie
 QR_BASE_URL=https://app.corpautohome.com/newautobots/qr
 ```
+
+注意：`AUTH_ENABLED` 从 `false` 改为 `true`，启用认证系统。
 
 - [ ] **Step 5: 运行 Prisma migration**
 
@@ -149,7 +152,7 @@ export async function getAuthUser(
   if (!AUTH_ENABLED) {
     await prisma.user.upsert({
       where: { id: ANONYMOUS_USER.userId },
-      update: {},
+      update: { username: "anonymous", accountStatus: "active" },
       create: {
         id: ANONYMOUS_USER.userId,
         email: ANONYMOUS_USER.email,
@@ -171,7 +174,7 @@ export async function getAuthUser(
 关键变更：
 - 删除 `bcryptjs` import、`hashPassword`、`verifyPassword`
 - `JwtPayload` 接口包含 `username?`、`email?`
-- 匿名用户 upsert 增加 `username`、`accountStatus` 字段
+- 匿名用户 upsert 的 `update` 增加 `username`、`accountStatus`，确保迁移后已有 anonymous 记录也能获得新字段
 
 - [ ] **Step 2: 创建 lib/admin.ts**
 
@@ -642,13 +645,14 @@ git commit -m "feat: extend /me endpoint with QR auth user fields"
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 
 type QRStatus = "loading" | "pending" | "scanned" | "success" | "expired" | "error";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setUser } = useAuthStore();
   const [qrImage, setQrImage] = useState("");
   const [status, setStatus] = useState<QRStatus>("loading");
@@ -692,7 +696,8 @@ export default function LoginPage() {
           setStatus("success");
           if (intervalRef.current) clearInterval(intervalRef.current);
           if (data.user) setUser(data.user);
-          router.push("/");
+          const redirect = searchParams.get("redirect") || "/";
+          router.push(redirect);
         } else if (data.status === 50) {
           setStatus("expired");
           if (intervalRef.current) clearInterval(intervalRef.current);
@@ -1009,7 +1014,7 @@ import {
 ```typescript
 const ADMIN_USERS = (process.env.NEXT_PUBLIC_ADMIN_USERS || "").split(",").filter(Boolean);
 
-function useIsAdmin(user: { username?: string | null; permissions?: any }) {
+function isAdminClient(user: { username?: string | null; permissions?: any }): boolean {
   if (user?.username && ADMIN_USERS.includes(user.username)) return true;
   if (user?.permissions?.is_admin) return true;
   return false;
@@ -1019,7 +1024,7 @@ function useIsAdmin(user: { username?: string | null; permissions?: any }) {
 3. 在 `Sidebar` 组件中，在 `navItems.map` 渲染后添加管理员入口：
 
 ```tsx
-const showAdmin = useIsAdmin(user);
+const showAdmin = isAdminClient(user);
 
 // 在 nav 内的 navItems.map 后添加：
 {showAdmin && (

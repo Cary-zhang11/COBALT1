@@ -5,9 +5,6 @@ const AUTH_ENABLED = process.env.AUTH_ENABLED !== "false";
 
 const PUBLIC_PATHS = [
   "/login",
-  "/register",
-  "/api/auth/register",
-  "/api/auth/login",
 ];
 
 export function middleware(request: NextRequest) {

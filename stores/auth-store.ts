@@ -2,9 +2,13 @@ import { create } from "zustand";
 
 interface User {
   id: string;
-  email: string;
+  email: string | null;
   name: string | null;
   avatar: string | null;
+  username: string | null;
+  group: string | null;
+  permissions: any;
+  accountStatus: string;
 }
 
 interface AuthState {

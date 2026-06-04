@@ -161,7 +161,7 @@ export function GenerateWizard({
     getNextPageParam: wizardListNextPage,
   });
 
-  type KbItem = { id: string; title: string; businessType: string | null; updatedAt: string };
+  type KbItem = { id: string; title: string; businessType: string | null; content: string; updatedAt: string };
   const kbItems = useMemo(
     () => kbListQuery.data?.pages.flatMap((p) => (p.items as KbItem[]) ?? []) ?? [],
     [kbListQuery.data],

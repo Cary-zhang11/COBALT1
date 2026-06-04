@@ -13,6 +13,7 @@ import {
   Clock,
   BarChart3,
   BookOpen,
+  Users,
 } from "lucide-react";
 
 const navItems = [
@@ -21,8 +22,15 @@ const navItems = [
   { href: "/usecase-gen?tab=editor", label: "用例编辑", icon: FileText },
   { href: "/usecase-gen?tab=dashboard", label: "数据看板", icon: BarChart3 },
   { href: "/usecase-gen?tab=knowledge", label: "知识库管理", icon: BookOpen },
-  { href: "/", label: "日志列表", icon: LayoutDashboard },
 ];
+
+const ADMIN_USERS = (process.env.NEXT_PUBLIC_ADMIN_USERS || "").split(",").filter(Boolean);
+
+function isAdminClient(user: { username?: string | null; permissions?: any }): boolean {
+  if (user?.username && ADMIN_USERS.includes(user.username)) return true;
+  if (user?.permissions?.is_admin) return true;
+  return false;
+}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -41,7 +49,7 @@ export function Sidebar() {
   return (
     <aside className="w-64 border-r bg-card flex flex-col">
       <div className="p-6 border-b">
-        <Link href="/" className="flex items-center gap-3 group">
+        <Link href="/usecase-gen" className="flex items-center gap-3 group">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/30 transition-shadow">
             <Cpu className="w-5 h-5 text-white" />
           </div>
@@ -81,6 +89,42 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {user && isAdminClient(user) && (
+          <>
+            <div className="my-2 border-t" />
+            <Link
+              href="/"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                pathname === "/"
+                  ? "bg-blue-50 text-blue-700 shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <LayoutDashboard className={cn(
+                "w-4 h-4 transition-colors",
+                pathname === "/" ? "text-blue-600" : "text-muted-foreground"
+              )} />
+              日志列表
+            </Link>
+            <Link
+              href="/admin/users"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                pathname.startsWith("/admin")
+                  ? "bg-blue-50 text-blue-700 shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <Users className={cn(
+                "w-4 h-4 transition-colors",
+                pathname.startsWith("/admin") ? "text-blue-600" : "text-muted-foreground"
+              )} />
+              用户管理
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="p-4 border-t">

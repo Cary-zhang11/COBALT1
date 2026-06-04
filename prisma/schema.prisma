@@ -8,13 +8,21 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  name         String?
-  avatar       String?
-  passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(uuid())
+  email         String?  @unique
+  name          String?
+  avatar        String?
+  passwordHash  String   @default("")
+
+  username      String?  @unique
+  mobile        String?
+  group         String?
+  permissions   Json?
+  accountStatus String   @default("active")
+  extras        Json?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   tasks     Task[]
   skills    Skill[]
@@ -77,6 +85,7 @@ model Task {
   totalCases        Int?
   qualityScore      Int?
   category          String?
+  businessType      String?
   dimensionCoverage Json?
 
   agentRuntime  String  @default("claude-cli")
@@ -92,6 +101,7 @@ model Task {
   tweakCount   Int      @default(0)
   tweakHistory Json?
   report       Json?
+  refCount     Int      @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -129,8 +139,10 @@ model TaskFeedback {
 model Knowledge {
   id        String    @id @default(uuid())
   title     String
-  content   String    @db.Text
-  tags      String[]  @default([])
+  content      String    @db.Text
+  tags         String[]  @default([])
+  type         String    @default("knowledge")
+  businessType String?
   userId    String
   user      User      @relation(fields: [userId], references: [id])
   refCount  Int       @default(0)
