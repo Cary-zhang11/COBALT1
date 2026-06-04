@@ -196,6 +196,18 @@ export function useOutputScanner({
             return;
           }
 
+          // Also wait for XMind if one existed before the tweak
+          // (XMind often generates after MD; without this, scanner stops too early)
+          if (baselineRef.current >= 0) {
+            const currentXmindVersion = maxXmindVersion(newFoundFiles);
+            if (currentXmindVersion <= baselineRef.current) {
+              if (!stopRef.current) {
+                timerRef.current = setTimeout(poll, interval);
+              }
+              return;
+            }
+          }
+
           if (!report.tree) {
             if (!stopRef.current) {
               timerRef.current = setTimeout(poll, interval);
