@@ -11,6 +11,8 @@ interface OutputFilesProps {
   onEditMarkdown?: (file: FileInfo) => void;
   /** 由外层 WizardSection 提供标题与边框 */
   sectioned?: boolean;
+  /** 是否正在生成中。有文件时不转圈，无文件且有此标记时展示"生成中..." */
+  isGenerating?: boolean;
 }
 
 function isDisplayable(name: string): boolean {
@@ -37,16 +39,20 @@ function downloadFile(taskId: string, file: FileInfo) {
   document.body.removeChild(a);
 }
 
-export function OutputFiles({ taskId, files, onEditMarkdown, sectioned }: OutputFilesProps) {
+export function OutputFiles({ taskId, files, onEditMarkdown, sectioned, isGenerating }: OutputFilesProps) {
   const displayable = files.filter((f) => isDisplayable(f.name));
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
 
   const listBody =
     displayable.length === 0 ? (
-      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-        <Loader2 className="w-3 h-3 animate-spin" />
-        生成中...
-      </p>
+      isGenerating ? (
+        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          生成中...
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">暂无输出文件</p>
+      )
     ) : (
       <div className="space-y-1.5">
         {displayable.map((f, i) => (

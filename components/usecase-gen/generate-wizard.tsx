@@ -1025,6 +1025,7 @@ export function GenerateWizard({
                     taskId={taskId}
                     files={mergedOutputFiles}
                     onEditMarkdown={() => onNavigateToTab?.(2)}
+                    isGenerating={generating}
                   />
                 </WizardSection>
 
@@ -1043,7 +1044,7 @@ export function GenerateWizard({
                       const baseline = maxXmindVersion([...scanner.foundFiles, ...loadedFiles]);
                       setXmindBaseline(baseline);
                       preTweakTreeRef.current = usecaseTree;
-                      setLoadedFiles([]);
+                      // P1c: no longer clear loadedFiles — keep previous files visible during tweak
                       setGenerating(true);
                       setGenStatus("正在微调用例...");
                     }}
