@@ -39,6 +39,7 @@ export function AITweakPanel({
   const [input, setInput] = useState("");
   const [scope, setScope] = useState("all");
   const [sending, setSending] = useState(false);
+  const hasRunningTweak = tweakHistory.some((e) => e.status === "running");
 
   const handleSend = async () => {
     const text = input.trim();
@@ -146,7 +147,7 @@ export function AITweakPanel({
         />
         <button
           onClick={handleSend}
-          disabled={!input.trim() || sending || !taskId}
+          disabled={!input.trim() || sending || !taskId || hasRunningTweak}
           className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-xs font-medium disabled:opacity-40 transition-opacity flex items-center gap-1.5"
         >
           {sending ? (
