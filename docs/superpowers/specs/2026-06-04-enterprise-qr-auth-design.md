@@ -135,10 +135,14 @@ Response 200:
 
 实现逻辑（status=30 时）：
 1. POST `QR_BASE_URL/validateTokenIoa?token={token}` → 获取用户信息
-2. 字段映射：`adAccount` → username，`photoUrl` → avatar
-3. Prisma upsert：按 username 查找，存在则更新，不存在则创建
+2. 字段映射：
+   - `adAccount` → username
+   - `photoUrl` → avatar
+   - `displayName`（或其他名字字段）→ name；无则取 username 作为 name
+   - 其余字段存入 extras JSON
+3. Prisma upsert：按 username 查找，存在则更新（portrait、mobile、email、group、extras），不存在则创建
 4. 检查 `accountStatus`：如果不是 active，返回错误（禁止登录）
-5. 签发 JWT（payload: {userId, email, username}）→ 写入 httpOnly cookie
+5. 签发 JWT（payload: {userId, username, email?}）→ 写入 httpOnly cookie
 6. 返回用户信息
 
 ### Admin Users 接口
@@ -169,11 +173,15 @@ POST /api/admin/users/batch-update
 Body:
 {
   "userIds": ["id1", "id2"],
-  "group": "测试",           // 可选
-  "accountStatus": "active", // 可选
-  "permissions": {...}       // 可选
+  "mobile": "138xxxx",        // 可选
+  "email": "xx@xx.com",       // 可选
+  "group": "测试",             // 可选
+  "accountStatus": "active",  // 可选
+  "permissions": {...}         // 可选
 }
 ```
+
+**服务端校验：** `accountStatus` 仅允许 `active | inactive | disabled | locked`，非法值返回 400。
 
 ---
 
@@ -282,18 +290,14 @@ if (!isAdmin(user)) {
 
 ## 七、Middleware 改动
 
-仅两处修改：
-
 ```typescript
 const PUBLIC_PATHS = [
   "/login",
-  "/api/auth/qr/generate",   // 新增
-  "/api/auth/qr/check",       // 新增
-  "/api/auth/me",             // 保留（未登录时返回 error，不拦截）
-  "/api/auth/logout",         // 保留
 ];
 // 移除: /register, /api/auth/register, /api/auth/login
 ```
+
+**说明：** QR 接口路径 `/api/auth/qr/*` 属于 `/api/auth/` 前缀，当前 middleware 逻辑 `!pathname.startsWith("/api/auth/")` 已自动跳过 token 检查，无需额外添加到 PUBLIC_PATHS。`/api/auth/me` 和 `/api/auth/logout` 同理。
 
 其余逻辑不变：API 路由检查 cookie token，页面路由无 token 时重定向 `/login`。
 
@@ -317,7 +321,10 @@ AUTH_ENABLED=true              # 开启认证
 ```bash
 npm install qrcode
 npm install -D @types/qrcode
+npm uninstall bcryptjs @types/bcryptjs   # 移除密码登录相关依赖
 ```
+
+移除后同步清理 `lib/auth.ts` 中的 `hashPassword` 和 `verifyPassword` 函数。
 
 ---
 
@@ -340,7 +347,7 @@ npm install -D @types/qrcode
 |---|---|
 | `prisma/schema.prisma` | User 表扩展 |
 | `middleware.ts` | PUBLIC_PATHS 调整 |
-| `lib/auth.ts` | JWT payload 增加 username；getAuthUser 适配 |
+| `lib/auth.ts` | JWT payload 增加 username、email 改为可选；getAuthUser 返回类型增加 username；AUTH_ENABLED=false 匿名用户 upsert 适配新字段；删除 hashPassword/verifyPassword |
 | `stores/auth-store.ts` | User 接口扩展 |
 | `components/auth-provider.tsx` | /me 返回结构适配 |
 | `components/sidebar.tsx` | 新增"用户管理"入口（管理员可见） |
@@ -355,6 +362,14 @@ npm install -D @types/qrcode
 | `app/api/auth/register/route.ts` | 移除注册 |
 | `app/register/page.tsx` | 移除注册页 |
 
+### Prisma Migration
+
+本次 User 表变更为结构性修改（字段新增、email 改为可选），需要运行：
+
+```bash
+npx prisma migrate dev --name add-qr-auth-fields
+```
+
 ---
 
 ## 十一、测试要点
@@ -366,6 +381,10 @@ npm install -D @types/qrcode
 - 被禁用用户（accountStatus != active）扫码登录被拒绝
 - JWT 过期后 middleware 正确拦截 → 重定向登录页
 - 管理员可访问用户列表，非管理员返回 403
-- 批量更新用户组/状态成功
+- 批量更新用户组/状态/手机号/邮箱成功
+- 批量更新 accountStatus 传入非法值时返回 400
 - 用户列表分页、筛选（keyword/group/accountStatus）正确
 - 旧 anonymous 用户数据不影响新功能
+- AUTH_ENABLED=false 开发模式下匿名用户 upsert 正常（username 默认 "anonymous"）
+- 外部 API 返回的用户信息中 displayName 正确映射到 name 字段
+- 移除 bcryptjs 后项目编译正常
