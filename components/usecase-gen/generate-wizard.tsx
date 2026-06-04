@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useOutputScanner, maxXmindVersion, type FileInfo } from "@/hooks/use-output-scanner";
+import { useOutputScanner, maxXmindVersion, maxMdVersion, type FileInfo } from "@/hooks/use-output-scanner";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { ExecutionPanel } from "./shared/execution-panel";
 import { OutputFiles } from "./shared/output-files";
@@ -248,6 +248,7 @@ export function GenerateWizard({
   const [genStats, setGenStats] = useState<{ totalCases: number; qualityScore: number; modules: number; duration: number } | null>(null);
   const [loadedFiles, setLoadedFiles] = useState<FileInfo[]>([]);
   const [xmindBaseline, setXmindBaseline] = useState(-1);
+  const [mdBaseline, setMdBaseline] = useState<number | undefined>(undefined);
 
   // Internal state (previously from parent props)
   const [usecaseTree, setUsecaseTree] = useState<UsecaseModule[] | null>(null);
@@ -271,6 +272,7 @@ export function GenerateWizard({
     taskId: taskId || "",
     enabled: generating && !!taskId,
     xmindBaselineVersion: xmindBaseline,
+    mdBaselineVersion: mdBaseline,
     onResult: (data) => {
       const tree = data.tree as UsecaseModule[];
       const summary = data.summary;
@@ -299,8 +301,15 @@ export function GenerateWizard({
         const removed = oldCases.filter((id) => !newSet.has(id)).length;
         const modified = oldCases.filter((id) => newSet.has(id)).length;
         const summaryText = `+${added} · 修改 ${modified} · -${removed}`;
-        const serverHistory = (data.tweakHistory as TweakEntry[]) || tweakHistory;
-        const round = serverHistory.length;
+
+        const serverHistory = (data.tweakHistory as TweakEntry[]) || [];
+        // Find round: prefer running entry, fallback to max round
+        const runningEntry = serverHistory
+          .filter((e: TweakEntry) => e.status === "running")
+          .sort((a: TweakEntry, b: TweakEntry) => b.round - a.round)[0];
+        const round = runningEntry?.round
+          ?? (serverHistory.length > 0 ? Math.max(...serverHistory.map((e: TweakEntry) => e.round)) : serverHistory.length);
+
         setTweakHistory((prev) => {
           const updated = [...prev];
           const idx = updated.findIndex((e) => e.round === round);
@@ -309,7 +318,8 @@ export function GenerateWizard({
           }
           return updated;
         });
-        persistTweakEntry(taskId, round, { status: "done", summary: summaryText });
+        // PATCH summary only — no expectedStatus (server may already have marked done)
+        persistTweakEntry(taskId, round, { summary: summaryText });
         preTweakTreeRef.current = null;
       }
     },
@@ -317,16 +327,20 @@ export function GenerateWizard({
       setGenStatus(msg);
       setGenerating(false);
       if (taskId) {
+        // Only update local UI — server (P0) already wrote failed to tweakHistory
         setTweakHistory((prev) => {
           const history = [...prev];
-          const round = history.length;
-          const idx = history.findIndex((e) => e.round === round);
-          if (idx >= 0) {
-            history[idx] = { ...history[idx], status: "failed" as const };
+          const runningEntry = history
+            .filter((e) => e.status === "running")
+            .sort((a, b) => b.round - a.round)[0];
+          if (runningEntry) {
+            const idx = history.findIndex((e) => e.round === runningEntry.round);
+            if (idx >= 0) {
+              history[idx] = { ...history[idx], status: "failed" as const };
+            }
           }
           return history;
         });
-        persistTweakEntry(taskId, tweakHistory.length, { status: "failed" });
       }
     },
   });
@@ -466,6 +480,7 @@ export function GenerateWizard({
     setLoadedFiles([]);
     setTweakHistory([]);
     setXmindBaseline(-1);
+    setMdBaseline(undefined);
     preTweakTreeRef.current = null;
     try {
       const { taskId: newTaskId } = await createTask.mutateAsync({
@@ -1041,8 +1056,9 @@ export function GenerateWizard({
                     modules={usecaseTree.map((m) => m.name)}
                     tweakHistory={tweakHistory}
                     onTweakStarted={() => {
-                      const baseline = maxXmindVersion([...scanner.foundFiles, ...loadedFiles]);
-                      setXmindBaseline(baseline);
+                      const currentFiles = [...scanner.foundFiles, ...loadedFiles];
+                      setXmindBaseline(maxXmindVersion(currentFiles));
+                      setMdBaseline(maxMdVersion(currentFiles));
                       preTweakTreeRef.current = usecaseTree;
                       // P1c: no longer clear loadedFiles — keep previous files visible during tweak
                       setGenerating(true);
