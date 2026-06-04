@@ -324,20 +324,10 @@ export function GenerateWizard({
         preTweakTreeRef.current = null;
       }
 
-      // Resolve any remaining running tweakHistory entries.
-      // Handles history re-entry (no preTweakTree) and race with P0.
-      const serverHistory = (data.tweakHistory as TweakEntry[]) || [];
-      const unresolvedRunning = serverHistory
-        .filter((e: TweakEntry) => e.status === "running")
-        .sort((a: TweakEntry, b: TweakEntry) => b.round - a.round)[0];
-      if (unresolvedRunning && taskId) {
-        setTweakHistory((prev) =>
-          prev.map((e) =>
-            e.round === unresolvedRunning.round ? { ...e, status: "done" as const } : e
-          )
-        );
-        persistTweakEntry(taskId, unresolvedRunning.round, { status: "done" });
-      }
+      // If report still has running entries (history re-entry without preTweakTree,
+      // or race with P0), trust the report's own tweakHistory — it's been re-read
+      // at the endpoint after the filesystem scan, so P0 should have updated it.
+      // Sync is already done above via setTweakHistory(data.tweakHistory).
     },
     onError: (msg) => {
       setGenStatus(msg);

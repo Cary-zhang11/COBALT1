@@ -138,6 +138,16 @@ export async function GET(
 
     const outputFiles = buildFileEntries(params.id, fileList);
 
+    // Re-read tweakHistory — P0 may have updated it during filesystem scan + MD parse
+    let tweakHistory = task.tweakHistory;
+    try {
+      const fresh = await prisma.task.findUnique({
+        where: { id: params.id },
+        select: { tweakHistory: true },
+      });
+      if (fresh?.tweakHistory) tweakHistory = fresh.tweakHistory;
+    } catch { /* keep stale value on error */ }
+
     console.log(`[report] taskId="${params.id}" status="${task.status}" duration=${task.duration} outputFiles=${fileList.length}`);
     return NextResponse.json({
       status: task.status,
@@ -148,7 +158,7 @@ export async function GET(
       meta: report.meta ?? {},
       duration: task.duration,
       tweakCount: task.tweakCount,
-      tweakHistory: task.tweakHistory,
+      tweakHistory,
     });
   } catch (error) {
     console.error("Report error:", error);
