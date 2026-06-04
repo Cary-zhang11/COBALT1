@@ -140,7 +140,7 @@ Response 200:
    - `photoUrl` → avatar
    - `displayName`（或其他名字字段）→ name；无则取 username 作为 name
    - 其余字段存入 extras JSON
-3. Prisma upsert：按 username 查找，存在则更新（portrait、mobile、email、group、extras），不存在则创建
+3. Prisma upsert：按 username 查找，存在则更新（avatar、mobile、email、group、extras），不存在则创建
 4. 检查 `accountStatus`：如果不是 active，返回错误（禁止登录）
 5. 签发 JWT（payload: {userId, username, email?}）→ 写入 httpOnly cookie
 6. 返回用户信息
@@ -227,6 +227,7 @@ Body:
 - 企业微信二维码图片（base64 渲染）
 - 状态文案：等待扫码 / 已扫码确认中 / 登录成功 / 二维码已过期
 - 过期后展示"刷新二维码"按钮
+- 组件 unmount 时清除轮询 interval，避免离开页面后持续发请求
 - 移除注册页 `/register`
 
 ### 用户管理页（新增 `/admin/users`）
