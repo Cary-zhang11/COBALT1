@@ -324,10 +324,14 @@ export function GenerateWizard({
         preTweakTreeRef.current = null;
       }
 
-      // If report still has running entries (history re-entry without preTweakTree,
-      // or race with P0), trust the report's own tweakHistory — it's been re-read
-      // at the endpoint after the filesystem scan, so P0 should have updated it.
-      // Sync is already done above via setTweakHistory(data.tweakHistory).
+      // Scanner confirmed completion — resolve any running entries locally.
+      // (P0 should have already updated DB, but handle race conditions defensively.
+      // No PATCH — server is the authority, this is UI-only optimism.)
+      setTweakHistory((prev) =>
+        prev.map((e) =>
+          e.status === "running" ? { ...e, status: "done" as const } : e
+        )
+      );
     },
     onError: (msg) => {
       setGenStatus(msg);
