@@ -324,14 +324,20 @@ export function GenerateWizard({
         preTweakTreeRef.current = null;
       }
 
-      // Scanner confirmed completion — resolve any running entries locally.
-      // (P0 should have already updated DB, but handle race conditions defensively.
-      // No PATCH — server is the authority, this is UI-only optimism.)
-      setTweakHistory((prev) =>
-        prev.map((e) =>
-          e.status === "running" ? { ...e, status: "done" as const } : e
-        )
-      );
+      // Resolve any running entries still in the report (race: scanner detected
+      // files before P0's markTweakEntryDone reached DB). Update local state only
+      // — P0 handles the server-side update.
+      const serverHistory = (data.tweakHistory as TweakEntry[]) || [];
+      const unresolved = serverHistory
+        .filter((e: TweakEntry) => e.status === "running")
+        .sort((a: TweakEntry, b: TweakEntry) => b.round - a.round)[0];
+      if (unresolved && taskId) {
+        setTweakHistory((prev) =>
+          prev.map((e) =>
+            e.round === unresolved.round ? { ...e, status: "done" as const } : e
+          )
+        );
+      }
     },
     onError: (msg) => {
       setGenStatus(msg);
