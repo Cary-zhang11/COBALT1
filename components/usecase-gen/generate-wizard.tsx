@@ -501,11 +501,28 @@ export function GenerateWizard({
                 }).catch((err) => console.error("Reconcile PATCH failed:", err));
               }
             } else if (stillRunning && taskStatus === "running") {
-              // Tweak is genuinely in progress — start scanner to detect new files
-              setXmindBaseline(maxXmindVersion(reconFiles));
-              setMdBaseline(maxMdVersion(reconFiles));
-              setGenerating(true);
-              setGenStatus("正在微调用例...");
+              // Tweak is in progress.
+              const currentMd = maxMdVersion(reconFiles);
+              const currentXmind = maxXmindVersion(reconFiles);
+              // If output for this round already exists on disk (CLI finished
+              // while user was away), resolve immediately.
+              if (currentMd >= stillRunning.round && currentXmind >= stillRunning.round && reconTree) {
+                setTweakHistory((prev) =>
+                  prev.map((e) =>
+                    e.round === stillRunning.round ? { ...e, status: "done" as const } : e
+                  )
+                );
+              } else {
+                // Start scanner. Use round-1 as baseline, NOT current max.
+                // Current max may already include partial output from this
+                // tweak (e.g. MD v10 generated but XMind not yet), which would
+                // cause the scanner to wait forever for a version > baseline.
+                const preVersion = Math.max(-1, stillRunning.round - 1);
+                setXmindBaseline(preVersion);
+                setMdBaseline(preVersion);
+                setGenerating(true);
+                setGenStatus("正在微调用例...");
+              }
             }
           } catch { /* reconcile failed silently */ }
         }
