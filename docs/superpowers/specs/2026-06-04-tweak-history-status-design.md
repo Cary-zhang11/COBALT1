@@ -55,7 +55,7 @@ markTweakEntryFailed(taskId: string, round: number, error?: string): Promise<voi
 
 ### 前端（`generate-wizard`）
 
-- `onResult`: 从 `data.tweakHistory` 中用 `findRunningTweakEntry` 取 round → PATCH `{summary}` + `expectedStatus: "running"`
+- `onResult`: 取 round（优先 `findRunningTweakEntry`，fallback 到 `maxRound`）→ PATCH `{summary}`（**不传 `expectedStatus`**——summary 仅追加信息，且此时服务端通常已标 done）
 - `onError`: 从 `data.tweakHistory` 中找 round → **只更新本地 UI**，不再 PATCH status（服务端已写 failed）
 - 移除 `round = serverHistory.length` / `round = tweakHistory.length` 的推算逻辑
 
