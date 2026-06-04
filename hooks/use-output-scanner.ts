@@ -28,6 +28,14 @@ interface UseOutputScannerOptions {
    *    N = _v{N}.xmind exists → wait for _v{N+1}+
    */
   xmindBaselineVersion?: number;
+  /**
+   * Baseline MD version for tweak completion detection.
+   * When set (>= 0), scanner uses MD-based completion (tweak mode):
+   *   - Checks maxMdVersion > mdBaselineVersion instead of xmind
+   *   - Does NOT check duration (not written during tweaks)
+   * When undefined, scanner uses existing xmind-based logic (initial mode).
+   */
+  mdBaselineVersion?: number;
 }
 
 /**
@@ -52,6 +60,31 @@ export function maxXmindVersion(files: FileInfo[]): number {
   return maxV;
 }
 
+/**
+ * Extract version number from testcase MD filenames in a file list.
+ * Only counts files whose name contains "测试用例" and ends with ".md".
+ *   "测试用例.md"       → 0  (no version suffix)
+ *   "测试用例_v3.md"    → 3
+ * Returns -1 if no matching MD files present.
+ */
+export function maxMdVersion(files: FileInfo[]): number {
+  const mdFiles = files.filter(
+    (f) => f.name.includes("测试用例") && f.name.endsWith(".md")
+  );
+  if (mdFiles.length === 0) return -1;
+
+  let maxV = -1;
+  for (const f of mdFiles) {
+    const m = f.name.match(/_v(\d+)\.md$/);
+    if (m) {
+      maxV = Math.max(maxV, parseInt(m[1], 10));
+    } else {
+      maxV = Math.max(maxV, 0);
+    }
+  }
+  return maxV;
+}
+
 export function useOutputScanner({
   taskId,
   interval = 3000,
@@ -59,6 +92,7 @@ export function useOutputScanner({
   onError,
   enabled = true,
   xmindBaselineVersion = -1,
+  mdBaselineVersion,
 }: UseOutputScannerOptions) {
   const [isScanning, setIsScanning] = useState(false);
   const [foundFiles, setFoundFiles] = useState<FileInfo[]>([]);
@@ -71,6 +105,8 @@ export function useOutputScanner({
   // Keep baseline in a ref so poll() always reads the latest value
   const baselineRef = useRef(xmindBaselineVersion);
   baselineRef.current = xmindBaselineVersion;
+  const mdBaselineRef = useRef(mdBaselineVersion);
+  mdBaselineRef.current = mdBaselineVersion;
 
   const stop = useCallback(() => {
     stopRef.current = true;
@@ -146,31 +182,52 @@ export function useOutputScanner({
           setFoundFiles(newFoundFiles);
         }
 
-        // 4. Completion gate — wait for xmind version higher than baseline
-        const currentXmindVersion = maxXmindVersion(newFoundFiles);
+        // 4. Completion gate
+        const isTweakMode = mdBaselineVersion !== undefined && mdBaselineVersion >= 0;
 
-        if (currentXmindVersion <= baselineRef.current) {
-          if (!stopRef.current) {
-            timerRef.current = setTimeout(poll, interval);
-          }
-          return;
-        }
+        if (isTweakMode) {
+          // Tweak mode: wait for higher MD version + tree (no duration check)
+          const currentMdVersion = maxMdVersion(newFoundFiles);
 
-        // Higher-version xmind detected — verify tree before completing
-        if (!report.tree) {
-          if (!stopRef.current) {
-            timerRef.current = setTimeout(poll, interval);
+          if (currentMdVersion <= mdBaselineRef.current!) {
+            if (!stopRef.current) {
+              timerRef.current = setTimeout(poll, interval);
+            }
+            return;
           }
-          return;
-        }
 
-        // Wait for duration to be persisted (race: files may appear on disk
-        // before startTaskExecution writes duration to DB on output_complete)
-        if (report.duration == null) {
-          if (!stopRef.current) {
-            timerRef.current = setTimeout(poll, interval);
+          if (!report.tree) {
+            if (!stopRef.current) {
+              timerRef.current = setTimeout(poll, interval);
+            }
+            return;
           }
-          return;
+
+          // Tweak mode: no duration gate (duration not written during tweaks)
+        } else {
+          // Initial mode: existing logic — wait for xmind + tree + duration
+          const currentXmindVersion = maxXmindVersion(newFoundFiles);
+
+          if (currentXmindVersion <= baselineRef.current) {
+            if (!stopRef.current) {
+              timerRef.current = setTimeout(poll, interval);
+            }
+            return;
+          }
+
+          if (!report.tree) {
+            if (!stopRef.current) {
+              timerRef.current = setTimeout(poll, interval);
+            }
+            return;
+          }
+
+          if (report.duration == null) {
+            if (!stopRef.current) {
+              timerRef.current = setTimeout(poll, interval);
+            }
+            return;
+          }
         }
 
         callbacksRef.current.onResult?.(report);
@@ -193,7 +250,7 @@ export function useOutputScanner({
         clearTimeout(timerRef.current);
       }
     };
-  }, [taskId, enabled, interval, stop, xmindBaselineVersion]);
+  }, [taskId, enabled, interval, stop, xmindBaselineVersion, mdBaselineVersion]);
 
   return { isScanning, foundFiles, stop };
 }
