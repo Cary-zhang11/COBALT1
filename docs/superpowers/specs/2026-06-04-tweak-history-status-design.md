@@ -28,10 +28,11 @@ error / catch   → markTweakEntryFailed                        ← P0 新增
 
 ## 3. P0：`lib/tweak-history.ts` + `resumeTask`
 
-### 新模块 `lib/tweak-history.ts`
+### 新模块 `lib/tweak-history.ts`（服务端）
 
 ```typescript
 // 返回最后一个 status === "running" 的条目，无则 undefined
+// （纯函数，前端共享同一逻辑：history.filter(e => e.status === "running").sort((a,b) => b.round - a.round)[0]）
 findRunningTweakEntry(history: TweakEntry[]): TweakEntry | undefined
 
 // 将指定 round 的条目状态更新为 "done"
@@ -91,8 +92,8 @@ maxMdVersion(files: FileInfo[]): number
 
 1. 现有第 1 次 report → 首屏渲染（不变）
 2. 若触发 → **仅 1 次**第 2 次 report（`reconciledRef` 防 Strict Mode 双调）
-3. `applyReportSnapshot(report)` 更新 tree / files / stats / history
-4. 兜底：若仍 `running` 且 `maxMdVersion >= running.round` 且 `tree` 存在 → 本地标 `done` + PATCH
+3. 用第 2 次 report 的数据更新本地 state：tree、outputFiles（→ `setLoadedFiles`）、stats、tweakHistory
+4. 兜底：若仍 `running` 且 `maxMdVersion >= running.round` 且 `tree` 存在 → 本地标 `done` + PATCH（`expectedStatus: "running"`）
 
 P0 上线后步骤 4 多为 no-op，保留兼容旧任务。
 
@@ -118,7 +119,7 @@ P0 上线后步骤 4 多为 no-op，保留兼容旧任务。
 | 取消微调 | `cancelTask` 中调用 `markTweakEntryFailed` |
 | PATCH 竞争 | PATCH 端点加 `expectedStatus` 参数：匹配则更新，不匹配返回 409；前端收到 409 从 report 刷新 |
 | `inject` 进行中 | 不写 `tweakHistory`，reconcile 不触发 |
-| 并发再发微调 | 产品层：上一轮 `running` 时禁用发送按钮 |
+| 并发再发微调 | AITweakPanel 发送按钮在 `tweakHistory` 中存在 `running` 条目时禁用（不仅依赖 `generating` prop——关页重开后 `generating=false` 但 tweakHistory 仍有 running） |
 | 手动 resume（非微调） | `findRunningTweakEntry` 为 null 或 round 不匹配 → 不更新 tweakHistory |
 | 模型不遵守命名约束 | §5 步骤 4 兜底放宽：`maxMdVersion >= running.round`，或放宽为只要 `tree` 存在 + `maxMdVersion >= 0`（有至少一个测试用例 MD 产出）即标 done |
 
