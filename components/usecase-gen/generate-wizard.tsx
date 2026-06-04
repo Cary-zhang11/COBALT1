@@ -257,6 +257,7 @@ export function GenerateWizard({
   const preTweakTreeRef = useRef<UsecaseModule[] | null>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+  const reconciledRef = useRef(false);
 
   // Persist tweak entry update to DB
   const persistTweakEntry = useCallback((tid: string, round: number, updates: Partial<TweakEntry>) => {
@@ -365,6 +366,7 @@ export function GenerateWizard({
     if (!initialTaskId) return;
 
     let cancelled = false;
+    reconciledRef.current = false;
     (async () => {
       try {
         const reportRes = await fetch(`/api/tasks/${initialTaskId}/report`);
@@ -422,6 +424,76 @@ export function GenerateWizard({
             setGenStatus("正在加载...");
             setWizStep(2);
           }
+        }
+
+        // P1b: If tweakHistory has a running entry, fire one reconcile fetch
+        const reportTweakHistory = (report.tweakHistory as TweakEntry[]) || [];
+        const hasRunning = reportTweakHistory.some((e: TweakEntry) => e.status === "running");
+        if (hasRunning && !cancelled && !reconciledRef.current) {
+          reconciledRef.current = true;
+          try {
+            const reconRes = await fetch(`/api/tasks/${initialTaskId}/report`);
+            if (!reconRes.ok || cancelled) return;
+            const reconReport = await reconRes.json();
+            if (cancelled) return;
+
+            // Update state from reconcile report
+            const reconTree = reconReport.tree as UsecaseModule[] | null;
+            const reconSummary = reconReport.summary;
+            const reconFiles: FileInfo[] = (reconReport.outputFiles || []).map(
+              (f: { name: string; path: string }) => {
+                let relativePath = f.name;
+                try {
+                  const url = new URL(f.path, "http://x");
+                  const fileParam = url.searchParams.get("file");
+                  if (fileParam) relativePath = decodeURIComponent(fileParam);
+                } catch { /* fallback */ }
+                return { name: f.name, relativePath };
+              }
+            );
+            const reconTweakHistory = (reconReport.tweakHistory as TweakEntry[]) || [];
+
+            if (reconTree) {
+              setUsecaseTree(reconTree);
+              setGenStats({
+                totalCases: reconSummary?.totalCases || 0,
+                qualityScore: reconSummary?.qualityScore || 0,
+                modules: reconSummary?.modules || 0,
+                duration: (reconReport as Record<string, unknown>).duration as number || 0,
+              });
+              setLoadedFiles(reconFiles);
+              onCompleteRef.current(reconTree, reconSummary);
+            }
+            if (reconTweakHistory.length > 0) {
+              setTweakHistory(reconTweakHistory);
+            }
+
+            // Fallback: if still running but MD file exists, mark done locally + PATCH
+            const stillRunning = reconTweakHistory
+              .filter((e: TweakEntry) => e.status === "running")
+              .sort((a: TweakEntry, b: TweakEntry) => b.round - a.round)[0];
+            if (stillRunning && reconTree) {
+              const currentMdVersion = maxMdVersion(reconFiles);
+              if (currentMdVersion >= stillRunning.round || (currentMdVersion >= 0 && reconTree)) {
+                // Local update
+                setTweakHistory((prev) =>
+                  prev.map((e) =>
+                    e.round === stillRunning.round ? { ...e, status: "done" as const } : e
+                  )
+                );
+                // PATCH with optimistic lock
+                fetch(`/api/tasks/${initialTaskId}/tweak`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    round: stillRunning.round,
+                    updates: { status: "done" },
+                    expectedStatus: "running",
+                  }),
+                }).catch((err) => console.error("Reconcile PATCH failed:", err));
+              }
+            }
+          } catch { /* reconcile failed silently */ }
         }
       } catch { /* fall through */ }
     })();
