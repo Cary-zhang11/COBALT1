@@ -94,7 +94,7 @@ export async function PATCH(
     const { userId } = await getAuthUser(token);
 
     const taskId = params.id;
-    const { round, updates } = await req.json();
+    const { round, updates, expectedStatus } = await req.json();
 
     if (!round || !updates) {
       return NextResponse.json(
@@ -110,13 +110,29 @@ export async function PATCH(
 
     const history = (task.tweakHistory as Array<Record<string, unknown>>) || [];
     const idx = history.findIndex((e) => e.round === round);
-    if (idx >= 0) {
-      history[idx] = { ...history[idx], ...updates };
-      await prisma.task.update({
-        where: { id: taskId },
-        data: { tweakHistory: history as Prisma.InputJsonValue },
-      });
+
+    if (idx < 0) {
+      return NextResponse.json(
+        { error: "Tweak entry not found" },
+        { status: 404 }
+      );
     }
+
+    // Optimistic lock: if expectedStatus provided, check it matches current
+    if (expectedStatus !== undefined) {
+      if (history[idx].status !== expectedStatus) {
+        return NextResponse.json(
+          { conflict: true, current: history[idx] },
+          { status: 409 }
+        );
+      }
+    }
+
+    history[idx] = { ...history[idx], ...updates };
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { tweakHistory: history as Prisma.InputJsonValue },
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {
