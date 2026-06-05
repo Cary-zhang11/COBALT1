@@ -12,6 +12,7 @@ interface Task {
   createdAt: string;
   hasTestcaseOutput?: boolean;
   skill: { name: string; description: string };
+  user?: { name: string | null; username: string | null };
 }
 
 export function useTasks(status?: string, skillId?: string) {

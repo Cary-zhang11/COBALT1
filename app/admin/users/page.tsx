@@ -160,7 +160,6 @@ export default function AdminUsersPage() {
                 />
               </th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">用户名</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">邮箱</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">用户组</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">状态</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">注册时间</th>
@@ -177,7 +176,6 @@ export default function AdminUsersPage() {
                   />
                 </td>
                 <td className="px-4 py-3">{u.username || u.name || "-"}</td>
-                <td className="px-4 py-3 text-gray-500">{u.email || "-"}</td>
                 <td className="px-4 py-3">{u.group || "-"}</td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-1.5">
@@ -192,7 +190,7 @@ export default function AdminUsersPage() {
             ))}
             {users.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                   暂无用户数据
                 </td>
               </tr>

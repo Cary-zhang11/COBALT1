@@ -2,7 +2,6 @@ import { Prisma } from "@prisma/client";
 
 /** 历史列表展示态 → Prisma where（与 task-display-status 口径一致） */
 export function buildTaskListWhere(options: {
-  userId: string;
   skillId?: string;
   /** 原始 DB status（兼容旧调用） */
   status?: string;
@@ -10,7 +9,7 @@ export function buildTaskListWhere(options: {
   displayStatus?: string;
   search?: string;
 }): Prisma.TaskWhereInput {
-  const where: Prisma.TaskWhereInput = { userId: options.userId };
+  const where: Prisma.TaskWhereInput = {};
 
   if (options.skillId) {
     where.skillId = options.skillId;

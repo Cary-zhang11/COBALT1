@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import QRCode from "qrcode";
 
+export const dynamic = "force-dynamic";
+
 const QR_BASE_URL = process.env.QR_BASE_URL || "https://app.corpautohome.com/newautobots/qr";
 
 export async function GET() {
@@ -9,6 +11,7 @@ export async function GET() {
     const res = await fetch(`${QR_BASE_URL}/generate`, {
       method: "POST",
       signal: AbortSignal.timeout(10000),
+      cache: "no-store",
     });
 
     if (!res.ok) {
@@ -44,7 +47,9 @@ export async function GET() {
       margin: 2,
     });
 
-    return NextResponse.json({ uuid, qrBase64, status });
+    return NextResponse.json({ uuid, qrBase64, status }, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (err) {
     console.error("QR generate error:", err);
     return NextResponse.json(

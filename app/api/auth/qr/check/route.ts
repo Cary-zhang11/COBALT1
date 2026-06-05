@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createToken } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 const QR_BASE_URL = process.env.QR_BASE_URL || "https://app.corpautohome.com/newautobots/qr";
 
 // 二维码状态码
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
     // 1. 调用外部 API 检查扫码状态
     const checkRes = await fetch(
       `${QR_BASE_URL}/check?uuid=${encodeURIComponent(uuid)}`,
-      { signal: AbortSignal.timeout(10000) }
+      { signal: AbortSignal.timeout(10000), cache: "no-store" }
     );
 
     if (!checkRes.ok) {
@@ -45,7 +47,9 @@ export async function GET(req: NextRequest) {
 
     // 2. 非成功状态直接返回
     if (status !== QR_STATUS.SUCCESS || !externalToken) {
-      return NextResponse.json({ status });
+      return NextResponse.json({ status }, {
+        headers: { "Cache-Control": "no-store" },
+      });
     }
 
     // 3. 扫码成功：调用 validateTokenIoa 获取用户信息

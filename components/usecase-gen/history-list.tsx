@@ -40,6 +40,7 @@ type TaskRow = {
   duration: number | null;
   tweakCount?: number;
   createdAt: string;
+  user?: { name: string | null; username: string | null };
 };
 
 function resolveDisplayStatus(task: TaskRow): string {
@@ -66,7 +67,7 @@ function formatTaskTitle(input: string): string {
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   return (
-    d.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }) +
+    d.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }) +
     " " +
     d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
   );
@@ -74,7 +75,7 @@ function formatDate(dateStr: string): string {
 
 /** task.duration 为毫秒，与看板/向导 KPI 一致 */
 function formatDuration(ms: number): string {
-  return `${(ms / 60000).toFixed(1)} 分钟（首次）`;
+  return `${(ms / 60000).toFixed(1)} 分钟`;
 }
 
 function formatTaskMeta(task: TaskRow): string {
@@ -110,6 +111,9 @@ function HistoryListRow({
         <p className="text-sm font-medium truncate">{formatTaskTitle(task.input)}</p>
         <p className="text-xs text-muted-foreground mt-0.5 tabular-nums truncate">
           {formatTaskMeta(task)}
+          {task.user?.name && (
+            <span className="ml-2 text-blue-600">{task.user.name}</span>
+          )}
         </p>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">

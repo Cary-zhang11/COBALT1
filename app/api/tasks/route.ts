@@ -16,6 +16,7 @@ const TASK_LIST_SELECT = {
   outputFiles: true,
   report: true,
   skill: { select: { name: true, description: true } },
+  user: { select: { name: true, username: true } },
 } as const;
 
 function mapTaskRows(
@@ -53,7 +54,6 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.min(50, Math.max(1, Number.isFinite(pageSizeRaw) ? pageSizeRaw : 20));
 
     const where = buildTaskListWhere({
-      userId,
       skillId,
       status: status || undefined,
       displayStatus,
