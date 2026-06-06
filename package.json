@@ -3,14 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "predev": "echo \"  ▲ 外部访问: http://$(ifconfig | grep 'inet ' | grep -v 127.0.0.1 | awk '{print $2}' | head -1):3000\"",
+    "dev": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "tsx scripts/seed-skills.ts",
-    "db:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-db.ps1"
+    "db:setup": "bash scripts/setup-db.sh",
+    "db:setup:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-db.ps1"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

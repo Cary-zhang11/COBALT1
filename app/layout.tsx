@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { Sidebar } from "@/components/sidebar";
+import { SidebarSkeleton } from "@/components/sidebar-skeleton";
 import { QueryProvider } from "@/components/query-provider";
 import { AuthProvider } from "@/components/auth-provider";
 
@@ -20,7 +22,9 @@ export default function RootLayout({
         <QueryProvider>
           <AuthProvider>
             <div className="flex h-screen bg-background">
-              <Sidebar />
+              <Suspense fallback={<SidebarSkeleton />}>
+                <Sidebar />
+              </Suspense>
               <main className="flex-1 flex flex-col overflow-hidden">
                 {children}
               </main>

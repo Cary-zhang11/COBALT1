@@ -89,6 +89,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ tasks: mapTaskRows(rows) });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to load tasks";
+    if (message === "Unauthorized" || message.includes("JWT") || message.includes("jwt") || message.includes("signature")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Tasks list error:", error);
     return NextResponse.json(
       { error: "Failed to load tasks" },
@@ -115,6 +119,13 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to create task";
+
+    // Auth errors should be 401, not 500
+    if (message === "Unauthorized" || message.includes("JWT") || message.includes("jwt") || message.includes("signature")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    console.error("[POST /api/tasks] Error:", message, error instanceof Error ? error.stack : "");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -57,7 +57,7 @@ export class ClaudeCodeCLIRuntime implements IAgentRuntime {
     const combinedPrompt = [
       "<system_instructions>",
       systemPrompt,
-      `\n<output_rules>\n!!! 严格沙箱约束 !!!\n本任务运行在隔离沙箱中，所有文件操作必须限定在以下目录树内:\n- 工作目录: ${getWorkspacePath(input.taskId)}\n- 输出目录: ${outputDir}\n- 临时目录: ${getTempPath(input.taskId)}\n\n规则:\n1. 所有输出文件直接放到输出目录，禁止创建子目录\n2. 禁止写入 docs/、uploads/ 等沙箱外路径\n3. 正确: ${outputDir}\\report.md\n4. 错误: ${outputDir}\\xxx\\report.md\n5. 错误: docs/report.md\n</output_rules>`,
+      `\n<output_rules>\n!!! 严格沙箱约束 !!!\n本任务运行在隔离沙箱中，所有文件操作必须限定在以下目录树内:\n- 工作目录: ${getWorkspacePath(input.taskId)}\n- 输出目录: ${outputDir}\n- 临时目录: ${getTempPath(input.taskId)}\n\n规则:\n1. 所有输出文件直接放到输出目录，禁止创建子目录\n2. 禁止写入 docs/、uploads/ 等沙箱外路径\n3. 正确: ${outputDir}/report.md\n4. 错误: ${outputDir}/xxx/report.md\n5. 错误: docs/report.md\n</output_rules>`,
       "</system_instructions>",
       "",
       "<user_request>",
