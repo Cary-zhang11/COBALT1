@@ -8,9 +8,9 @@ export async function GET(
 ) {
   try {
     const token = req.cookies.get("token")?.value;
-    const { userId } = await getAuthUser(token);
-    const task = await prisma.task.findFirst({
-      where: { id: params.id, userId },
+    await getAuthUser(token);
+    const task = await prisma.task.findUnique({
+      where: { id: params.id },
       include: {
         skill: true,
         logs: { orderBy: { sequence: "asc" } },
