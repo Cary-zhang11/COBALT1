@@ -1,0 +1,10 @@
+node_modules
+.env
+.env.local
+.next
+sandbox/
+storage/
+
+/lib/generated/prisma
+.next/ 
+uploads/

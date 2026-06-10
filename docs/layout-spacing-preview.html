@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>COBALT 布局方案 v1.2 预览</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            border: "hsl(214 31.8% 91.4%)",
+            background: "hsl(0 0% 100%)",
+            foreground: "hsl(222.2 84% 4.9%)",
+            card: "hsl(0 0% 100%)",
+            primary: { DEFAULT: "hsl(262.1 83.3% 57.8%)", foreground: "hsl(210 40% 98%)" },
+            muted: { DEFAULT: "hsl(210 40% 96.1%)", foreground: "hsl(215.4 16.3% 46.9%)" },
+            accent: { DEFAULT: "hsl(189 94% 43%)", foreground: "hsl(0 0% 100%)" },
+          },
+          borderRadius: { lg: "0.75rem" },
+          maxWidth: { "screen-xl": "1280px" },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { font-family: Inter, "PingFang SC", system-ui, sans-serif; }
+    .width-guide { outline: 2px dashed rgba(139,92,246,.45); outline-offset: 3px; position: relative; }
+    .width-guide::after {
+      content: attr(data-label); position: absolute; top: -10px; left: 8px;
+      font-size: 10px; font-weight: 600; color: #7c3aed; background: #f5f3ff;
+      padding: 1px 6px; border-radius: 4px; border: 1px solid #ddd6fe; z-index: 10;
+    }
+    .struct-tag { display: inline-flex; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-right: 4px; margin-bottom: 4px; }
+    .struct-tag.new { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+    .struct-tag.old { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .struct-tag.proto { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .struct-tag.fix { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    /* Step3 等长内容：方案 A 底栏贴底（min-h 撑满主列） */
+    .wizard-step-row-tall {
+      min-height: min(520px, calc(100vh - 12rem));
+    }
+    .wizard-main-col {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0%;
+      min-width: 0;
+      min-height: 100%;
+    }
+    .wizard-main-col-compact {
+      min-height: 0;
+    }
+    .wizard-main-body {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .wizard-main-body-compact {
+      flex: 0 0 auto;
+    }
+    .sticky-footer {
+      flex-shrink: 0;
+      margin-top: auto;
+      position: sticky;
+      bottom: 0;
+      z-index: 20;
+      background: linear-gradient(to top, #fff 85%, transparent);
+      padding-top: 16px;
+    }
+    .wizard-footer-compact {
+      flex-shrink: 0;
+      margin-top: 1.5rem;
+      padding-top: 0;
+      position: static;
+      background: none;
+    }
+    .callout { font-size: 11px; padding: 8px 12px; border-radius: 0 8px 8px 0; margin-bottom: 12px; border-left-width: 3px; }
+    .callout-green { border-color: #10b981; background: #ecfdf5; color: #047857; }
+    .callout-red { border-color: #f87171; background: #fef2f2; color: #b91c1c; }
+    .callout-blue { border-color: #3b82f6; background: #eff6ff; color: #1d40af; }
+    .callout-amber { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
+    .drag-zone { border: 2px dashed hsl(214 31.8% 91.4%); transition: all .2s; }
+    .plan-table { width: 100%; font-size: 11px; border-collapse: collapse; }
+    .plan-table th, .plan-table td { border: 1px solid hsl(214 31.8% 91.4%); padding: 6px 8px; text-align: left; vertical-align: top; }
+    .plan-table th { background: hsl(210 40% 96.1%); font-weight: 600; }
+    .plan-table code { font-size: 10px; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    .section-body { padding: 1.25rem; }
+    .ant-stat-card { background: #fff; border-radius: 8px; padding: 20px 24px; border: 1px solid hsl(214 31.8% 91.4%); }
+    .ant-stat-card .stat-value { font-size: 30px; line-height: 38px; font-weight: 600; color: rgba(0,0,0,.85); }
+    .ant-stat-card .stat-footer { margin-top: 8px; font-size: 14px; color: rgba(0,0,0,.45); }
+    .ant-chart-card { background: #fff; border-radius: 8px; border: 1px solid hsl(214 31.8% 91.4%); }
+    .ant-chart-head { padding: 16px 24px 0; display: flex; justify-content: space-between; align-items: center; }
+    .ant-chart-body { padding: 12px 24px 24px; height: 200px; }
+    .chart-trend-wrap { height: 176px; position: relative; }
+    .chart-trend-wrap svg { width: 100%; height: 100%; display: block; }
+    .pie-mock { width: 140px; height: 140px; border-radius: 50%; margin: 0 auto; background: conic-gradient(#1890ff 0 35%, #52c41a 35% 58%, #faad14 58% 78%, #f5222d 78% 100%); }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.12); border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-background text-foreground antialiased h-screen flex flex-col">
+
+  <header class="flex-shrink-0 border-b bg-card px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-sm font-bold">COBALT 布局方案 v1.2 预览</h1>
+      <p class="text-xs text-muted-foreground mt-0.5">现状 / 建议（含对齐+右栏常驻）/ +原型增强 · 先看左侧「方案总览」</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="flex rounded-lg border overflow-hidden text-xs font-medium" id="modeBtns">
+        <button type="button" data-mode="old" class="px-3 py-2 border-r">现状</button>
+        <button type="button" data-mode="new" class="px-3 py-2 border-r">建议 v1.2</button>
+        <button type="button" data-mode="proto" class="px-3 py-2">+原型</button>
+      </div>
+      <label class="flex items-center gap-1 text-xs cursor-pointer">
+        <input type="checkbox" id="toggleGuides" checked class="accent-violet-600" />
+        宽度标注
+      </label>
+    </div>
+  </header>
+
+  <div class="flex flex-1 min-h-0">
+    <aside class="w-64 border-r bg-card flex flex-col flex-shrink-0">
+      <div class="p-6 border-b">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold">C</div>
+          <div><div class="font-bold text-lg">COBALT</div><div class="text-[10px] text-muted-foreground">Sidebar 不变</div></div>
+        </div>
+      </div>
+      <nav class="flex-1 p-4 space-y-1 text-sm overflow-y-auto" id="nav"></nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-hidden">
+      <div id="changeBanner" class="flex-shrink-0 px-6 py-2 text-xs border-b bg-muted/30"></div>
+      <div class="flex-1 overflow-auto p-6">
+        <div id="pageContainer" class="w-full mx-auto"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const NAV = [
+      { id: "overview", label: "📋 方案总览", desc: "v1.2 完整清单" },
+      { id: "wizard-s1", label: "生成向导 · Step1", desc: "紧凑·无底栏死白" },
+      { id: "wizard-s2", label: "生成向导 · Step2", desc: "列表 flex-1" },
+      { id: "wizard-s3", label: "生成向导 · Step3", desc: "生成结果" },
+      { id: "history", label: "历史记录", desc: "列表+筛选" },
+      { id: "editor", label: "用例编辑", desc: "树·详情·保存" },
+      { id: "dashboard", label: "数据看板", desc: "含用户评价列" },
+      { id: "knowledge", label: "知识库管理", desc: "左筛+列表" },
+      { id: "logs", label: "日志列表", desc: "标杆" },
+    ];
+
+    let kbTab = 0;
+
+    const WF_NODES = ["文档解析", "需求分析", "用例生成", "质量校验", "导出格式"];
+
+    let activeId = "overview";
+    let mode = "new";
+    let showGuides = true;
+
+    const isProto = () => mode === "proto";
+    const isNew = () => mode === "new" || mode === "proto";
+    const isOld = () => mode === "old";
+
+    function guide(cls, label) {
+      if (!showGuides || !label) return cls;
+      return `${cls} width-guide` + ` data-label="${label}"`;
+    }
+
+    function btnPrimary(t, outline) {
+      return outline
+        ? `<button class="border border-border text-foreground px-5 py-2.5 rounded-xl text-sm font-medium">${t}</button>`
+        : `<button class="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm">${t}</button>`;
+    }
+
+    function callout(text, type) {
+      const m = { red: "callout-red", blue: "callout-blue", amber: "callout-amber", green: "callout-green" };
+      return `<div class="callout ${m[type] || "callout-green"}">${text}</div>`;
+    }
+
+    function pageHeader(title, desc, actions = "") {
+      if (isOld() && !actions) return "";
+      const tag = isProto() ? '<span class="struct-tag proto">+原型</span>' : isNew() ? '<span class="struct-tag new">v1.2</span>' : "";
+      return `<div class="mb-5 flex items-start justify-between gap-4 flex-wrap">
+        <div>${tag}<h1 class="text-2xl font-bold">${title}</h1>${desc ? `<p class="text-sm text-muted-foreground mt-1">${desc}</p>` : ""}</div>
+        ${actions ? `<div class="flex gap-2 flex-wrap">${actions}</div>` : ""}
+      </div>`;
+    }
+
+    function stepBar(active) {
+      const conn = isNew()
+        ? '<div class="h-0.5 flex-1 mx-2 bg-border min-w-[12px]"></div>'
+        : '<div class="h-0.5 w-8 mx-2 bg-border flex-shrink-0"></div>';
+      const steps = ["输入物料", "关联用例", "生成并预览"];
+      const fullWidthNote = isNew() ? '<span class="struct-tag fix">三步同宽 max-w-7xl · 右栏 sticky</span>' : '<span class="struct-tag old">Step条在左栏 · 全宽</span>';
+      return `${fullWidthNote}
+        <div class="flex items-center bg-card border rounded-xl p-4 mb-4 shadow-sm w-full">
+          ${steps.map((s, i) => `
+            <div class="flex items-center ${i < 2 ? "flex-1 min-w-0" : ""}">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${i <= active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}">${i < active ? "✓" : i + 1}</div>
+                <span class="text-sm truncate ${i <= active ? "text-primary font-medium" : "text-muted-foreground"}">${s}</span>
+              </div>
+              ${i < 2 ? conn : ""}
+            </div>`).join("")}
+        </div>`;
+    }
+
+    function stickyFooter(left, right, stepIndex) {
+      if (isOld()) return `<div class="flex ${left ? "justify-between" : "justify-end"} gap-3 mt-4">${left || ""}${right}</div>`;
+      const compact = stepIndex < 2;
+      const wrapCls = compact ? "wizard-footer-compact" : "sticky-footer";
+      const label = compact ? "紧凑底栏 mt-6 · 紧跟内容" : "sticky 底栏 · mt-auto 贴主列底";
+      return `<div class="${guide(wrapCls, label)}">
+        <div class="bg-card border border-border/60 rounded-xl shadow-sm px-5 py-3 flex items-center ${left ? "justify-between" : "justify-end"} gap-3">${left || ""}${right}</div>
+      </div>`;
+    }
+
+    function wizardMainBody(stepIndex, html) {
+      const compact = isNew() && stepIndex < 2;
+      const bodyCls = compact ? "wizard-main-body-compact" : "wizard-main-body";
+      const label = compact ? "主区不 flex-1 撑高" : "主区 flex-1";
+      return `<div class="${guide(bodyCls + " space-y-4", label)}">${html}</div>`;
+    }
+
+    function wizardStepRowClass(stepIndex) {
+      if (isOld()) return "flex gap-6";
+      if (stepIndex < 2) {
+        return guide("flex gap-5 items-start", "Step1/2 紧凑 · 无 min-h");
+      }
+      return guide("flex gap-5 items-start wizard-step-row-tall", "Step3 · items-start");
+    }
+
+    function wizardMainColClass(stepIndex) {
+      if (isOld()) return "flex-1 min-w-0 space-y-4";
+      const compact = stepIndex < 2;
+      const col = compact ? "wizard-main-col wizard-main-col-compact" : "wizard-main-col";
+      return guide(col, compact ? "主列自然高度" : "主列 min-h 100%");
+    }
+
+    /** 右栏：单壳常驻 — Step1/2 轨迹+配置；Step3 轨迹+快捷操作 */
+    function executionPanel(stepIndex, state) {
+      const w = isOld() ? "w-56" : "w-60";
+      const wLabel = isOld() ? "w-56" : "w-60 固定";
+
+      if (isOld()) {
+        if (stepIndex < 2) {
+          return `<div class="${guide(w + " flex-shrink-0", wLabel)}">
+            <div class="bg-card border rounded-xl p-4 sticky top-6 text-xs">
+              <p class="font-semibold text-sm mb-2">当前配置预览</p>
+              <div class="bg-muted rounded-lg p-3 space-y-2">
+                <div class="flex justify-between gap-1"><span class="text-muted-foreground">物料</span><span class="truncate max-w-[100px]">未选择</span></div>
+              </div>
+              <p class="text-red-500 text-[10px] mt-2">无执行轨迹</p>
+            </div></div>`;
+        }
+        return `<div class="${w} flex-shrink-0">
+          <div class="bg-card border rounded-xl p-4 sticky top-6 text-xs space-y-2">
+            <button class="w-full border rounded-lg py-2 text-xs">下载</button>
+            <button class="w-full border rounded-lg py-2 text-xs">去编辑</button>
+            <p class="text-red-500 text-[10px]">与主区 CTA 重复 · 整栏替换</p>
+          </div></div>`;
+      }
+
+      const nodeState = (i) => {
+        if (state === "wait") return "wait";
+        if (state === "running") return i === 2 ? "running" : i < 2 ? "done" : "wait";
+        return "done";
+      };
+
+      const nodes = WF_NODES.map((n, i) => {
+        const st = nodeState(i);
+        const dot = st === "done" ? "text-emerald-600" : st === "running" ? "text-primary font-medium" : "text-muted-foreground opacity-40";
+        const icon = st === "done" ? "✓" : st === "running" ? "●" : "○";
+        return `<div class="flex items-center gap-2 ${dot}"><span class="w-3 text-center text-[10px]">${icon}</span><span class="text-xs">${n}</span></div>`;
+      }).join("");
+
+      const configBlock = stepIndex < 2 ? `
+        <div class="mt-4 pt-3 border-t border-border">
+          <p class="text-xs font-semibold mb-2 px-1">当前配置预览</p>
+          <div class="bg-muted/60 rounded-lg px-3 py-2.5 space-y-1.5 text-[11px]">
+            ${[["物料来源", "需求_v2.docx"], ["参考知识", stepIndex === 1 ? "2 份" : "0 份"], ["历史范文", stepIndex === 1 ? "1 份" : "0 份"], ["输出格式", "Markdown"]].map(([k,v]) =>
+              `<div class="grid grid-cols-[4.5rem_1fr] gap-2 items-center min-h-[18px]">
+                <span class="text-muted-foreground">${k}</span>
+                <span class="font-medium truncate text-right tabular-nums">${v}</span>
+              </div>`).join("")}
+          </div>
+        </div>` : "";
+
+      const quickBlock = stepIndex === 2 && state === "done" ? `
+        <div class="mt-4 pt-3 border-t border-border">
+          <p class="text-xs font-semibold mb-2">快捷操作</p>
+          <div class="space-y-1.5">
+            ${[
+              ["下载 Markdown", ""],
+              ["AI 微调", ""],
+              ["评价", "scroll 至主区「本次生成评价」"],
+              ["编辑", ""],
+            ].map(([t, hint]) => {
+              const onClick = t === "评价"
+                ? ` onclick="document.getElementById('step3-rating')?.scrollIntoView({behavior:'smooth',block:'start'})"`
+                : t === "AI 微调"
+                  ? ` onclick="document.getElementById('step3-ai-tweak')?.scrollIntoView({behavior:'smooth',block:'start'})"`
+                  : "";
+              return `<button type="button"${onClick} class="w-full flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border border-border hover:bg-muted/40 text-left ${t === "评价" ? "border-amber-200/80 bg-amber-50/50" : ""}" title="${hint}">
+                <span>${t}</span>${t === "评价" || t === "AI 微调" ? '<span class="text-[9px] text-muted-foreground">↓主区</span>' : ""}
+              </button>`;
+            }).join("")}
+          </div>
+          <p class="text-[10px] text-muted-foreground mt-2 pt-2 border-t">Token: 4,238</p>
+        </div>` : "";
+
+      const doneBanner = stepIndex === 2 && state === "done" ? `
+        <div class="mt-3 bg-emerald-50 border border-emerald-100 rounded-lg p-2 text-[10px] text-emerald-700">✓ 执行完成 · 文件已就绪</div>` : "";
+
+      return `<div class="${guide(w + " flex-shrink-0 self-start", wLabel + " · sticky")}">
+        <div class="bg-card border rounded-xl p-4 sticky top-6 text-xs max-h-[calc(100vh-8rem)] overflow-y-auto shadow-sm">
+          <span class="struct-tag new">sticky top-6 · 滚动时始终可见</span>
+          <div class="flex items-center justify-between mb-3 mt-1">
+            <h4 class="font-semibold text-sm">执行轨迹</h4>
+            ${state === "running" ? '<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>' : ""}
+          </div>
+          <div class="space-y-1">${nodes}</div>
+          ${configBlock}${doneBanner}${quickBlock}
+        </div>
+      </div>`;
+    }
+
+    /** 三步统一宽度，切换步骤时左缘/右栏位置不变 */
+    const WIZARD_SHELL_UNIFIED = { cls: "max-w-7xl", label: "三步统一 · 1280px" };
+
+    function wizardShellWidth() {
+      if (isOld()) return { cls: "w-full", label: "全宽（切换会跳）" };
+      return WIZARD_SHELL_UNIFIED;
+    }
+
+    /** 统一向导骨架：Step条 + 主区 + 右栏，整体限宽居中 */
+    function wizardShell(stepIndex, mainInner, footerLeft, footerRight, panelState, opts = {}) {
+      const { calloutText, calloutType, headerActions } = opts;
+      const oldLayout = isOld();
+      const shell = wizardShellWidth();
+
+      if (oldLayout) {
+        return `${pageHeader("用例生成", `Step ${stepIndex + 1}`)}
+          ${calloutText ? callout(calloutText, calloutType || "red") : ""}
+          <div class="flex gap-6">
+            <div class="flex-1 min-w-0 space-y-4">
+              ${stepBar(stepIndex)}${mainInner}${stickyFooter(footerLeft, footerRight)}
+            </div>
+            ${executionPanel(stepIndex, panelState)}
+          </div>`;
+      }
+
+      return `${pageHeader("用例生成", `Step ${stepIndex + 1}`, headerActions || "")}
+        ${calloutText ? callout(calloutText, calloutType || "green") : ""}
+        <div class="${guide(shell.cls + " mx-auto w-full", shell.label)}">
+          ${stepBar(stepIndex)}
+          <div class="${wizardStepRowClass(stepIndex)}">
+            <div class="${wizardMainColClass(stepIndex)}">
+              ${wizardMainBody(stepIndex, mainInner)}
+              ${stickyFooter(footerLeft, footerRight, stepIndex)}
+            </div>
+            ${executionPanel(stepIndex, panelState)}
+          </div>
+        </div>`;
+    }
+
+    /* ─── 方案总览 ─── */
+    function viewOverview() {
+      return `<div class="max-w-4xl space-y-5">
+        <h1 class="text-2xl font-bold">COBALT 布局优化 · 完整方案 v1.2</h1>
+        <p class="text-sm text-muted-foreground">在保持配色与 Sidebar 前提下，统一宽度/间距/向导骨架。左侧导航可逐页预览；顶部切换「现状 / 建议 / +原型」。</p>
+
+        ${callout("<strong>v1.2 新增</strong>：向导按步限宽居中 · 右栏常驻 · 三步左缘对齐 · 单层滚动", "amber")}
+
+        <h2 class="text-sm font-bold">阶段 A · 全站 padding（5 文件）</h2>
+        <table class="plan-table">
+          <tr><th>文件</th><th>改动</th></tr>
+          <tr><td><code>usecase-gen/page.tsx</code></td><td>唯一 <code>p-6</code>；向导 Tab 内由组件按步 <code>max-w-* mx-auto</code>；历史 <code>max-w-4xl</code>；编辑/看板 <code>max-w-7xl</code></td></tr>
+          <tr><td><code>dashboard.tsx</code></td><td>去掉根 <code>p-6 overflow-auto</code></td></tr>
+          <tr><td><code>knowledge-base.tsx</code></td><td>同上；左筛 <code>w-52</code> 可选</td></tr>
+          <tr><td><code>history-list.tsx</code></td><td>去 <code>p-4</code>；<code>max-w-4xl mx-auto</code></td></tr>
+          <tr><td><code>app/page.tsx</code></td><td>日志 <code>p-8→p-6</code>，保持 <code>max-w-4xl</code></td></tr>
+        </table>
+
+        <h2 class="text-sm font-bold">阶段 B · 生成向导 + 右栏（核心）</h2>
+        <table class="plan-table">
+          <tr><th>文件</th><th>改动</th></tr>
+          <tr><td><code>generate-wizard.tsx</code></td><td>
+            ① Step 条提到两栏之上（全宽）<br/>
+            ② 去掉外层+左列 <code>overflow-auto</code>（仅 page 滚动）<br/>
+            ③ 切换步骤 <code>scrollTo(0)</code><br/>
+            ④ 三步<strong>统一</strong> <code>max-w-7xl mx-auto</code>（≈1280px）<br/>
+            ④b 右栏 <code>sticky top-6 self-start</code>，随滚动始终可见<br/>
+            ⑤ Step1 单卡片（上传+粘贴）· Step2 <code>lg:grid-cols-2</code>（双栏保留搜索+业务类型，无已选汇总条）· Step3 KPI <code>xl:grid-cols-4</code><br/>
+            ⑤b <strong>Step1/2 紧凑</strong>：取消行 <code>min-h</code> · 底栏 <code>mt-6</code> 紧跟内容 · Step2 列表 <code>flex-1</code> 吃剩余高度<br/>
+            ⑥ Step3 保留长页滚动；底栏可 sticky
+          </td></tr>
+          <tr><td><code>generate-wizard.tsx</code> Step3</td><td>
+            统一 section 壳 · KPI <code>tabular-nums</code>（AI 质量评分）· 微调默认展开<br/>
+            输出文件：每行 <code>预览|编辑|下载</code> · 无独立底栏 CTA<br/>
+            <strong>评价</strong>：微调后、模块表前 · 主区 <code>RatingPanel</code> · 右栏快捷操作可跳转「评价」
+          </td></tr>
+          <tr><td><code>execution-panel.tsx</code></td><td>
+            ① 单壳结构，禁止互斥 <code>return</code><br/>
+            ② <strong>Step1/2</strong>：执行轨迹（wait）+ 当前配置预览<br/>
+            ③ <strong>Step3 生成中</strong>：执行轨迹 running/done<br/>
+            ④ <strong>Step3 完成</strong>：轨迹全 done + 快捷操作（含<strong>评价</strong>→滚动主区）<br/>
+            ⑤ <code>w-60</code>，文案 <code>max-w-[160px]</code>，<code>sticky top-6</code>
+          </td></tr>
+        </table>
+
+        <h2 class="text-sm font-bold">阶段 C · 其他 Tab</h2>
+        <table class="plan-table">
+          <tr><th>页面</th><th>改动</th></tr>
+          <tr><td>历史记录</td><td>Page Header + 顶栏筛选 · 单卡片列表 · <strong>整行进详情</strong>无操作钮 · 无左侧 Icon · 列表可滚动</td></tr>
+          <tr><td>日志列表</td><td>与历史同结构 · 去掉左侧 Icon 色块</td></tr>
+          <tr><td>用例编辑</td><td><code>max-w-7xl</code> · Page Header（模块/用例/P0–P2）· 左树 <code>w-72</code> · 右详情表单 · 底栏保存/放弃 · +原型 Tab</td></tr>
+          <tr><td>数据看板</td><td>用户评价三处：<strong>KPI「用户平均评分」</strong> · <strong>图表「用户评价分布」</strong> · <strong>表格「用户评价」列</strong>（星级 + <code>comment</code> 截断）；趋势图保持现网 · 删效率统计条</td></tr>
+          <tr><td>知识库管理</td><td><code>max-w-7xl</code> · 顶栏 Tab+统计+<strong>上传</strong>（无页头/底栏重复）· 左筛 <code>w-52 sticky</code> · 列表行统一 · 空态内上传</td></tr>
+        </table>
+
+        <h2 class="text-sm font-bold">明确不改</h2>
+        <p class="text-xs text-muted-foreground">login/register · tasks 相关页 · Sidebar · 弹窗组件 · 生成/执行主流程不改（看板可扩展 <code>GET /api/stats</code> 只读字段）</p>
+
+        <h2 class="text-sm font-bold">默认决策（D1–D7）</h2>
+        <ul class="text-xs space-y-1 list-disc pl-4 text-muted-foreground">
+          <li>D1 内容居中 <code>mx-auto</code></li>
+          <li>D2 右栏保留，<code>w-60</code>，三步常驻（与 Sidebar <code>w-64</code> 区分）</li>
+          <li>D3 阶段 A+B+C 全做</li>
+          <li>D4 日志/历史 <code>max-w-4xl</code></li>
+          <li>D5 知识库左栏 <code>w-52</code></li>
+          <li>D6 向导三步统一 <code>max-w-7xl mx-auto</code> + 右栏 sticky</li>
+          <li>D7 看板参考 Ant Design Pro Analysis（KPI 环比 + 卡片头 + 表格）</li>
+        </ul>
+
+        <h2 class="text-sm font-bold">向导骨架示意（v1.2）</h2>
+        <pre class="text-[10px] bg-muted/40 border rounded-lg p-4 overflow-x-auto leading-relaxed">Step1/2 紧凑：主区自然高 + 底栏 mt-6（无大块留白）
+Step3 长内容：主区可滚动 + 右栏 sticky
+
+┌─ page p-6 ─────────────────────────────────────────────┐
+│  max-w-7xl · Step Bar · [主列 | 右栏 sticky]          │
+└──────────────────────────────────────────────────────┘</pre>
+      </div>`;
+    }
+
+    function viewWizardS1() {
+      let body;
+      if (isOld()) {
+        body = `<div class="bg-card border rounded-xl p-5 mb-4"><h3 class="font-semibold text-sm mb-2">上传需求文档</h3>
+          <div class="border-2 border-dashed rounded-lg py-3 text-center text-xs text-muted-foreground">py-3 较矮</div></div>
+          <div class="bg-card border rounded-xl p-5"><h3 class="font-semibold text-sm mb-2">粘贴需求文本</h3>
+          <div class="border rounded-lg h-24 bg-muted/30"></div></div>`;
+      } else if (isProto()) {
+        body = `<div class="bg-card border rounded-xl p-5 space-y-4">
+          <div class="drag-zone rounded-xl py-10 text-center"><p class="text-sm text-muted-foreground">大拖拽区 · 点击/拖拽上传</p></div>
+          <textarea class="w-full border rounded-lg p-3 text-sm h-20" placeholder="粘贴需求…"></textarea>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="bg-card border rounded-xl p-4"><span class="struct-tag proto">原型</span><p class="text-sm font-medium mt-2">最近需求</p></div>
+          <div class="bg-card border rounded-xl p-4"><p class="text-sm font-medium">few-shot 复选</p></div>
+        </div>`;
+      } else {
+        body = `<div class="bg-card border border-border/60 rounded-xl p-5 space-y-4">
+          <h3 class="font-semibold text-sm">输入需求</h3>
+          <div class="border-2 border-dashed rounded-xl py-8 text-center text-xs text-muted-foreground">单卡片 · 上传区</div>
+          <div class="border rounded-lg h-20 bg-muted/20 p-3 text-sm text-muted-foreground">textarea · 阅读舒适</div>
+        </div>
+        <div class="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground leading-relaxed">
+          <span class="struct-tag fix">提示</span> 支持 docx / pdf / md / txt · 可只粘贴文本 · 下一步可勾选知识库与历史范文
+        </div>`;
+      }
+
+      return wizardShell(0, body, "", btnPrimary("下一步：关联用例 →"), "wait", {
+        calloutText: isOld() ? "现状：全宽 · 按钮紧跟短内容 · 下方大片空白" : isProto() ? "+原型：大上传区" : "<strong>紧凑模式</strong>：无行级 min-h · 底栏 mt-6 紧跟（非 mt-auto 贴底）· 无下方死白",
+        calloutType: isOld() ? "red" : isProto() ? "blue" : "green",
+      });
+    }
+
+    /** Step2 双栏：搜索 + 业务类型（与现网 generate-wizard 一致） */
+    function step2FilterBar() {
+      return `<div class="flex gap-2 mb-3 flex-shrink-0">
+        <input type="text" class="flex-1 border border-border rounded-lg px-2 py-1 text-xs" placeholder="搜索..." />
+        <select class="border border-border rounded-lg px-2 py-1 text-xs"><option value="">全部</option><option>C1C</option><option>C2C</option></select>
+      </div>`;
+    }
+
+    function step2ListLabels(names) {
+      return names.map((n, i) =>
+        `<label class="flex gap-2 border rounded-lg px-3 py-2 cursor-pointer ${i === 0 ? "border-cyan-500/50 bg-cyan-50/50" : ""}">
+          <input type="checkbox" ${i === 0 ? "checked" : ""} class="accent-cyan-500"/>
+          <span class="truncate">${n}</span>
+        </label>`
+      ).join("");
+    }
+
+    function step2ColumnCard(title, desc, names, extraTag) {
+      const listCls = isNew()
+        ? guide("flex-1 min-h-0 overflow-y-auto space-y-1.5 text-xs py-1", "flex-1 列表区")
+        : "space-y-1.5 text-xs max-h-64 overflow-y-auto";
+      const cardCls = isNew()
+        ? guide("bg-card border border-border/60 rounded-xl shadow-sm p-5 flex flex-col min-h-[min(320px,calc(100vh-14rem))]", "双栏卡片撑高")
+        : "bg-card border rounded-xl shadow-sm p-5";
+      return `<div class="${cardCls}">
+        <h3 class="font-semibold text-sm mb-1 flex-shrink-0">${title}</h3>
+        <p class="text-xs text-muted-foreground mb-3 flex-shrink-0">${desc}</p>
+        ${extraTag || ""}
+        ${step2FilterBar()}
+        <div class="${listCls}">${step2ListLabels(names)}</div>
+        <button type="button" class="mt-2 w-full text-xs text-muted-foreground py-1 flex-shrink-0">共 ${names.length}+ 条，加载更多 →</button>
+      </div>`;
+    }
+
+    function viewWizardS2() {
+      const grid = isOld() ? "grid grid-cols-2 gap-4" : guide("grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[min(360px,calc(100vh-14rem))] items-stretch", "双栏等高");
+      const kbCard = step2ColumnCard(
+        "业务知识",
+        "勾选本次生成需要参考的业务规范文档",
+        ["支付规范.md", "订单流程说明.md", "退款规则.md", "会员权益.md", "风控策略.md"]
+      );
+      const historyCard = step2ColumnCard(
+        "历史用例范文",
+        "勾选优秀历史用例作为 few-shot 参考",
+        ["用例_20250301.md", "登录模块范文.md", "支付回归_v2.md", "通用用例范文.md"],
+        isNew() ? '<span class="struct-tag new mb-2 inline-block flex-shrink-0">列表 flex-1 占满卡片剩余高度</span>' : ""
+      );
+
+      const body = `<div class="${grid}">${kbCard}${historyCard}</div>`;
+
+      return wizardShell(1, body, isNew() ? btnPrimary("← 上一步", true) : "", btnPrimary("开始生成"), "wait", {
+        calloutText: isOld() ? "现状：全宽 · 列表 max-h-64 固定" : "<strong>紧凑 + 列表拉伸</strong>：无底栏死白 · 双栏 min-h 随视口 · 列表 flex-1 滚动（替代固定 256px）",
+        calloutType: isOld() ? "red" : "green",
+      });
+    }
+
+    /** Step3 统一区块壳：标题行 px-5 py-3 对齐，正文 section-body 对齐 */
+    function sectionHead(title, icon, meta = "", opts = {}) {
+      const { collapsed = false, chevron = true } = opts;
+      return `<div class="px-5 py-3 flex items-center justify-between border-b bg-muted/20 min-h-[44px] ${chevron ? "cursor-pointer" : ""}">
+        <h3 class="font-semibold text-sm flex items-center gap-2 leading-none min-w-0">
+          <span class="text-primary w-4 text-center flex-shrink-0 text-xs">${icon}</span>
+          <span class="truncate">${title}</span>
+          ${meta ? `<span class="text-muted-foreground font-normal text-xs whitespace-nowrap">${meta}</span>` : ""}
+        </h3>
+        ${chevron ? `<span class="text-muted-foreground text-[10px] flex-shrink-0 ml-2 transition-transform ${collapsed ? "" : "rotate-180"}">▼</span>` : ""}
+      </div>`;
+    }
+
+    function sectionCard(title, icon, body, opts = {}) {
+      const { meta = "", collapsed = false, collapsedHint = "点击标题展开", chevron = true, id = "" } = opts;
+      return `<div${id ? ` id="${id}"` : ""} class="bg-card border rounded-xl shadow-sm overflow-hidden">
+        ${sectionHead(title, icon, meta, { collapsed, chevron })}
+        ${collapsed
+          ? `<div class="px-5 py-3 text-xs text-muted-foreground border-t border-border/50">${collapsedHint}</div>`
+          : `<div class="section-body">${body}</div>`}
+      </div>`;
+    }
+
+    /** Step3 主区 — 对齐现网区块顺序，v1.2 仅微调样式不改结构 */
+    function step3KpiCards(responsive) {
+      const grid = responsive ? "grid-cols-2 xl:grid-cols-4" : "grid-cols-4";
+      const cards = [
+        { label: "生成模块", val: "6", sub: "功能模块", icon: "📊", bg: "bg-primary/10", valCls: "text-primary" },
+        { label: "用例总数", val: "48", sub: "条测试用例", icon: "📋", bg: "bg-emerald-100", valCls: "text-foreground" },
+        { label: "质量评分", val: "92", sub: "AI 综合评估", icon: "🎯", bg: "bg-amber-100", valCls: "text-emerald-600" },
+        { label: "生成耗时", val: "3.2", sub: "分钟", icon: "⏱", bg: "bg-violet-100", valCls: "text-foreground" },
+      ];
+      const body = `<div class="grid ${grid} gap-4">
+          ${cards.map(c => `<div class="border border-border/60 rounded-xl p-4 flex items-stretch justify-between gap-3 min-h-[96px]">
+            <div class="flex flex-col min-w-0 flex-1">
+              <p class="text-xs text-muted-foreground font-medium leading-4 h-4 truncate">${c.label}</p>
+              <p class="text-2xl font-bold tabular-nums leading-none mt-2 ${c.valCls}">${c.val}</p>
+              <p class="text-xs text-muted-foreground mt-auto pt-2 leading-4">${c.sub}</p>
+            </div>
+            <div class="w-9 h-9 rounded-xl ${c.bg} flex items-center justify-center text-sm flex-shrink-0 self-start">${c.icon}</div>
+          </div>`).join("")}
+        </div>`;
+      return sectionCard("数据概览", "📊", body, { chevron: false });
+    }
+
+    function step3OutputFiles(variant = "new") {
+      const files = [
+        { name: "支付模块_测试用例_v1.md", preview: true, editable: true },
+        { name: "支付模块_测试用例.xmind", preview: false, editable: false },
+      ];
+      const body = `<div class="space-y-1.5">
+          ${files.map(f => {
+            const actions = [];
+            if (f.preview) {
+              actions.push('<button type="button" class="text-[10px] px-2 py-1 rounded-md bg-primary/10 text-primary font-medium whitespace-nowrap">预览</button>');
+            }
+            if (f.editable && variant !== "old") {
+              actions.push(`<button type="button" class="text-[10px] px-2 py-1 rounded-md bg-primary text-primary-foreground font-medium whitespace-nowrap" title="打开用例编辑 Tab 并加载该 .md">编辑</button>`);
+            }
+            actions.push('<button type="button" class="text-[10px] px-2 py-1 rounded-md bg-muted text-muted-foreground whitespace-nowrap">下载</button>');
+            return `<div class="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2.5 min-h-[40px]">
+              <span class="text-muted-foreground flex-shrink-0 w-4 text-center text-xs">📄</span>
+              <span class="truncate flex-1 min-w-0 text-xs leading-5 font-medium">${f.name}</span>
+              <div class="flex items-center gap-1 flex-shrink-0">${actions.join("")}</div>
+            </div>`;
+          }).join("")}
+          ${variant === "new" ? '<p class="text-[10px] text-muted-foreground pt-1"><span class="struct-tag new">同行 CTA</span> .md 按钮顺序：预览 → 编辑 → 下载；.xmind 仅下载</p>' : ""}
+        </div>`;
+      const meta = variant === "old" ? "1 个" : `${files.length} 个`;
+      return sectionCard("输出文件", "📄", body, { meta, chevron: false });
+    }
+
+    /** Step3 用户评价（非 KPI 里的 AI 质量分） */
+    function step3Rating() {
+      const stars = [1, 2, 3, 4, 5].map(n =>
+        `<button type="button" class="text-lg leading-none ${n <= 4 ? "text-amber-400" : "text-muted-foreground/30"}" title="${n} 星">★</button>`
+      ).join("");
+      const body = `<div class="space-y-3">
+          <p class="text-[10px] text-muted-foreground"><span class="struct-tag new">微调后评价</span> 与 KPI「质量评分」区分；可对微调后的结果打分（提交覆盖/取最新一条）</p>
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="text-xs text-muted-foreground whitespace-nowrap">整体满意度</span>
+            <div class="flex items-center gap-0.5">${stars}</div>
+            <button type="button" class="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-medium">提交评价</button>
+          </div>
+          <div>
+            <label class="text-xs text-muted-foreground block mb-1.5">补充说明（可选）</label>
+            <textarea class="w-full border border-border rounded-lg px-3 py-2 text-xs min-h-[56px] resize-y" placeholder="生成结果是否满足预期？"></textarea>
+            <p class="text-[10px] text-muted-foreground mt-1.5">提交后写入 <code>TaskFeedback.comment</code> · 看板「最近生成记录」<strong>用户评价</strong>列第二行展示（非 KPI/图表）</p>
+          </div>
+        </div>`;
+      return sectionCard("本次生成评价", "⭐", body, { chevron: false, id: "step3-rating" });
+    }
+
+    /** 现状：独立底栏「去编辑用例」 */
+    function step3FileActionsLegacy(tag) {
+      const tagHtml = tag ? `<span class="struct-tag ${tag.cls} ml-2">${tag.text}</span>` : "";
+      return `<div class="flex justify-end items-center gap-2 flex-wrap py-0.5">
+        ${btnPrimary("去编辑用例 →")}
+        ${tagHtml}
+      </div>`;
+    }
+
+    function step3AiTweak(collapsed) {
+      const body = `<div class="space-y-4">
+          <div>
+            <p class="text-xs text-muted-foreground font-medium mb-2 h-4">快捷指令</p>
+            <div class="flex flex-wrap gap-1.5">
+              ${["补充边界场景", "增加异常覆盖", "精简步骤描述", "提升P0覆盖率"].map(c =>
+                `<button class="text-[10px] border border-border rounded-lg px-2.5 py-1.5 leading-none">${c}</button>`).join("")}
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-muted-foreground w-12 flex-shrink-0">范围</span>
+            <select class="border border-border rounded-lg px-2 py-1.5 text-xs w-32"><option>全部模块</option><option>支付模块</option></select>
+          </div>
+          <div class="flex gap-2 items-stretch">
+            <input class="flex-1 border border-border rounded-lg px-3 py-2 text-xs min-h-[36px]" placeholder="自然语言描述要如何修改…" />
+            <button class="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-xs font-medium flex-shrink-0 self-stretch">发送</button>
+          </div>
+          <div class="pt-3 border-t border-border">
+            <p class="text-xs font-medium text-muted-foreground mb-2 h-4">微调记录 (1)</p>
+            <div class="bg-muted/40 rounded-lg px-3 py-2 text-[10px] flex items-center gap-2 min-h-[36px]">
+              <span class="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold tabular-nums">v1</span>
+              <span class="flex-1 truncate text-muted-foreground">补充支付超时边界场景</span>
+              <span class="text-emerald-600 whitespace-nowrap tabular-nums">+6 用例</span>
+            </div>
+          </div>
+        </div>`;
+      return sectionCard("AI 微调", "✨", body, {
+        collapsed,
+        collapsedHint: '点击标题展开 · 已有 <strong class="text-foreground">1</strong> 条微调记录',
+        id: "step3-ai-tweak",
+      });
+    }
+
+    function step3ModuleTable(collapsed = false) {
+      const rows = [
+        { mod: "登录模块", n: 8, p: [2, 4, 2], cov: 88 },
+        { mod: "支付模块", n: 18, p: [5, 9, 4], cov: 92 },
+        { mod: "订单模块", n: 12, p: [3, 6, 3], cov: 85 },
+        { mod: "退款模块", n: 10, p: [2, 5, 3], cov: 79 },
+      ];
+      const body = `<table class="w-full text-xs">
+          <thead><tr class="border-b bg-muted/30">
+            <th class="text-left px-4 py-2.5 font-semibold text-muted-foreground w-[38%]">模块</th>
+            <th class="text-center px-3 py-2.5 font-semibold text-muted-foreground w-[14%] tabular-nums">用例数</th>
+            <th class="text-center px-3 py-2.5 font-semibold text-muted-foreground w-[28%]">P0 / P1 / P2</th>
+            <th class="text-right px-4 py-2.5 font-semibold text-muted-foreground w-[20%] tabular-nums">覆盖率</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(r => `<tr class="border-b last:border-0 hover:bg-muted/20">
+              <td class="px-4 py-2.5 font-medium align-middle">${r.mod}</td>
+              <td class="text-center px-3 py-2.5 tabular-nums align-middle">${r.n}</td>
+              <td class="text-center px-3 py-2.5 align-middle">
+                <span class="inline-flex gap-1 justify-center">
+                  <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-700 tabular-nums min-w-[20px] text-center">${r.p[0]}</span>
+                  <span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 tabular-nums min-w-[20px] text-center">${r.p[1]}</span>
+                  <span class="px-1.5 py-0.5 rounded bg-muted text-muted-foreground tabular-nums min-w-[20px] text-center">${r.p[2]}</span>
+                </span>
+              </td>
+              <td class="text-right px-4 py-2.5 text-emerald-600 font-medium tabular-nums align-middle">${r.cov}%</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>`;
+      return sectionCard("模块用例概览", "📋", collapsed ? "" : body, {
+        meta: "4 模块 · 48 用例",
+        collapsed,
+        collapsedHint: "4 个模块 · 共 48 条用例 · 点击展开表格",
+      });
+    }
+
+    function step3MainBody(variant) {
+      const gap = "space-y-4";
+      const tweakCollapsed = false;
+
+      if (variant === "old") {
+        return `<div class="${gap}">
+          ${step3KpiCards(false)}
+          ${step3OutputFiles("old")}
+          ${step3FileActionsLegacy({ cls: "old", text: "独立底栏 · 非按文件编辑" })}
+          ${step3AiTweak(false)}
+          ${step3ModuleTable(false)}
+          <p class="text-[10px] text-muted-foreground"><span class="struct-tag old">现状</span> 各区块标题/内边距不统一 · 微调默认全展开占高</p>
+        </div>`;
+      }
+      if (variant === "proto") {
+        return `<div class="${gap}">
+          <div class="bg-card border rounded-xl shadow-sm overflow-hidden">
+            ${sectionHead("生成完成", "✓", "48 用例 · 质量 92", { chevron: false })}
+            <div class="section-body pt-4 pb-4">
+              <span class="struct-tag proto">二期可选 · 完成横幅（不含主 CTA）</span>
+            </div>
+          </div>
+          ${step3KpiCards(true)}
+          ${step3OutputFiles("new")}
+          ${step3AiTweak(tweakCollapsed)}
+          ${step3Rating()}
+          ${step3ModuleTable(false)}
+        </div>`;
+      }
+      return `<div class="${gap}">
+        ${step3KpiCards(true)}
+        ${step3OutputFiles("new")}
+        ${step3AiTweak(tweakCollapsed)}
+        ${step3Rating()}
+        <p class="text-[10px] text-muted-foreground px-1"><span class="struct-tag fix">v1.2</span> 输出文件 → AI 微调 → 评价 → 模块表</p>
+        ${step3ModuleTable(false)}
+      </div>`;
+    }
+
+    function viewWizardS3() {
+      const state = "done";
+      let body, calloutText, calloutType, headerActions;
+
+      if (isOld()) {
+        body = step3MainBody("old");
+        calloutText = "现状：主区已有 KPI → 输出文件 → 去编辑 → AI微调 → 模块表；问题在右栏整栏替换 + 「去编辑」偏底";
+        calloutType = "red";
+        headerActions = "";
+        return wizardShell(2, body, "", "", state, { calloutText, calloutType, headerActions });
+      }
+      if (isProto()) {
+        body = step3MainBody("proto");
+        calloutText = "+原型可选：完成横幅/三按钮；核心区块仍与现网相同";
+        calloutType = "blue";
+        headerActions = "";
+      } else {
+        body = step3MainBody("new");
+        calloutText = "v1.2：主区 文件→微调→评价→模块表 · 右栏快捷操作含「评价」跳转 · sticky";
+        calloutType = "green";
+        headerActions = "";
+      }
+
+      return wizardShell(2, body, "", "", state, { calloutText, calloutType, headerActions: "" });
+    }
+
+    /** 日志/历史通用行（旧） */
+    function listRow(title, subtitle, status, badgeCls, old) {
+      const badge = `<span class="text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap ${badgeCls}">${status}</span>`;
+      if (old) {
+        return `<div class="bg-card border rounded-lg px-3 py-2.5 flex items-center justify-between gap-3 text-sm cursor-pointer hover:bg-muted/30">
+          <div class="min-w-0 flex-1"><p class="font-medium truncate">${title}</p>${subtitle ? `<p class="text-xs text-muted-foreground mt-0.5">${subtitle}</p>` : ""}</div>
+          <div class="text-right flex-shrink-0">${badge}</div>
+        </div>`;
+      }
+      return `<div class="flex items-center justify-between gap-4 p-4 bg-card border rounded-xl hover:shadow-md cursor-pointer transition-shadow">
+        <div class="min-w-0 flex-1">
+          <p class="font-medium text-sm truncate">${title}</p>
+          <p class="text-xs text-muted-foreground truncate mt-0.5">${subtitle}</p>
+        </div>
+        <div class="text-right flex-shrink-0 flex flex-col items-end gap-1">
+          ${badge}
+          <p class="text-[10px] text-muted-foreground tabular-nums">06-02 14:30</p>
+        </div>
+      </div>`;
+    }
+
+    function historyStatusBadge(label, cls) {
+      return `<span class="text-xs px-2 py-0.5 rounded-md font-medium whitespace-nowrap border ${cls}">${label}</span>`;
+    }
+
+    /** 历史记录 v1.2 行：整行点击进入详情 · 右侧仅状态（+ 可选辅助信息） */
+    function historyListRow(title, meta, statusLabel, statusCls, extras) {
+      return `<div class="flex items-center gap-4 px-4 py-3 min-h-[52px] hover:bg-muted/30 transition-colors border-b border-border/60 last:border-0 cursor-pointer group">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium truncate">${title}</p>
+          <p class="text-xs text-muted-foreground mt-0.5 tabular-nums truncate">${meta}</p>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          ${extras || ""}
+          ${historyStatusBadge(statusLabel, statusCls)}
+          <span class="text-muted-foreground/40 text-sm group-hover:text-muted-foreground transition-colors" aria-hidden="true">›</span>
+        </div>
+      </div>`;
+    }
+
+    function historyToolbar(total, old) {
+      if (old) return "";
+      const filters = ["全部", "进行中", "已暂停", "已完成", "失败"];
+      const chips = filters.map((f, i) =>
+        `<button type="button" class="px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${i === 0 ? "border-border bg-background text-foreground shadow-sm" : "border-transparent text-muted-foreground hover:bg-muted/50"}">${f}</button>`
+      ).join("");
+      return `<div class="px-4 flex items-center justify-between gap-3 border-b border-border/60 bg-muted/20 min-h-[48px] h-12 box-border flex-wrap">
+        <div class="flex items-center gap-2 min-w-0 flex-1">
+          <input type="search" placeholder="搜索任务 / 文件名..." class="w-full max-w-xs border border-border rounded-lg px-3 py-1.5 text-sm" />
+          <div class="hidden sm:flex items-center gap-1 p-0.5 bg-muted/50 rounded-lg shrink-0">${chips}</div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
+          <span class="tabular-nums whitespace-nowrap">共 <strong class="text-foreground">${total}</strong> 条</span>
+          <button type="button" class="h-8 px-2.5 text-xs font-medium rounded-lg border border-border hover:bg-muted/60">刷新</button>
+        </div>
+      </div>`;
+    }
+
+    function viewHistory() {
+      if (isOld()) {
+        const rows = [
+          listRow("上传文件: 通用用例.docx", "06/03 13:05 · 3.5 分钟", "已暂停", "bg-amber-100 text-amber-700", true),
+          listRow("上传文件: 乘车页面改版.docx", "06/03 12:40 · 0.8 分钟", "失败", "bg-red-100 text-red-600", true),
+          listRow("支付模块需求", "06/02 18:20", "已完成", "bg-emerald-100 text-emerald-700", true),
+        ];
+        return `<div class="${guide("max-w-4xl mx-auto w-full", "max-w-4xl")}">
+          <h3 class="text-sm font-semibold mb-3">历史记录 (14) <span class="struct-tag old">小标题</span></h3>
+          ${callout("现状：松散卡片 · 仅状态标签 · 操作靠小 Icon（▶）· 信息挤在上部", "red")}
+          <div class="space-y-2">${rows.join("")}</div>
+        </div>`;
+      }
+
+      const mockRows = [
+        historyListRow(
+          "上传文件: 通用用例.docx",
+          "06/03 13:05 · 3.5 分钟",
+          "已暂停", "bg-amber-50 text-amber-800 border-amber-200",
+          '<span class="text-xs text-muted-foreground bg-muted/60 border border-border px-1.5 py-0.5 rounded tabular-nums shrink-0">微调 2</span>'
+        ),
+        historyListRow(
+          "上传文件: 乘车页面改版.docx",
+          "06/03 12:40 · 0.8 分钟",
+          "失败", "bg-red-50 text-red-700 border-red-200"
+        ),
+        historyListRow(
+          "上传文件: 订单退款规则.pdf",
+          "06/02 18:20 · 2.1 分钟",
+          "已完成", "bg-emerald-50 text-emerald-700 border-emerald-200"
+        ),
+        historyListRow(
+          "粘贴需求: 会员权益改造",
+          "06/02 09:15 · 1.6 分钟",
+          "已完成", "bg-emerald-50 text-emerald-700 border-emerald-200"
+        ),
+        historyListRow(
+          "上传文件: 登录模块_v2.docx",
+          "06/01 16:02 · —",
+          "进行中", "bg-blue-50 text-blue-700 border-blue-200"
+        ),
+      ];
+
+      const listShell = `<div class="${guide("bg-card border border-border/60 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-[min(480px,calc(100vh-12rem))]", "列表壳 · 吃满视口")}">
+        ${historyToolbar(14, false)}
+        <div class="${guide("flex-1 min-h-0 overflow-y-auto", "列表区滚动")}">${mockRows.join("")}</div>
+        <div class="px-4 py-2.5 border-t border-border/60 bg-muted/10 text-xs text-muted-foreground text-center shrink-0">
+          已展示 5 条 · 滚动加载更多（示意）
+        </div>
+      </div>`;
+
+      const emptyDemo = isProto() ? "" : `
+        <p class="text-[11px] text-muted-foreground mt-4 px-1"><span class="struct-tag fix">空态示意</span> 无任务时列表壳内居中：</p>
+        <div class="bg-card border border-border/60 rounded-xl mt-2 max-w-md mx-auto px-6 py-12 text-center">
+          <p class="text-sm text-muted-foreground mb-3">暂无历史记录</p>
+          <button type="button" class="h-9 px-4 text-sm font-medium rounded-lg border border-border bg-background hover:bg-muted/60">去用例生成</button>
+        </div>`;
+
+      return `<div class="${guide("max-w-4xl mx-auto w-full", "max-w-4xl")}">
+        ${pageHeader("历史记录", "查看并继续未完成的生成任务")}
+        ${callout("<strong>v1.2</strong>：顶栏搜索+筛选 · 单卡片列表 · <strong>整行点击</strong>进入任务详情（不展示继续/查看/重试按钮）· 右侧仅状态+›", "green")}
+        ${listShell}
+        ${emptyDemo}
+        ${isProto() ? callout("<strong>+原型</strong>：批量删除 · 按时间/状态排序 · 导出 CSV", "blue") : ""}
+      </div>`;
+    }
+
+    /** 用例编辑 · 对齐 case-editor.tsx 结构 */
+    function editorCaseTree(variant) {
+      const modules = [
+        { name: "支付模块", open: true, cases: [
+          { title: "支付超时自动取消", p: "P0", sel: true },
+          { title: "组合支付部分失败", p: "P1", sel: false },
+          { title: "优惠券叠加规则", p: "P2", sel: false },
+        ]},
+        { name: "登录模块", open: true, cases: [
+          { title: "验证码错误锁定", p: "P0", sel: false },
+          { title: "第三方登录回调", p: "P1", sel: false },
+        ]},
+        { name: "订单模块", open: false, cases: [
+          { title: "订单状态流转", p: "P1", sel: false },
+        ]},
+      ];
+      const dot = (p) => p === "P0" ? "bg-red-500" : p === "P1" ? "bg-orange-400" : "bg-muted-foreground/40";
+      return `<div class="${guide("w-72 flex-shrink-0 bg-card border rounded-xl shadow-sm p-4 overflow-y-auto max-h-[min(480px,55vh)]", "w-72 用例树")}">
+        <p class="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">用例树结构</p>
+        ${variant === "new" ? '<p class="text-[10px] text-muted-foreground mb-2">点击模块展开 · 点击用例加载右侧详情</p>' : ""}
+        ${modules.map(mod => `
+          <div class="mb-1">
+            <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/60 cursor-pointer text-sm font-medium">
+              <span class="text-muted-foreground text-[10px]">${mod.open ? "▼" : "▶"}</span>
+              <span class="flex-1 truncate">${mod.name}</span>
+              <span class="text-[10px] bg-muted px-1.5 rounded tabular-nums">${mod.cases.length}</span>
+            </div>
+            ${mod.open ? mod.cases.map(c => `
+              <div class="ml-4 flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs border transition-colors ${c.sel ? "bg-primary/10 border-primary/30 text-primary font-medium" : "border-transparent hover:bg-muted/50 text-muted-foreground"}">
+                <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot(c.p)}"></span>
+                <span class="truncate">${c.title}</span>
+              </div>`).join("") : ""}
+          </div>`).join("")}
+        ${variant === "proto" ? '<div class="mt-3 pt-3 border-t text-[10px] space-y-1"><span class="struct-tag proto">+原型</span> 树顶 P0/P1/P2 汇总条</div>' : ""}
+      </div>`;
+    }
+
+    function editorCaseDetail(variant) {
+      const disabled = variant === "old" ? "opacity-60" : "";
+      return `<div class="flex-1 min-w-0 bg-card border rounded-xl shadow-sm overflow-hidden flex flex-col">
+        ${variant === "proto" ? `<div class="flex border-b px-4 pt-2 bg-muted/20">
+            <button type="button" class="px-3 pb-2 border-b-2 border-primary text-sm font-medium">详情</button>
+            <button type="button" class="px-3 pb-2 text-sm text-muted-foreground">AI 微调</button>
+          </div>` : ""}
+        <div class="section-body flex-1 overflow-y-auto max-h-[min(480px,55vh)] ${disabled}">
+          <h3 class="font-semibold text-base mb-4">支付超时自动取消</h3>
+          <div class="space-y-4 text-sm">
+            <div>
+              <label class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">前置条件</label>
+              <div class="border border-border rounded-lg p-2.5 text-xs bg-background min-h-[48px]">用户已登录，购物车存在待支付订单（剩余支付时间 &lt; 15min）</div>
+            </div>
+            <div>
+              <label class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">测试步骤</label>
+              <div class="border border-border rounded-lg p-2.5 text-xs bg-background min-h-[72px] whitespace-pre-line">1. 进入订单详情等待超时
+2. 观察订单状态与通知</div>
+            </div>
+            <div>
+              <label class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">预期结果</label>
+              <div class="border border-border rounded-lg p-2.5 text-xs bg-background min-h-[56px]">订单自动关闭，库存释放，用户收到超时提醒</div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">优先级</label>
+                <select class="w-full border border-border rounded-lg px-2 py-1.5 text-xs" disabled="${variant === "old"}"><option>P0</option><option>P1</option><option>P2</option></select>
+              </div>
+              <div>
+                <label class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">标签</label>
+                <input class="w-full border border-border rounded-lg px-2 py-1.5 text-xs" value="支付,超时,边界" ${variant === "old" ? "disabled" : ""} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function editorToolbar(variant) {
+      if (variant === "old") {
+        return `<div class="bg-card border rounded-xl px-4 py-3 mb-4 flex items-center justify-between flex-wrap gap-2">
+          <div class="flex gap-2 flex-wrap">
+            <button type="button" class="border rounded-lg px-3 py-1.5 text-xs text-muted-foreground cursor-not-allowed" disabled>版本对比</button>
+            <button type="button" class="border rounded-lg px-3 py-1.5 text-xs text-muted-foreground cursor-not-allowed" disabled>导出 XMind</button>
+            <button type="button" class="border rounded-lg px-3 py-1.5 text-xs text-muted-foreground cursor-not-allowed" disabled>导出 Excel</button>
+          </div>
+          <span class="struct-tag old">工具栏项均为 disabled</span>
+        </div>`;
+      }
+      if (variant === "proto") {
+        return `<div class="bg-card border rounded-xl px-4 py-3 mb-4 flex items-center justify-between flex-wrap gap-2">
+          <div class="flex gap-2 flex-wrap">
+            <button type="button" class="border rounded-lg px-3 py-1.5 text-xs hover:bg-muted/50">导出 Markdown</button>
+            <button type="button" class="border rounded-lg px-3 py-1.5 text-xs hover:bg-muted/50">版本对比</button>
+          </div>
+          <button type="button" class="text-xs border border-primary/40 text-primary px-3 py-1.5 rounded-lg font-medium">✨ AI 优化选中用例</button>
+        </div>`;
+      }
+      return `<div class="bg-card border rounded-xl px-4 py-3 mb-4 flex items-center justify-between flex-wrap gap-2">
+        <div class="flex gap-2 flex-wrap items-center">
+          <span class="struct-tag new">v1.2 精简</span>
+          <button type="button" class="border border-border rounded-lg px-3 py-1.5 text-xs hover:bg-muted/40">导出 Markdown</button>
+          <button type="button" class="border border-border rounded-lg px-3 py-1.5 text-xs text-muted-foreground" title="二期">导出 XMind</button>
+        </div>
+        <div class="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+          <span>P0 <strong class="text-red-600">12</strong></span>
+          <span>P1 <strong class="text-orange-600">86</strong></span>
+          <span>P2 <strong class="text-foreground">150</strong></span>
+        </div>
+      </div>`;
+    }
+
+    function editorSaveBar(variant) {
+      const stickyNote = variant === "new"
+        ? '<span class="struct-tag new">底栏常驻</span> 与 page 单层滚动；保存成功 toast'
+        : variant === "proto" ? '<span class="struct-tag proto">+原型</span> 保存时可勾选「写入知识库范文」' : "";
+      return `<div class="${guide("mt-4 bg-card border rounded-xl shadow-sm px-5 py-3 flex items-center justify-between flex-wrap gap-3 flex-shrink-0", "保存条")}">
+        <p class="text-xs text-muted-foreground max-w-md">编辑修改可作为 few-shot 样例反哺知识库（与现网文案一致）</p>
+        <div class="flex items-center gap-2 flex-wrap">
+          ${stickyNote}
+          ${btnPrimary("放弃修改", true)}
+          ${btnPrimary("保存修改")}
+        </div>
+      </div>`;
+    }
+
+    function editorEmptyState() {
+      return `<div class="flex-1 flex items-center justify-center py-16 bg-card border rounded-xl">
+        <div class="text-center text-sm text-muted-foreground">
+          <p class="text-3xl mb-3 opacity-30">✨</p>
+          <p>暂无生成结果，请先在「生成向导」中生成用例</p>
+          <p class="text-[10px] mt-2">Step3 行内「编辑」→ <code>tab=editor</code> + 加载对应 .md</p>
+        </div>
+      </div>`;
+    }
+
+    function viewEditor() {
+      const variant = isProto() ? "proto" : isOld() ? "old" : "new";
+      const subtitle = variant === "new"
+        ? "3 个模块 · 248 条用例"
+        : variant === "proto"
+          ? "3 模块 · 248 用例 · +AI 优化"
+          : "共 248 个用例";
+
+      const calloutText = {
+        old: "现状：<code>case-editor.tsx</code> 无 Page Header · 工具栏多按钮 disabled · 保存条非 sticky · 无双栏高度约束",
+        new: "v1.2：<code>max-w-7xl mx-auto</code> · Page Header + P0/P1/P2 · 左树 w-72 可滚动 · 右详情表单 · 精简工具栏 · 底栏保存；从 Step3「编辑」带文件上下文",
+        proto: "+原型：详情 | AI 微调 Tab · 工具栏「AI 优化」· 树顶优先级统计",
+      }[variant];
+
+      const showEmptyToggle = variant === "new"
+        ? `<details class="mb-4 text-xs"><summary class="cursor-pointer text-muted-foreground">预览空状态（无 usecaseTree）</summary>
+            <div class="mt-2">${editorEmptyState()}</div></details>` : "";
+
+      return `<div class="${guide("max-w-7xl mx-auto w-full space-y-0", "max-w-7xl")}">
+        ${pageHeader("用例编辑", subtitle)}
+        ${callout(calloutText, variant === "old" ? "red" : variant === "proto" ? "blue" : "green")}
+        ${showEmptyToggle}
+        ${editorToolbar(variant)}
+        <div class="flex gap-4 items-stretch min-h-[320px]">
+          ${editorCaseTree(variant)}
+          ${editorCaseDetail(variant)}
+        </div>
+        ${editorSaveBar(variant)}
+        ${variant === "new" ? `<p class="text-[10px] text-muted-foreground mt-3 px-1">布局：<code>flex gap-4</code> · 树/详情 <code>max-h</code> 内滚动 · Tab 容器仅 <code>p-6</code>（阶段 A）</p>` : ""}
+      </div>`;
+    }
+
+    /**
+     * 看板 · 最近生成记录表（用户评价列 — 仅 v1.2 预览，dashboard.tsx 未实现）
+     * 数据：TaskFeedback.rating + comment（Step3「补充说明」）左连 task
+     */
+    function dashboardRecentRecordsTable(variant) {
+      const isNewTable = variant === "new";
+      const headers = isNewTable
+        ? ["时间", "用户", "需求名", "用例数", "AI质量分", "用户评价", "Token", "类型"]
+        : ["时间", "用户", "需求名", "用例数", "质量分", "Token", "类型"];
+      /** [time, user, req, count, aiScore, rating, comment, tokens, cat] */
+      const rowsNew = [
+        ["06-02 14:30", "张三", "支付模块需求", 48, 92, 5, "支付场景覆盖较全，边界用例可再加强", 4238, "C1C"],
+        ["06-02 11:20", "李四", "用户注册流程", 32, 88, 4, null, 3102, "C2C"],
+        ["06-01 16:45", "王五", "订单退款规则", 56, 85, null, null, 5120, "C1B"],
+      ];
+      const rowsOld = [
+        ["06-02 14:30", "张三", "支付模块需求", 48, 92, 4238, "C1C"],
+        ["06-02 11:20", "李四", "用户注册流程", 32, 88, 3102, "C2C"],
+      ];
+      const renderNewRow = (r) => {
+        const [time, user, req, count, aiScore, userRating, comment, tokens, cat] = r;
+        const aiCell = `<span class="px-1.5 py-0.5 rounded ${aiScore >= 90 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}">${aiScore}</span>`;
+        const ratingCell = userRating === null
+          ? '<span class="text-muted-foreground">—</span>'
+          : `<div class="min-w-[6.5rem] max-w-[11rem]">
+              <div class="flex items-center gap-1 flex-wrap">
+                <span class="text-amber-500 tracking-tight text-[11px] leading-none">${"★".repeat(userRating)}${"☆".repeat(5 - userRating)}</span>
+                <span class="text-muted-foreground tabular-nums text-[10px]">${userRating}</span>
+              </div>
+              ${comment
+                ? `<p class="text-[10px] text-muted-foreground mt-1 leading-snug line-clamp-2" title="${comment.replace(/"/g, "&quot;")}">${comment}</p>`
+                : '<p class="text-[10px] text-muted-foreground/50 mt-0.5 italic">无补充说明</p>'}
+            </div>`;
+        return `<tr class="border-b border-border/40 hover:bg-muted/30">
+          <td class="px-4 py-3 whitespace-nowrap text-muted-foreground">${time}</td>
+          <td class="px-4 py-3 whitespace-nowrap">${user}</td>
+          <td class="px-4 py-3 max-w-[8rem] truncate" title="${req}">${req}</td>
+          <td class="px-4 py-3 tabular-nums">${count}</td>
+          <td class="px-4 py-3">${aiCell}</td>
+          <td class="px-4 py-3 align-top bg-amber-50/40">${ratingCell}</td>
+          <td class="px-4 py-3 text-muted-foreground tabular-nums">${tokens.toLocaleString()}</td>
+          <td class="px-4 py-3">${cat}</td>
+        </tr>`;
+      };
+      const renderOldRow = (r) => {
+        const [time, user, req, count, score, tokens, cat] = r;
+        return `<tr class="border-b border-border/40 hover:bg-muted/30">
+          <td class="px-4 py-3 text-muted-foreground">${time}</td>
+          <td class="px-4 py-3">${user}</td>
+          <td class="px-4 py-3 max-w-[8rem] truncate">${req}</td>
+          <td class="px-4 py-3 tabular-nums">${count}</td>
+          <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600">${score}</span></td>
+          <td class="px-4 py-3 text-muted-foreground tabular-nums">${tokens.toLocaleString()}</td>
+          <td class="px-4 py-3">${cat}</td>
+        </tr>`;
+      };
+      const moduleNote = isNewTable
+        ? ""
+        : `<div class="px-4 py-2 border-b bg-muted/30 text-[10px] text-muted-foreground">
+            <span class="struct-tag old">现网</span> 仅「质量分」（AI）· 无用户评价列
+          </div>`;
+      return `<div class="ant-chart-card" id="dashboard-user-rating-table">
+          <div class="ant-chart-head border-b border-border/60 pb-3 mb-0 flex-wrap gap-2">
+            <span class="font-semibold text-sm">最近生成记录</span>
+            <div class="flex gap-2 ml-auto"><input class="border rounded px-2 py-1 text-xs w-32" placeholder="搜索需求…" /><select class="border rounded px-2 py-1 text-xs bg-background"><option>全部</option><option>有评价</option><option>无评价</option></select></div>
+          </div>
+          ${moduleNote}
+          <div class="p-0 overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead><tr class="border-b bg-muted/30">
+                ${headers.map((h) => {
+                  const hl = h === "用户评价" ? "bg-amber-100/80 text-amber-900 font-semibold" : "";
+                  return `<th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap ${hl}">${h}</th>`;
+                }).join("")}
+              </tr></thead>
+              <tbody>
+                ${isNewTable ? rowsNew.map(renderNewRow).join("") : rowsOld.map(renderOldRow).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    function viewDashboard() {
+      if (isOld()) {
+        return `<div class="${guide("max-w-7xl mx-auto w-full", "")}">
+          <span class="struct-tag old">无页头 · KPI 无环比 · 无用户评价列</span>
+          <div class="grid grid-cols-4 gap-4 mb-4">${["2,401","38","86","3.8"].map(v=>`<div class="bg-card border rounded-xl p-5"><p class="text-3xl font-bold text-primary">${v}</p></div>`).join("")}</div>
+          <div class="grid grid-cols-3 gap-4 mb-4"><div class="col-span-2 bg-card border rounded-xl p-5 h-40 text-center text-sm text-muted-foreground flex items-center justify-center">折线图</div><div class="bg-card border rounded-xl p-5 h-40 flex items-center justify-center text-sm text-muted-foreground">饼图</div></div>
+          ${dashboardRecentRecordsTable("old")}
+        </div>`;
+      }
+
+      const antStat = (title, value, trend, up, icon, color) => `
+        <div class="ant-stat-card flex justify-between items-start">
+          <div class="min-w-0">
+            <p class="text-sm text-[rgba(0,0,0,.45)] mb-2">${title}</p>
+            <p class="stat-value tabular-nums">${value}</p>
+            <p class="stat-footer"><span class="${up ? "text-[#52c41a]" : "text-[#ff4d4f]"}">${up ? "▲" : "▼"} ${Math.abs(trend)}%</span> <span class="ml-1">周同比</span></p>
+          </div>
+          <div class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ml-4 ${color} text-lg">${icon}</div>
+        </div>`;
+
+      const chartCard = (title, extra, body, span = "") => `
+        <div class="ant-chart-card ${span}">
+          <div class="ant-chart-head">
+            <span class="font-semibold text-sm text-[rgba(0,0,0,.85)]">${title}</span>
+            <span class="text-xs text-muted-foreground">${extra}</span>
+          </div>
+          <div class="ant-chart-body">${body}</div>
+        </div>`;
+
+      /** 现网 dashboard.tsx：双 Y 轴折线 · count #3b82f6 · avgScore #10b981 · h-176 */
+      const chartTrendExisting = () => {
+        const dates = ["05-28","05-29","05-30","05-31","06-01","06-02"];
+        const count = [12, 18, 15, 22, 28, 24];
+        const score = [82, 85, 84, 88, 90, 87];
+        const W = 520, H = 140, L = 36, R = 44, T = 12, B = 28;
+        const plotW = W - L - R, plotH = H - T - B;
+        const maxC = 30, minS = 75, maxS = 95;
+        const px = (i) => L + (i / (dates.length - 1)) * plotW;
+        const pyC = (v) => T + plotH - (v / maxC) * plotH;
+        const pyS = (v) => T + plotH - ((v - minS) / (maxS - minS)) * plotH;
+        const countPts = count.map((v, i) => `${px(i)},${pyC(v)}`).join(" ");
+        const scorePts = score.map((v, i) => `${px(i)},${pyS(v)}`).join(" ");
+        const gridY = [0, 0.25, 0.5, 0.75, 1].map(t => `<line x1="${L}" y1="${T + plotH * t}" x2="${L + plotW}" y2="${T + plotH * t}" stroke="#e5e7eb" stroke-dasharray="3 3"/>`);
+        const xLabels = dates.map((d, i) => `<text x="${px(i)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#94a3b8">${d}</text>`).join("");
+        return `<div class="bg-card rounded-xl border border-border/60 p-5 lg:col-span-2">
+          <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h4 class="font-semibold text-sm">每日生成量 &amp; 质量分趋势</h4>
+            <div class="flex items-center gap-3 text-[10px] text-muted-foreground">
+              <span class="flex items-center gap-1"><span class="inline-block w-3 h-0.5 bg-[#3b82f6] rounded"></span>生成量（左轴）</span>
+              <span class="flex items-center gap-1"><span class="inline-block w-3 h-0.5 bg-[#10b981] rounded"></span>质量分（右轴）</span>
+            </div>
+          </div>
+          <div class="chart-trend-wrap focus:outline-none">
+            <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+              ${gridY}
+              <polyline points="${countPts}" fill="none" stroke="#3b82f6" stroke-width="2" vector-effect="non-scaling-stroke"/>
+              <polyline points="${scorePts}" fill="none" stroke="#10b981" stroke-width="2" vector-effect="non-scaling-stroke"/>
+              ${count.map((v,i)=>`<circle cx="${px(i)}" cy="${pyC(v)}" r="2.5" fill="#3b82f6"/>`).join("")}
+              ${score.map((v,i)=>`<circle cx="${px(i)}" cy="${pyS(v)}" r="2.5" fill="#10b981"/>`).join("")}
+              ${xLabels}
+              <text x="8" y="${T + plotH/2}" font-size="8" fill="#94a3b8" transform="rotate(-90 8 ${T + plotH/2})" text-anchor="middle">生成量</text>
+              <text x="${W - 6}" y="${T + plotH/2}" font-size="8" fill="#94a3b8" transform="rotate(90 ${W - 6} ${T + plotH/2})" text-anchor="middle">质量分</text>
+            </svg>
+          </div>
+        </div>`;
+      };
+
+      const pieMock = `<div class="flex items-center justify-center h-full min-h-[176px]"><div class="pie-mock"></div></div>`;
+      const hbarMock = `<div class="space-y-2 h-full flex flex-col justify-center">${["张三","李四","王五","赵六","钱七"].map((n,i)=>`<div class="flex items-center gap-2 text-xs"><span class="w-10 text-muted-foreground">${n}</span><div class="flex-1 h-5 bg-muted/50 rounded overflow-hidden"><div class="h-full bg-[#1890ff] rounded" style="width:${[92,78,65,54,48][i]}%"></div></div><span class="tabular-nums text-muted-foreground w-6">${[92,78,65,54,48][i]}</span></div>`).join("")}</div>`;
+      const ratingDistMock = `<div class="min-h-[176px] flex flex-col justify-center gap-2">
+          ${[[5,52],[4,28],[3,12],[2,5],[1,3]].map(([star,pct])=>`<div class="flex items-center gap-2 text-xs">
+            <span class="w-9 text-muted-foreground tabular-nums">${star} 星</span>
+            <div class="flex-1 h-4 bg-muted/50 rounded overflow-hidden"><div class="h-full bg-amber-400/90 rounded" style="width:${pct}%"></div></div>
+            <span class="w-10 text-right tabular-nums text-muted-foreground">${pct}%</span>
+          </div>`).join("")}
+          <p class="text-[10px] text-muted-foreground mt-2 pt-2 border-t border-border/50">评价率 67%（有评任务 / 已完成）</p>
+        </div>`;
+      return `<div class="${guide("max-w-7xl mx-auto w-full pb-16", "max-w-7xl · 底留白")}">
+        <div class="mb-6">
+          <h1 class="text-xl font-semibold text-[rgba(0,0,0,.85)]">数据看板</h1>
+          <p class="text-sm text-muted-foreground mt-1">用例生成统计 · 质量与用户评价概览</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+          ${antStat("累计用例数", "2,401", 12.5, true, "📊", "bg-primary/10")}
+          ${antStat("月活跃用户", "38", 5.2, false, "👥", "bg-emerald-100")}
+          ${antStat("AI 平均质量分", "86", 3.1, true, "🎯", "bg-amber-100")}
+          ${antStat("平均耗时", "3.8分", 8.0, false, "⏱", "bg-violet-100")}
+          ${antStat("用户平均评分", "4.2", 6.8, true, "⭐", "bg-amber-50")}
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          ${chartTrendExisting()}
+          ${chartCard("需求类型分布", "", pieMock)}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+          ${chartCard("覆盖维度分布", "测试维度", pieMock)}
+          ${chartCard("用户评价分布", "近 30 天 · 1–5 星占比", ratingDistMock)}
+          ${chartCard("人员使用 Top 10", "近 30 天", hbarMock, "md:col-span-2 xl:col-span-2")}
+        </div>
+
+        ${dashboardRecentRecordsTable("new")}
+      </div>`;
+    }
+
+    /** 知识库 · 操作按钮（12px 避免发糊） */
+    function kbBtn(label, variant = "ghost") {
+      const base = "inline-flex items-center justify-center h-7 px-2.5 text-xs font-medium leading-none rounded-md whitespace-nowrap shrink-0 border transition-colors";
+      const v = {
+        ghost: "border-border text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+        primary: "border-transparent bg-primary text-primary-foreground hover:bg-primary/90",
+        danger: "border-red-200 text-red-600 hover:bg-red-50",
+        soft: "border-transparent bg-primary/10 text-primary hover:bg-primary/20",
+      };
+      return `<button type="button" class="${base} ${v[variant] || v.ghost}">${label}</button>`;
+    }
+
+    function kbFilterSidebar(old) {
+      const opts = ["全部", "C1C", "C1B", "C2C", "C2B", "数科", "车小妹", "未分类"];
+      const radios = opts.map((opt, i) => `
+        <label class="flex items-center gap-2 cursor-pointer py-0.5">
+          <input type="radio" name="kb-bt" class="accent-cyan-500 w-3.5 h-3.5" ${i === 0 ? "checked" : ""} />
+          <span class="text-sm">${opt}</span>
+        </label>`).join("");
+
+      if (old) {
+        return `<div class="${guide("w-48 flex-shrink-0 space-y-3", "w-48 左筛")}">
+          <div class="bg-card border rounded-xl shadow-sm p-4">
+            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">搜索</p>
+            <input class="w-full border border-border rounded-lg px-3 py-2 text-xs" placeholder="关键词..." />
+          </div>
+          <div class="bg-card border rounded-xl shadow-sm p-4">
+            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">业务类型</p>
+            <div class="space-y-1">${radios}</div>
+          </div>
+        </div>`;
+      }
+
+      return `<aside class="${guide("w-52 flex-shrink-0 sticky top-6 self-start z-10", "w-52 · sticky")}">
+        <div class="bg-card border border-border/60 rounded-xl p-4 space-y-4">
+          <div>
+            <p class="text-xs font-semibold text-muted-foreground mb-2">搜索</p>
+            <input class="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="标题 / 文件名..." />
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-muted-foreground mb-2">业务类型</p>
+            <div class="space-y-1">${radios}</div>
+          </div>
+          <p class="text-[11px] text-muted-foreground leading-snug pt-1 border-t border-border/50">未分类：业务类型为空的条目（业务知识 / 历史用例两 Tab 均有）</p>
+        </div>
+      </aside>`;
+    }
+
+    function kbListRowOld(title, meta, ref, actions, badge) {
+      return `<div class="bg-card border rounded-xl shadow-sm p-4 flex items-center gap-4">
+        <div class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 text-muted-foreground">📄</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <p class="text-sm font-medium truncate">${title}</p>${badge || ""}
+          </div>
+          <p class="text-xs text-muted-foreground mt-0.5 truncate">${meta}</p>
+        </div>
+        <div class="text-center flex-shrink-0">
+          <p class="text-lg font-bold text-cyan-500 tabular-nums">${ref}</p>
+          <p class="text-xs text-muted-foreground">引用次数</p>
+        </div>
+        <div class="flex gap-2 flex-shrink-0">${actions}</div>
+      </div>`;
+    }
+
+    function kbListRowNew(title, meta, ref, actions, badge) {
+      return `<div class="flex items-center gap-4 px-4 py-3 min-h-[52px] hover:bg-muted/30 transition-colors border-b border-border/60 last:border-0">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <p class="text-sm font-medium truncate max-w-full">${title}</p>
+            ${badge || ""}
+            <span class="text-xs text-cyan-700 bg-cyan-50 border border-cyan-100 px-1.5 py-0.5 rounded tabular-nums shrink-0">引用 ${ref}</span>
+          </div>
+          <p class="text-xs text-muted-foreground mt-0.5 truncate">${meta}</p>
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">${actions}</div>
+      </div>`;
+    }
+
+    function kbListRow(title, meta, ref, actions, badge) {
+      return isOld()
+        ? kbListRowOld(title, meta, ref, actions, badge)
+        : kbListRowNew(title, meta, ref, actions, badge);
+    }
+
+    /** Tab + 统计 + 上传 — 固定 h-12，切换 Tab 不跳高（上传仅此一处，无页头/底栏重复） */
+    function kbContentToolbar(old) {
+      const tabs = ["业务知识", "历史用例"];
+      const total = 2;
+      const metaRight = kbTab === 0 ? "全部业务类型" : "平台生成 1 · 手动上传 1";
+      const uploadLabel = kbTab === 0 ? "上传知识" : "上传范文";
+      const tabBtns = tabs.map((t, i) => {
+        if (old) {
+          return `<button type="button" data-kb-tab="${i}" class="kb-tab-btn px-4 py-2 rounded-lg text-sm font-medium ${kbTab === i ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground"}">${t}</button>`;
+        }
+        return `<button type="button" data-kb-tab="${i}" class="kb-tab-btn px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${kbTab === i ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted/60"}">${t}</button>`;
+      }).join("");
+
+      const tabsWrap = old
+        ? `<div class="flex gap-1 p-1">${tabBtns}</div>`
+        : `<div class="flex items-center gap-1 p-0.5 bg-muted/50 rounded-lg">${tabBtns}</div>`;
+
+      const meta = `<div class="text-xs text-muted-foreground flex items-center gap-2 min-w-0">
+          <span class="whitespace-nowrap tabular-nums">共 <strong class="text-foreground font-semibold">${total}</strong> 条</span>
+          <span class="text-border/80">|</span>
+          <span class="truncate max-w-[200px]">${metaRight}</span>
+        </div>`;
+
+      const uploadBtn = old
+        ? ""
+        : `<button type="button" title="打开上传弹窗 · 仅 .md" class="inline-flex items-center justify-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg bg-primary text-primary-foreground shadow-sm shrink-0 whitespace-nowrap hover:bg-primary/90">
+            <span aria-hidden="true">+</span>${uploadLabel}
+          </button>`;
+
+      const right = old
+        ? meta
+        : `<div class="flex items-center gap-3 shrink-0">${meta}${uploadBtn}</div>`;
+
+      return `<div class="px-4 flex items-center justify-between gap-4 border-b border-border/60 bg-muted/20 min-h-[48px] h-[48px] box-border">
+        ${tabsWrap}
+        ${right}
+      </div>`;
+    }
+
+    function kbEmptyUpload(old) {
+      if (old) return "";
+      const hint = kbTab === 0 ? "上传业务知识文档" : "上传历史用例范文";
+      return `<div class="px-6 py-12 text-center border-b border-dashed border-border/60">
+          <p class="text-sm text-muted-foreground mb-3">暂无内容</p>
+          <button type="button" class="inline-flex items-center justify-center h-9 px-4 text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-sm">${hint}</button>
+          <p class="text-xs text-muted-foreground mt-3">支持 .md · 单文件 ≤ 5MB · 与顶栏「${kbTab === 0 ? "上传知识" : "上传范文"}」同一入口</p>
+        </div>`;
+    }
+
+    function viewKnowledge() {
+      const badgePlatform = '<span class="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded font-medium shrink-0">平台生成</span>';
+      const badgeUpload = '<span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded font-medium shrink-0">手动上传</span>';
+      const badgeBt = '<span class="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded shrink-0">C1C</span>';
+
+      const knowledgeRows = [
+        kbListRow("支付业务规则.md", "更新于 2026-06-01 · C1C", 12,
+          `${kbBtn("预览")}${kbBtn("下载")}${kbBtn("删除", "danger")}`, badgeBt),
+        kbListRow("退款流程说明.md", "更新于 2026-05-28 · 未分类", 3,
+          `${kbBtn("预览")}${kbBtn("下载")}${kbBtn("删除", "danger")}`, ""),
+      ];
+
+      const historyRows = [
+        kbListRow("通用用例_测试用例.md", "2026-06-02 · 张三 · 68 用例 · 质量 92 · 13 模块", 5,
+          `${kbBtn("预览")}${kbBtn("下载")}<span class="relative inline-block"><button type="button" class="${"inline-flex items-center justify-center h-7 px-2.5 text-xs font-medium leading-none rounded-md border border-border text-muted-foreground"}">分配类型 ▾</button></span>`,
+          badgePlatform),
+        kbListRow("登录模块范文.md", "2026-05-30 · 手动上传 · C2B", 2,
+          `${kbBtn("预览")}${kbBtn("下载")}${kbBtn("删除", "danger")}`, badgeUpload),
+      ];
+
+      const uploadZoneOld = `<button type="button" class="mt-4 w-full border-2 border-dashed border-border rounded-xl py-3 text-sm text-muted-foreground hover:border-cyan-500 hover:text-cyan-600 transition-colors">+ 上传 md 文件</button>`;
+
+      const rows = (kbTab === 0 ? knowledgeRows : historyRows).join("");
+      const listShell = isOld()
+        ? `<div class="bg-card border rounded-xl shadow-sm overflow-hidden">
+            ${kbContentToolbar(true)}
+            <div class="p-3 space-y-2">${rows}</div>
+          </div>${uploadZoneOld}`
+        : `<div class="bg-card border border-border/60 rounded-xl overflow-hidden shadow-sm">
+            ${kbContentToolbar(false)}
+            ${rows}
+          </div>`;
+
+      const body = `<div class="flex ${isOld() ? "gap-4" : "gap-5 items-start"}">
+        ${kbFilterSidebar(isOld())}
+        <div class="flex-1 min-w-0">
+          ${listShell}
+        </div>
+      </div>`;
+
+      if (isOld()) {
+        return `<div class="${guide("w-full", "全宽（现网）")}">
+          ${callout("现状：无 Page Header · Tab 浮动 pill · 左筛 w-48 双卡片 · 列表左侧大图标 + 引用次数大数字列 · 操作按钮偏小", "red")}
+          ${body}
+        </div>`;
+      }
+
+      const shell = guide("max-w-7xl mx-auto w-full", "max-w-7xl");
+      return `<div class="${shell}">
+        ${pageHeader("知识库管理", "业务知识文档与历史用例范文")}
+        ${callout("<strong>v1.2 上传</strong>：去掉页头「上传/刷新」· 唯一主入口在列表顶栏右侧（业务知识=<strong>上传知识</strong>，历史=<strong>上传范文</strong>）· 打开现有 UploadModal · 空列表时列表内大按钮（同入口）· 无底部常驻虚线区", "green")}
+        ${body}
+        <p class="text-[11px] text-muted-foreground mt-3 px-1"><span class="struct-tag fix">空态示意</span> 有数据时仅顶栏按钮；无数据时在列表卡片内显示：</p>
+        <div class="bg-card border border-border/60 rounded-xl overflow-hidden shadow-sm mt-2 max-w-3xl">
+          ${kbContentToolbar(false)}
+          ${kbEmptyUpload(false)}
+        </div>
+        ${isProto() ? callout("<strong>+原型</strong>：顶栏上传支持下拉「上传知识 / 批量导入」· 预览改右侧抽屉", "blue") : ""}
+      </div>`;
+    }
+
+    function viewLogs() {
+      const showOldIcon = isOld();
+      const rows = showOldIcon
+        ? `<div class="flex items-center gap-4 p-4 bg-card border rounded-xl">
+            <div class="p-2 rounded-lg bg-emerald-100 text-emerald-600"><span class="struct-tag old">Icon</span>✓</div>
+            <div class="flex-1"><p class="font-medium text-sm">用例生成</p><p class="text-xs text-muted-foreground truncate">Generate test cases…</p></div>
+            <span class="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">已完成</span>
+          </div>`
+        : `<div class="space-y-3">
+            ${listRow("用例生成", "Generate test cases for payment module…", "已完成", "bg-emerald-100 text-emerald-700", false)}
+            ${listRow("用例生成", "User registration flow requirements…", "执行中", "bg-blue-100 text-blue-700", false)}
+            ${listRow("用例生成", "Order refund policy document…", "失败", "bg-red-100 text-red-600", false)}
+          </div>`;
+      return `<div class="${guide("max-w-4xl mx-auto w-full", "max-w-4xl")}">
+        ${pageHeader("日志列表", "查看所有执行日志")}
+        ${isOld() ? callout("现状：左侧状态 Icon 色块", "red") : callout("v1.2：去掉 Icon · 仅右侧状态文字标签（与历史记录一致）", "green")}
+        ${rows}
+      </div>`;
+    }
+
+    const NOTES = {
+      old: { overview: "当前问题汇总见总览表「现状」列", "wizard-s1": "Step条在左栏 · 右栏仅配置 · 双卡片", "wizard-s2": "无右栏 · 双列无断点", "wizard-s3": "右栏变快捷按钮 · 主CTA在底部", history: "小标题", editor: "disabled 工具栏", dashboard: "无页头", knowledge: "w-48 双卡片 · 大图标行", logs: "p-8" },
+      new: { overview: "v1.2 · 三步同宽+右栏sticky · 看板Ant Pro", "wizard-s1": "紧凑模式 · 无底栏死白", "wizard-s2": "紧凑 + 列表 flex-1 撑满", "wizard-s3": "微调后评价 · 右栏快捷含评价", history: "整行进详情·无操作钮", editor: "树+详情+保存条", dashboard: "用户评分 KPI+分布+表格列", knowledge: "顶栏上传 · 无刷新/底栏虚线", logs: "无状态图标 · 同历史" },
+      proto: { overview: "+原型增强", "wizard-s1": "大拖拽", "wizard-s2": "同骨架", "wizard-s3": "五段式", history: "—", editor: "Tab", dashboard: "Ant Pro + 环比", knowledge: "抽屉预览 · 多选", logs: "—" },
+    };
+
+    const VIEWS = { overview: viewOverview, "wizard-s1": viewWizardS1, "wizard-s2": viewWizardS2, "wizard-s3": viewWizardS3, history: viewHistory, editor: viewEditor, dashboard: viewDashboard, knowledge: viewKnowledge, logs: viewLogs };
+
+    function renderNav() {
+      document.getElementById("nav").innerHTML = NAV.map(n => `
+        <button type="button" data-id="${n.id}" class="w-full text-left px-3 py-2.5 rounded-lg ${activeId === n.id ? "bg-blue-50 text-blue-700" : "text-muted-foreground hover:bg-muted"}">
+          <div class="font-medium text-sm">${n.label}</div>${n.desc ? `<div class="text-[10px] opacity-70">${n.desc}</div>` : ""}
+        </button>`).join("");
+      document.getElementById("nav").querySelectorAll("button").forEach(b => { b.onclick = () => { activeId = b.dataset.id; render(); }; });
+    }
+
+    function setMode(m) {
+      mode = m;
+      ["old","new","proto"].forEach(id => {
+        const btn = document.querySelector(`[data-mode="${id}"]`);
+        const active = mode === id;
+        const styles = { old: active ? "bg-red-50 text-red-700 font-medium" : "bg-muted text-muted-foreground", new: active ? "bg-emerald-50 text-emerald-700 font-medium" : "bg-muted text-muted-foreground", proto: active ? "bg-blue-50 text-blue-700 font-medium" : "bg-muted text-muted-foreground" };
+        btn.className = `px-3 py-2 ${id !== "proto" ? "border-r" : ""} ${styles[id]}`;
+      });
+      render();
+    }
+
+    function bindKbTabs() {
+      document.querySelectorAll(".kb-tab-btn").forEach(btn => {
+        btn.onclick = () => {
+          kbTab = parseInt(btn.dataset.kbTab, 10);
+          render();
+        };
+      });
+    }
+
+    function render() {
+      const labels = { old: "【现状】", new: "【建议 v1.2】", proto: "【建议 + 原型】" };
+      document.getElementById("changeBanner").innerHTML = `<strong>${labels[mode]}</strong> ${NOTES[mode][activeId] || ""}`;
+      document.getElementById("pageContainer").innerHTML = VIEWS[activeId]();
+      if (activeId === "knowledge") bindKbTabs();
+      renderNav();
+    }
+
+    document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+    document.getElementById("toggleGuides").onchange = e => { showGuides = e.target.checked; render(); };
+
+    setMode("new");
+  </script>
+</body>
+</html>

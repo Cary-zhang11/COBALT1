@@ -1,0 +1,140 @@
+import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getAuthUser } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const token = req.cookies.get("token")?.value;
+  try {
+    await getAuthUser(token);
+  } catch {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const encoder = new TextEncoder();
+  let lastSequence = 0;
+  let isActive = true;
+  let lastPausedState: { reason: string | null; toolName: string | null; toolInput: unknown | null } | null = null;
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: unknown) => {
+        try {
+          controller.enqueue(
+            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+          );
+        } catch {
+          // Controller closed (client disconnected) — silently ignore
+        }
+      };
+
+      const poll = async () => {
+        while (isActive) {
+          try {
+            const task = await prisma.task.findUnique({
+              where: { id: params.id },
+              select: { status: true, pauseReason: true },
+            });
+
+            if (!task) {
+              send("error", { message: "Task not found" });
+              controller.close();
+              return;
+            }
+
+            // If task is already terminal, just send done and close immediately
+            // This prevents re-sending all logs on EventSource reconnect
+            if (["completed", "failed", "cancelled"].includes(task.status)) {
+              const allLogs = await prisma.taskLog.findMany({
+                where: { taskId: params.id },
+                orderBy: { sequence: "asc" },
+              });
+              for (const log of allLogs) {
+                if (!isActive) return; // Client disconnected — stop replay
+                send("log", {
+                  sequence: log.sequence,
+                  type: log.type,
+                  output: log.output,
+                  input: log.input,
+                  createdAt: log.createdAt,
+                });
+              }
+              send("done", { status: task.status });
+              controller.close();
+              return;
+            }
+
+            const newLogs = await prisma.taskLog.findMany({
+              where: { taskId: params.id, sequence: { gt: lastSequence } },
+              orderBy: { sequence: "asc" },
+            });
+
+            for (const log of newLogs) {
+              if (!isActive) return; // Client disconnected — stop pushing
+              send("log", {
+                sequence: log.sequence,
+                type: log.type,
+                output: log.output,
+                input: log.input,
+                createdAt: log.createdAt,
+              });
+              lastSequence = log.sequence;
+
+              if (log.type === "pause" && log.input) {
+                try {
+                  const data = JSON.parse(log.input);
+                  lastPausedState = {
+                    reason: data.reason || null,
+                    toolName: data.tool || null,
+                    toolInput: data.input || null,
+                  };
+                } catch {
+                  lastPausedState = null;
+                }
+              }
+            }
+
+            if (task.status === "paused") {
+              send("paused", {
+                status: "paused",
+                reason: task.pauseReason,
+                ...lastPausedState,
+              });
+            }
+
+            await new Promise((r) => setTimeout(r, 1000));
+          } catch (error) {
+            // Don't call send("error") here — controller may already be closed
+            // (e.g. client disconnected mid-poll). send() itself is guarded, but
+            // controller.close() on an already-closed controller also throws.
+            if (isActive) {
+              send("error", {
+                message:
+                  error instanceof Error ? error.message : "Polling error",
+              });
+            }
+            try { controller.close(); } catch { /* already closed */ }
+            return;
+          }
+        }
+      };
+
+      poll();
+    },
+    cancel() {
+      isActive = false;
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}

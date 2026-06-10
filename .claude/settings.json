@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/**)",
+      "Bash(*)",
+      "Read(/**)",
+      "Read(D:\\\\qorder_workspace\\\\Cobalt\\\\.claude\\\\skills\\\\**)",
+      "Write(/**)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "Skill(using-superpowers)",
+      "Skill(using-superpowers:*)",
+      "Skill(brainstorming)",
+      "Skill(brainstorming:*)",
+      "Skill(ui-ux-pro-max-0.1.0)",
+      "Skill(ui-ux-pro-max-0.1.0:*)",
+      "Skill(find-skills)",
+      "Skill(find-skills:*)",
+      "Skill(prd-to-tests-new)",
+      "Skill(prd-to-tests-new:*)",
+      "Bash(rmdir /s /q .next)",
+      "Bash(del /f tsconfig.tsbuildinfo)",
+      "Edit(/.claude/skills/prd-to-tests-new/**)"
+    ]
+  }
+}
