@@ -1123,7 +1123,7 @@ export function GenerateWizard({
                     {[
                       {
                         label: "生成模块",
-                        value: genStats?.modules || usecaseTree.length,
+                        value: usecaseTree.length,
                         sub: "功能模块",
                         valCls: "text-primary",
                         icon: <BarChart3 className="w-4 h-4 text-primary" />,
@@ -1131,7 +1131,7 @@ export function GenerateWizard({
                       },
                       {
                         label: "用例总数",
-                        value: genStats?.totalCases || usecaseTree.reduce((s, m) => s + m.cases.length, 0),
+                        value: usecaseTree.reduce((s, m) => s + m.cases.length, 0),
                         sub: "条测试用例",
                         valCls: "text-foreground",
                         icon: <FileCheck className="w-4 h-4 text-emerald-600" />,

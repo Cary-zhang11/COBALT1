@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "echo \"  ▲ 外部访问: http://$(ifconfig | grep 'inet ' | grep -v 127.0.0.1 | awk '{print $2}' | head -1):3000\"",
+    "predev": "node -e \"const os=require('os');const ip=Object.values(os.networkInterfaces()).flat().find(i=>!i.internal&&i.family==='IPv4');console.log('  ▲ 外部访问: http://'+(ip?ip.address:'localhost')+':3000')\"",
     "dev": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
