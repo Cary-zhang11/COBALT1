@@ -16,6 +16,10 @@ export async function GET(req: NextRequest) {
     const search = req.nextUrl.searchParams.get("search") || "";
     const businessType = req.nextUrl.searchParams.get("businessType") || "";
     const type = req.nextUrl.searchParams.get("type") || "";
+    const userId = req.nextUrl.searchParams.get("userId") || "";
+    const dateFrom = req.nextUrl.searchParams.get("dateFrom") || "";
+    const dateTo = req.nextUrl.searchParams.get("dateTo") || "";
+    const tags = req.nextUrl.searchParams.get("tags") || "";
     const page = parseInt(req.nextUrl.searchParams.get("page") || "1", 10);
     const pageSizeRaw = parseInt(req.nextUrl.searchParams.get("pageSize") || "20", 10);
     const pageSize = Math.min(50, Math.max(1, Number.isFinite(pageSizeRaw) ? pageSizeRaw : 20));
@@ -34,6 +38,25 @@ export async function GET(req: NextRequest) {
     }
     if (type) {
       where.type = type;
+    }
+    if (userId) {
+      where.userId = userId;
+    }
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) {
+        where.createdAt.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        // 日期范围包含当天结束
+        where.createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
+      }
+    }
+    if (tags) {
+      const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
+      if (tagList.length > 0) {
+        where.tags = { hasSome: tagList };
+      }
     }
 
     const [items, total] = await Promise.all([

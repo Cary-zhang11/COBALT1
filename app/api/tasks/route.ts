@@ -49,6 +49,9 @@ export async function GET(req: NextRequest) {
     const skillId = searchParams.get("skillId") || undefined;
     const displayStatus = searchParams.get("displayStatus") || undefined;
     const search = searchParams.get("search") || undefined;
+    const filterUserId = searchParams.get("userId") || undefined;
+    const dateFrom = searchParams.get("dateFrom") || undefined;
+    const dateTo = searchParams.get("dateTo") || undefined;
     const pageRaw = searchParams.get("page");
     const pageSizeRaw = parseInt(searchParams.get("pageSize") || "20", 10);
     const pageSize = Math.min(50, Math.max(1, Number.isFinite(pageSizeRaw) ? pageSizeRaw : 20));
@@ -58,6 +61,9 @@ export async function GET(req: NextRequest) {
       status: status || undefined,
       displayStatus,
       search,
+      userId: filterUserId,
+      dateFrom,
+      dateTo,
     });
 
     if (pageRaw) {

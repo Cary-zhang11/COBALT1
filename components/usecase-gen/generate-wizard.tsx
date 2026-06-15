@@ -48,6 +48,14 @@ function wizardListNextPage(
   return loaded < (lastPage.total ?? 0) ? allPages.length + 1 : undefined;
 }
 
+function formatDisplayDate(d?: string): string {
+  if (!d) return "";
+  // 已是格式化日期（如 "2026/6/15"）直接返回
+  if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(d)) return d;
+  const date = new Date(d);
+  return isNaN(date.getTime()) ? d : date.toLocaleDateString("zh-CN");
+}
+
 function WizardStickyFooter({
   children,
   compact = false,
@@ -110,6 +118,8 @@ export function GenerateWizard({
     sourcePath?: string;
     sourceTaskId?: string;
     mdFileName?: string;
+    userName?: string;
+    createdAt?: string;
   }
 
   const kbListQuery = useInfiniteQuery({
@@ -162,7 +172,7 @@ export function GenerateWizard({
     getNextPageParam: wizardListNextPage,
   });
 
-  type KbItem = { id: string; title: string; businessType: string | null; content: string; updatedAt: string };
+  type KbItem = { id: string; title: string; businessType: string | null; content: string; updatedAt: string; createdAt: string; user?: { name: string | null } };
   const kbItems = useMemo(
     () => kbListQuery.data?.pages.flatMap((p) => (p.items as KbItem[]) ?? []) ?? [],
     [kbListQuery.data],
@@ -174,7 +184,7 @@ export function GenerateWizard({
     const seen = new Set<string>();
     const uploadedItems =
       uploadedHistoryQuery.data?.pages.flatMap(
-        (p) => (p.items as { id: string; title: string; content: string }[]) ?? [],
+        (p) => (p.items as { id: string; title: string; content: string; user?: { name: string | null }; createdAt?: string }[]) ?? [],
       ) ?? [];
     for (const item of uploadedItems) {
       const id = `knowledge:${item.id}`;
@@ -184,11 +194,13 @@ export function GenerateWizard({
         id,
         displayName: (item.title || "untitled") + ".md",
         sourcePath: item.content,
+        userName: item.user?.name || undefined,
+        createdAt: item.createdAt,
       });
     }
     const platformItems =
       platformHistoryQuery.data?.pages.flatMap(
-        (p) => (p.items as { id: string; mdFileName: string }[]) ?? [],
+        (p) => (p.items as { id: string; mdFileName: string; userName?: string; createdAt?: string }[]) ?? [],
       ) ?? [];
     for (const item of platformItems) {
       if (!item.mdFileName) continue;
@@ -200,6 +212,8 @@ export function GenerateWizard({
         displayName: item.mdFileName,
         sourceTaskId: item.id,
         mdFileName: item.mdFileName,
+        userName: item.userName,
+        createdAt: item.createdAt,
       });
     }
     return result;
@@ -880,8 +894,8 @@ export function GenerateWizard({
                 <h3 className="font-semibold mb-1 text-sm">业务知识</h3>
                 <p className="text-xs text-muted-foreground mb-3">勾选本次生成需要参考的业务规范文档</p>
 
-                {/* 搜索 + 业务类型筛选 */}
-                <div className="flex gap-2 mb-3">
+                {/* 筛选栏：搜索 + 业务类型 */}
+                <div className="flex gap-1.5 mb-2">
                   <input
                     type="text"
                     placeholder="搜索..."
@@ -894,7 +908,7 @@ export function GenerateWizard({
                     onChange={(e) => setKbBusinessType(e.target.value)}
                     className="border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
                   >
-                    <option value="">全部</option>
+                    <option value="">全部类型</option>
                     {BUSINESS_TYPES.map((bt) => (
                       <option key={bt} value={bt}>{bt}</option>
                     ))}
@@ -922,7 +936,13 @@ export function GenerateWizard({
                           onChange={() => toggleKnowledge(item.id)}
                           className="accent-cyan-500 w-3.5 h-3.5 flex-shrink-0"
                         />
-                        <span className="text-sm truncate flex-1 min-w-0">{item.title}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm truncate block">{item.title}</span>
+                          <span className="text-[10px] text-muted-foreground truncate block">
+                            {item.user?.name && `${item.user.name} · `}
+                            {formatDisplayDate(item.createdAt)}
+                          </span>
+                        </div>
                       </label>
                     ))
                   )}
@@ -947,8 +967,8 @@ export function GenerateWizard({
                 <h3 className="font-semibold mb-1 text-sm">历史用例范文</h3>
                 <p className="text-xs text-muted-foreground mb-3">勾选优秀历史用例作为 few-shot 参考</p>
 
-                {/* 搜索 + 业务类型筛选 */}
-                <div className="flex gap-2 mb-3">
+                {/* 筛选栏：搜索 + 业务类型 */}
+                <div className="flex gap-1.5 mb-2">
                   <input
                     type="text"
                     placeholder="搜索..."
@@ -961,7 +981,7 @@ export function GenerateWizard({
                     onChange={(e) => setHistoryBusinessType(e.target.value)}
                     className="border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
                   >
-                    <option value="">全部</option>
+                    <option value="">全部类型</option>
                     {BUSINESS_TYPES.map((bt) => (
                       <option key={bt} value={bt}>{bt}</option>
                     ))}
@@ -990,7 +1010,13 @@ export function GenerateWizard({
                           onChange={() => toggleHistory(opt.id)}
                           className="accent-cyan-500 w-3.5 h-3.5 flex-shrink-0"
                         />
-                        <span className="text-sm truncate">{opt.displayName}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm truncate block">{opt.displayName}</span>
+                          <span className="text-[10px] text-muted-foreground truncate block">
+                            {opt.userName && `${opt.userName} · `}
+                            {formatDisplayDate(opt.createdAt)}
+                          </span>
+                        </div>
                       </label>
                     ))
                   )}

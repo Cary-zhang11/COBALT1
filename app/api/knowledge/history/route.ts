@@ -9,6 +9,9 @@ export async function GET(req: NextRequest) {
 
     const search = req.nextUrl.searchParams.get("search") || "";
     const businessType = req.nextUrl.searchParams.get("businessType") || "";
+    const userId = req.nextUrl.searchParams.get("userId") || "";
+    const dateFrom = req.nextUrl.searchParams.get("dateFrom") || "";
+    const dateTo = req.nextUrl.searchParams.get("dateTo") || "";
     const page = parseInt(req.nextUrl.searchParams.get("page") || "1", 10);
     const pageSizeRaw = parseInt(req.nextUrl.searchParams.get("pageSize") || "20", 10);
     const pageSize = Math.min(50, Math.max(1, Number.isFinite(pageSizeRaw) ? pageSizeRaw : 20));
@@ -22,11 +25,22 @@ export async function GET(req: NextRequest) {
       where.input = { contains: search, mode: "insensitive" };
     }
     if (businessType) {
-      // "unclassified" 映射为 IS NULL
       if (businessType === "unclassified") {
         where.businessType = null;
       } else {
         where.businessType = businessType;
+      }
+    }
+    if (userId) {
+      where.userId = userId;
+    }
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) {
+        where.createdAt.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        where.createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
       }
     }
 

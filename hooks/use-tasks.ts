@@ -34,6 +34,9 @@ export type TasksPageParams = {
   skillId?: string;
   search?: string;
   displayStatus?: string;
+  userId?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page: number;
   pageSize?: number;
 };
@@ -54,6 +57,9 @@ export function useTasksPage(params: TasksPageParams) {
       params.skillId,
       params.search,
       params.displayStatus,
+      params.userId,
+      params.dateFrom,
+      params.dateTo,
       params.page,
       pageSize,
     ],
@@ -64,6 +70,9 @@ export function useTasksPage(params: TasksPageParams) {
       if (params.skillId) qs.set("skillId", params.skillId);
       if (params.search?.trim()) qs.set("search", params.search.trim());
       if (params.displayStatus) qs.set("displayStatus", params.displayStatus);
+      if (params.userId) qs.set("userId", params.userId);
+      if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
+      if (params.dateTo) qs.set("dateTo", params.dateTo);
       const res = await fetch(`/api/tasks?${qs}`);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();

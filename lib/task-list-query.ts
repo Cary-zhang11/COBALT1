@@ -8,6 +8,9 @@ export function buildTaskListWhere(options: {
   /** 历史页展示态：active | paused | completed | failed */
   displayStatus?: string;
   search?: string;
+  userId?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }): Prisma.TaskWhereInput {
   const where: Prisma.TaskWhereInput = {};
 
@@ -17,6 +20,20 @@ export function buildTaskListWhere(options: {
 
   if (options.search?.trim()) {
     where.input = { contains: options.search.trim(), mode: "insensitive" };
+  }
+
+  if (options.userId) {
+    where.userId = options.userId;
+  }
+
+  if (options.dateFrom || options.dateTo) {
+    where.createdAt = {};
+    if (options.dateFrom) {
+      where.createdAt.gte = new Date(options.dateFrom);
+    }
+    if (options.dateTo) {
+      where.createdAt.lte = new Date(options.dateTo + "T23:59:59.999Z");
+    }
   }
 
   if (options.displayStatus) {
