@@ -87,6 +87,7 @@ export function GenerateWizard({
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [requirementText, setRequirementText] = useState("");
   const [validationMsg, setValidationMsg] = useState("");
+  const [dragOverUpload, setDragOverUpload] = useState(false);
 
   // ---- Step 2: 知识库关联 ----
   const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<Set<string>>(new Set());
@@ -597,10 +598,31 @@ export function GenerateWizard({
         }
       } catch {}
     }
+    // 重置 file input 的 value，确保删除后重新选择同名文件时 onChange 能再次触发
+    e.target.value = "";
   };
 
-  const removeFile = (name: string) => {
-    setUploadedFiles((prev) => prev.filter((f) => f.name !== name));
+  const handleDropUpload = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverUpload(false);
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        if (res.ok) {
+          const data = await res.json();
+          setUploadedFiles((prev) => [...prev, { name: file.name, path: data.filePath }]);
+        }
+      } catch {}
+    }
+  };
+
+  const removeFile = (path: string) => {
+    setUploadedFiles((prev) => prev.filter((f) => f.path !== path));
   };
 
   // Start Generate
@@ -765,8 +787,13 @@ export function GenerateWizard({
                 输入需求
               </h3>
               <div
-                className="border-2 border-dashed rounded-xl py-8 px-4 text-center cursor-pointer transition-all border-border hover:border-primary/30 hover:bg-primary/5"
+                className={`border-2 border-dashed rounded-xl py-8 px-4 text-center cursor-pointer transition-all ${
+                  dragOverUpload ? "border-primary bg-primary/5" : "border-border hover:border-primary/30 hover:bg-primary/5"
+                }`}
                 onClick={() => document.getElementById("wizard-file-input")?.click()}
+                onDragOver={(e) => { e.preventDefault(); setDragOverUpload(true); }}
+                onDragLeave={() => setDragOverUpload(false)}
+                onDrop={handleDropUpload}
               >
                 <p className="text-xs text-muted-foreground">
                   <span className="text-primary font-medium">点击上传</span> 或拖拽文件到此处 · 支持 .docx .md .txt
@@ -775,13 +802,13 @@ export function GenerateWizard({
               </div>
               {uploadedFiles.length > 0 && (
                 <div className="mt-3 space-y-1.5">
-                  {uploadedFiles.map((f, i) => (
-                    <div key={i} className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2 text-sm">
+                  {uploadedFiles.map((f) => (
+                    <div key={f.path} className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2 text-sm">
                       <div className="flex items-center gap-2 min-w-0">
                         <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                         <span className="truncate">{f.name}</span>
                       </div>
-                      <button onClick={(ev) => { ev.stopPropagation(); removeFile(f.name); }} className="text-muted-foreground hover:text-red-500 flex-shrink-0 ml-2">
+                      <button onClick={(ev) => { ev.stopPropagation(); removeFile(f.path); }} className="text-muted-foreground hover:text-red-500 flex-shrink-0 ml-2">
                         <span className="text-sm">✕</span>
                       </button>
                     </div>

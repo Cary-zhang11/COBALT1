@@ -150,6 +150,8 @@ export default function TaskExecutePage() {
 
     setChatFiles((prev) => [...prev, ...uploadedPaths]);
     setUploading(false);
+    // 重置 file input 的 value，确保删除后重新选择同名文件时 onChange 能再次触发
+    e.target.value = "";
   };
 
   const handleSend = async () => {

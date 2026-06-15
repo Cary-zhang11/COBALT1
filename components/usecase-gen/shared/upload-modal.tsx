@@ -50,6 +50,10 @@ export function UploadModal({ open, onClose, context }: UploadModalProps) {
     setTitle("");
     setBusinessType("");
     setDragOver(false);
+    // 重置 file input 的 value，确保删除后重新选择同名文件时 onChange 能再次触发
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -127,7 +131,11 @@ export function UploadModal({ open, onClose, context }: UploadModalProps) {
               </p>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFile(null);
+                  if (inputRef.current) inputRef.current.value = "";
+                }}
                 className="text-xs text-red-500 mt-1 hover:underline"
               >
                 移除
