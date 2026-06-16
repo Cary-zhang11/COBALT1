@@ -16,15 +16,14 @@ description: 将业务需求文档（PRD）转换为结构化测试用例文档�
 **每次使用本技能时，必须严格按以下顺序执行：**
 
 1. 读取本文件 `SKILL.md` 全文
-2. 读取全部参考文件（以下 8 个文件，缺一不可）
+2. 读取全部参考文件（以下 7 个文件，缺一不可）
    - `references/test_dimensions.md` — 测试维度定义、触发判定、裁剪规则
-   - `references/generation_rules.md` — 用例编写规范（模块划分/分组/校验链/模板/防漏等全部规则）
+   - `references/generation_rules.md` — 用例编写规范（模块划分/分组/校验链/模板/防漏等全部规则，Step 4 和 Step 6 共用）
    - `references/output_template.md` — 输出文档结构模板、完整性自检清单
-   - `references/smoke_analysis.md` — 三方分析 + 红蓝对抗规则
-   - `references/smoke_decomposition.md` — P0 功能点拆分规则
-   - `references/smoke_generation.md` — 开发冒烟用例生成规则
-   - `references/smoke_output.md` — 冒烟用例输出格式与校验规则
-   - `references/generation_rules.md` — 全量用例生成规则（第二次引用，Step 6 用）
+   - `references/smoke_analysis.md` — 三方分析 + 红蓝对抗规则（Step 2）
+   - `references/smoke_decomposition.md` — P0 功能点拆分规则（Step 2）
+   - `references/smoke_generation.md` — 开发冒烟用例生成规则（Step 3）
+   - `references/smoke_output.md` — 冒烟用例输出格式与校验规则（Step 3）
 3. 确认已理解全部规则后，方可开始执行后续步骤
 
 **规则章节对应表：**
@@ -55,7 +54,7 @@ description: 将业务需求文档（PRD）转换为结构化测试用例文档�
 [WF:done:<节点名称>]
 ```
 
-**节点名称与步骤对应表（8 个步骤）：**
+**节点名称与步骤对应表（8 个标记，覆盖 7 个步骤）：**
 
 | 步骤 | 节点名称 | 插入时机 |
 |------|---------|---------|
@@ -322,7 +321,7 @@ Step 1 全部完成后，输出进度标记：`[WF:done:文档解析]`（注意�
 python "{SKILL_DIR}/scripts/md2excel.py" "{TASK_OUTPUT_DIR}/{需求名称}_开发冒烟用例.md" "{TASK_OUTPUT_DIR}/{需求名称}_开发冒烟用例.xlsx"
 ```
 
-- 转换失败则输出 `[XMind 转换失败] 原因：...`，继续后续工作
+- 转换失败则输出 `[Excel 转换失败] 原因：...`，继续后续工作
 
 输出进度标记：`[WF:done:冒烟-导出]`
 
