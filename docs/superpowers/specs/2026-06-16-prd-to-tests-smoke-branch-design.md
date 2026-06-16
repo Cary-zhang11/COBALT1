@@ -1,7 +1,7 @@
 # PRD→测试用例：增加开发冒烟用例并行分支
 
 > **创建日期**: 2026-06-16
-> **状态**: 设计中
+> **状态**: 已确认
 > **影响范围**: `.claude/skills/prd-to-tests-new/`
 
 ---
@@ -125,6 +125,28 @@ Step 1 完成（`[WF:done:文档解析]`）后，立即通过 `Agent` 工具
 | `{需求名称}_开发冒烟用例.xlsx` | 冒烟分支：Excel 格式冒烟用例（新增） |
 
 **改动 2：删除「五、冒烟测试清单」章节。** 该章节（全量用例列表）直接移除，不做任何替换或引导。后续章节编号顺延（「六、完整性检查报告」→「五、完整性检查报告」）。
+
+### 5.3 `components/usecase-gen/generate-wizard.tsx`（小幅改动）
+
+`step3OutputCount` 过滤条件追加 `.xlsx`：
+
+```
+// 行 754 附近，改前：
+(f.name.endsWith(".md") || f.name.endsWith(".xmind"))
+// 改后：
+(f.name.endsWith(".md") || f.name.endsWith(".xmind") || f.name.endsWith(".xlsx"))
+```
+
+### 5.4 `components/usecase-gen/shared/output-files.tsx`（小幅改动）
+
+`isDisplayable()` 追加 `.xlsx`：
+
+```
+// 行 21 附近，改前：
+return name.endsWith(".md") || name.endsWith(".xmind");
+// 改后：
+return name.endsWith(".md") || name.endsWith(".xmind") || name.endsWith(".xlsx");
+```
 
 ## 六、结果页兼容性
 
