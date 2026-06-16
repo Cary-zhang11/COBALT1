@@ -16,10 +16,14 @@ description: 将业务需求文档（PRD）转换为结构化测试用例文档�
 **每次使用本技能时，必须严格按以下顺序执行：**
 
 1. 读取本文件 `SKILL.md` 全文
-2. 读取全部参考文件（以下 3 个文件，缺一不可）
+2. 读取全部参考文件（以下 7 个文件，缺一不可）
    - `references/test_dimensions.md` — 8 个测试维度的详细定义、覆盖范围、拆分规则、裁剪规则
    - `references/generation_rules.md` — 用例编写规范（模块划分/分组/校验链/模板/防漏等全部规则）
-   - `references/output_template.md` — 输出文档结构模板、冒烟清单选取规则、完整性自检清单
+   - `references/output_template.md` — 输出文档结构模板、完整性自检清单
+   - `../prd-to-tests-smoke/references/three_party_analysis.md` — 三方分析 + 红蓝对抗规则（冒烟分支）
+   - `../prd-to-tests-smoke/references/step02_decomposition.md` — P0 功能点拆分规则（冒烟分支）
+   - `../prd-to-tests-smoke/references/smoke_test_generation.md` — 冒烟用例生成规则（冒烟分支）
+   - `../prd-to-tests-smoke/references/step05_output.md` — 输出格式与校验规则（冒烟分支）
 3. 确认已理解全部规则后，方可开始执行后续步骤
 
 **规则章节对应表：**
@@ -31,6 +35,7 @@ description: 将业务需求文档（PRD）转换为结构化测试用例文档�
 | Step 2.4 校验链分组 | `generation_rules.md` → 校验链分组规则 |
 | Step 4 用例生成 | `generation_rules.md` → 用例模板/合并规则/拆分规则/防漏规则/来源标注/优先级分配 |
 | Step 5 输出校验 | `output_template.md` → 文档结构模板/完整性自检清单 |
+| Step 6 冒烟分支 | `../prd-to-tests-smoke/references/` 下 4 个文件 → 三方分析/红蓝对抗/冒烟用例生成 |
 
 > 即使你对本技能非常熟悉，每次执行也**必须从头读取全部文件**。这是强制要求，不是可选建议。
 
