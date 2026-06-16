@@ -128,10 +128,33 @@ Step 1 完成（`[WF:done:文档解析]`）后，立即通过 `Agent` 工具
 
 ## 六、结果页兼容性
 
-**无需改动。** 任务结果页（`/tasks/[id]/result`）通过 `/api/tasks/[id]/download` 递归扫描 `{TASK_OUTPUT_DIR}` 获取所有文件。冒烟分支的 3 份文件写入同一输出目录后，结果页自动扫出并展示下载链接。
+### 6.1 `_source.md` 为何不显示
 
-- `.md` → 紫色图标（已有）
-- `.xlsx` → 绿色图标（已有）
+`_source.md` 并非没有被下载 API 扫到，而是被用例向导的展示层**主动过滤**：
+
+- `generate-wizard.tsx` `step3OutputCount` 过滤：`!f.name.includes("_source")`
+- `output-files.tsx` `isDisplayable()` 过滤：`!name.includes("_source")`
+
+这是合理设计——`_source.md` 是 docx2text 中间产物，非用户交付物。
+
+### 6.2 `.xlsx` 文件当前不可见
+
+`OutputFiles` 组件的 `isDisplayable()` 和 `step3OutputCount` 只允许 `.md` / `.xmind`，`.xlsx` 被过滤。需要修改：
+
+| 文件 | 改动 |
+|------|------|
+| `output-files.tsx:21` `isDisplayable()` | `... \|\| name.endsWith(".xlsx")` |
+| `generate-wizard.tsx:754` `step3OutputCount` | `... \|\| f.name.endsWith(".xlsx")` |
+
+> `isPreviewable()` 不用改——`.xlsx` 不可预览只可下载，现有逻辑正确。
+
+### 6.3 冒烟文件展示矩阵
+
+| 文件 | 下载 API | step3OutputCount | OutputFiles |
+|------|:---:|:---:|:---:|
+| `_三方分析.md` | ✅ | ✅ | ✅ |
+| `_开发冒烟用例.md` | ✅ | ✅ | ✅ |
+| `_开发冒烟用例.xlsx` | ✅ | ✅（修后） | ✅（修后） |
 
 ## 七、不改的文件
 
@@ -143,7 +166,7 @@ Step 1 完成（`[WF:done:文档解析]`）后，立即通过 `Agent` 工具
 | `prd-to-tests-new/scripts/md2xmind.py` | 主线 XMind 脚本不变 |
 | `prd-to-tests-smoke/scripts/md2excel.py` | 直接复用，不修改 |
 | `prd-to-tests-new/workflow_flowchart.md` | 流程图可后续更新，非本次必须 |
-| `app/tasks/[id]/result/page.tsx` | 自动扫描输出目录，无需改动 |
+| `app/tasks/[id]/result/page.tsx` | `_source` 过滤是设计意图，不修改 |
 | `app/api/tasks/[id]/download/route.ts` | 递归扫描，无需改动 |
 
 ## 八、行为约束
