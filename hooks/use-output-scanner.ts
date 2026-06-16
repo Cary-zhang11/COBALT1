@@ -217,10 +217,10 @@ export function useOutputScanner({
 
           // Tweak mode: no duration gate (duration not written during tweaks)
         } else {
-          // Initial mode: wait for MD tree + xmind file（xmind 是正式产出物，需确保扫到）
+          // Initial mode: wait for xmind + tree only
           const currentXmindVersion = maxXmindVersion(newFoundFiles);
 
-          if (currentXmindVersion < 0) {
+          if (currentXmindVersion <= baselineRef.current) {
             if (!stopRef.current) {
               timerRef.current = setTimeout(poll, interval);
             }
