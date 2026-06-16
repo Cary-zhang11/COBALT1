@@ -126,7 +126,14 @@ Step 1 完成（`[WF:done:文档解析]`）后，立即通过 `Agent` 工具
 
 **改动 2：删除「五、冒烟测试清单」章节。** 该章节（全量用例列表）直接移除，不做任何替换或引导。后续章节编号顺延（「六、完整性检查报告」→「五、完整性检查报告」）。
 
-## 六、不改的文件
+## 六、结果页兼容性
+
+**无需改动。** 任务结果页（`/tasks/[id]/result`）通过 `/api/tasks/[id]/download` 递归扫描 `{TASK_OUTPUT_DIR}` 获取所有文件。冒烟分支的 3 份文件写入同一输出目录后，结果页自动扫出并展示下载链接。
+
+- `.md` → 紫色图标（已有）
+- `.xlsx` → 绿色图标（已有）
+
+## 七、不改的文件
 
 | 文件 | 原因 |
 |------|------|
@@ -136,15 +143,17 @@ Step 1 完成（`[WF:done:文档解析]`）后，立即通过 `Agent` 工具
 | `prd-to-tests-new/scripts/md2xmind.py` | 主线 XMind 脚本不变 |
 | `prd-to-tests-smoke/scripts/md2excel.py` | 直接复用，不修改 |
 | `prd-to-tests-new/workflow_flowchart.md` | 流程图可后续更新，非本次必须 |
+| `app/tasks/[id]/result/page.tsx` | 自动扫描输出目录，无需改动 |
+| `app/api/tasks/[id]/download/route.ts` | 递归扫描，无需改动 |
 
-## 七、行为约束
+## 八、行为约束
 
 - 冒烟分支通过 `Agent` + `run_in_background: true` 启动，与主线真正并行执行
 - 主线 Step 5 末尾等待冒烟分支完成后汇总结果
 - 冒烟分支任一环节失败（如图片识别失败、Excel 转换失败），不影响主线输出，仅在对应输出中注明失败原因
 - 所有输出文件统一使用 `{TASK_OUTPUT_DIR}` 路径，不写入沙箱外
 
-## 八、风险与边界
+## 九、风险与边界
 
 - **跨 skill 文件引用**：冒烟分支依赖 `prd-to-tests-smoke/references/` 下的规则文件。若 smoke skill 后续规则变更，本分支行为随之变化。这既是风险也是优势（规则自动保持同步）。
 - **不与主线共享状态**：冒烟分支独立执行三方分析，不依赖主线 Step 2-4 的分析结果。
