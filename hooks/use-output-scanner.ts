@@ -217,16 +217,7 @@ export function useOutputScanner({
 
           // Tweak mode: no duration gate (duration not written during tweaks)
         } else {
-          // Initial mode: wait for xmind + tree only
-          const currentXmindVersion = maxXmindVersion(newFoundFiles);
-
-          if (currentXmindVersion <= baselineRef.current) {
-            if (!stopRef.current) {
-              timerRef.current = setTimeout(poll, interval);
-            }
-            return;
-          }
-
+          // Initial mode: wait for MD + tree（report API 自行扫描并解析 _测试用例.md）
           if (!report.tree) {
             if (!stopRef.current) {
               timerRef.current = setTimeout(poll, interval);
