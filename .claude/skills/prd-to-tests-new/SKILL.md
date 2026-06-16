@@ -299,7 +299,54 @@ Markdown 文档生成完成后，**必须自动执行**以下转换命令：
 - 兼容 XMind 8 及后续版本
 - 转换失败则输出 `[XMind 转换失败] 原因：...`，继续后续工作
 
-XMind 转换完成后，输出最后一个进度标记：`[WF:done:导出格式]`
+XMind 转换完成后，输出进度标记：`[WF:done:导出格式]`
+
+### Step 6: 开发冒烟用例（后台并行分支）
+
+Step 1 完成（`[WF:done:文档解析]`输出后），**立即**通过 `Agent`工具 + `run_in_background: true`启动冒烟分支子任务。子任务启动后主线立即继续 Step 2-5，两条分支真正并行执行。
+
+**子任务 prompt 模板：**
+
+```
+你是测试专家，负责对以下 PRD 需求执行三方分析 + 红蓝对抗 + 生成开发冒烟用例。
+
+## 输入文件
+- PRD 解析结果：{TASK_OUTPUT_DIR}/{需求名称}_source.md
+- PRD 图片目录：{TASK_OUTPUT_DIR}/{需求名称}_images/
+- 输出目录：{TASK_OUTPUT_DIR}
+
+## 执行规则
+按以下顺序读取并执行规则文件：
+1. ../prd-to-tests-smoke/references/three_party_analysis.md
+   - 第一阶段：三方独立分析（产品/架构/测试三视角独立审视）
+   - 第二阶段：红蓝对抗（QA→产品、QA→架构、架构→产品，≥3 个真实问题）
+   - 第三阶段：结论汇总
+2. ../prd-to-tests-smoke/references/step02_decomposition.md — 仅拆分 P0 功能点
+3. ../prd-to-tests-smoke/references/smoke_test_generation.md — 生成冒烟用例
+4. ../prd-to-tests-smoke/references/step05_output.md — 输出校验
+
+## 进度标记
+每个阶段完成后输出对应标记：
+- 三方分析 + 红蓝对抗完成 → [WF:done:冒烟-三方分析]
+- 冒烟用例生成 + 校验完成 → [WF:done:冒烟-用例生成]
+- Excel 转换完成 → [WF:done:冒烟-导出]
+
+## 约束
+- 冒烟用例 5-20 条，全部 P0，每步 ≤5 步
+- 前置条件开发本地可快速准备
+- 三方分析中关键风险必须有对应冒烟用例覆盖
+- 任一环节失败不影响主线，仅在输出中注明失败原因
+```
+
+**Excel 转换命令：**
+
+冒烟用例 Markdown 写入完成后，执行：
+
+```bash
+python "{SKILL_DIR}/../prd-to-tests-smoke/scripts/md2excel.py" "{TASK_OUTPUT_DIR}/{需求名称}_开发冒烟用例.md" "{TASK_OUTPUT_DIR}/{需求名称}_开发冒烟用例.xlsx"
+```
+
+**等待与汇总：** 主线 Step 5 末尾，使用 `TaskOutput`工具等待冒烟分支子任务完成（`block: true`），然后汇总最终交付物清单（主线 2 份 + 冒烟 3 份 = 共 5 份文件）。
 
 ---
 
