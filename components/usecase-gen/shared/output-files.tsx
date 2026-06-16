@@ -18,7 +18,7 @@ interface OutputFilesProps {
 function isDisplayable(name: string): boolean {
   if (name.includes("_source")) return false;
   if (name.includes("archive/")) return false;
-  return name.endsWith(".md") || name.endsWith(".xmind");
+  return name.endsWith(".md") || name.endsWith(".xmind") || name.endsWith(".xlsx");
 }
 
 function isPreviewable(name: string): boolean {

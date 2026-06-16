@@ -751,7 +751,7 @@ export function GenerateWizard({
         (f) =>
           !f.name.includes("_source") &&
           !f.name.includes("archive/") &&
-          (f.name.endsWith(".md") || f.name.endsWith(".xmind"))
+          (f.name.endsWith(".md") || f.name.endsWith(".xmind") || f.name.endsWith(".xlsx"))
       ).length,
     [mergedOutputFiles]
   );
