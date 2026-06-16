@@ -109,6 +109,7 @@ export async function GET(
     }
 
     // Try filesystem parse for latest tree (DB report may be stale during tweak)
+    let duration = task.duration;
     const mdPath = await findLatestMdFile(outputDir);
     if (mdPath) {
       try {
@@ -120,6 +121,15 @@ export async function GET(
             summary: parsed.summary,
             meta: parsed.meta,
           };
+          // Duration: use DB value if set, otherwise fall back to file mtime
+          if (duration == null) {
+            try {
+              const stat = await fs.stat(mdPath);
+              duration = Math.max(0, stat.mtimeMs - task.createdAt.getTime());
+            } catch {
+              // stat failed, leave duration as null
+            }
+          }
         }
       } catch {
         console.error("Failed to parse md for task", params.id);
@@ -127,11 +137,15 @@ export async function GET(
     }
 
     // Persist to DB if changed (don't block response)
-    if (!task.report || fsFiles.length > 0) {
+    if (!task.report || fsFiles.length > 0 || (task.duration == null && duration != null)) {
       prisma.task
         .update({
           where: { id: params.id },
-          data: { report: report as Prisma.InputJsonValue, outputFiles: fileList },
+          data: {
+            report: report as Prisma.InputJsonValue,
+            outputFiles: fileList,
+            ...(task.duration == null && duration != null ? { duration } : {}),
+          },
         })
         .catch((err) => console.error("Failed to persist report for task", params.id, err));
     }
@@ -156,7 +170,7 @@ export async function GET(
       rawMarkdown: "",
       outputFiles,
       meta: report.meta ?? {},
-      duration: task.duration,
+      duration,
       tweakCount: task.tweakCount,
       tweakHistory,
     });
