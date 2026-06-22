@@ -85,7 +85,9 @@ interface MindMapData {
 | `public/editor/mind-map.js` | 新增 | iframe 内 simple-mind-map 初始化 + 消息处理 |
 | `public/vendor/simple-mind-map.umd.min.js` | 新增 | simple-mind-map UMD 本地副本 |
 
-**不动**：`generate-wizard.tsx`、`use-output-scanner.ts`、`page.tsx`、知识库 API、所有 API 路由
+**不动**：`generate-wizard.tsx`、`use-output-scanner.ts`、知识库 API、所有 API 路由
+
+> `page.tsx` 需做适配：将 `usecaseTree` 通过 `modulesToMindMap()` 转换后传入，并提供 `onSave` / `onExportToKnowledge` 回调实现。
 
 ### 依赖
 
@@ -99,17 +101,19 @@ interface MindMapData {
 ### 数据流概览
 
 ```
-向导 / 历史列表 / 空画布
+向导 / 空画布（本次入口 A、C）
          │
          ▼
     CaseEditor (纯编辑组件)
          │
          ├─ 编辑中 ←→ iframe (postMessage)
          │
-         └─ 保存时 → onSave(data) 回调
+         └─ 保存时 → onSave({ json, xmindBase64 }) 回调
                        │
                        ▼
-                  父级决定写回格式 (MD / XMind)，调用对应 API
+                  父级决定写回格式：
+                  ├─ MD 源文件 → json 通过 md-mindmap-convert 转 Markdown → 写回
+                  └─ XMind 源文件 → xmindBase64 解码 → 写回
 ```
 
 ### Props 接口
@@ -123,8 +127,8 @@ interface CaseEditorProps {
 }
 
 interface SaveResult {
-  json: MindMapData;          // 脑图 JSON，MD 源文件可直接用
-  xmindBase64: string;        // XMind zip 文件的 base64，XMind 源文件用
+  json: MindMapData;          // 脑图 JSON，父级通过 md-mindmap-convert 转为 Markdown
+  xmindBase64: string;        // XMind zip 文件的 base64，可直接解码写回
 }
 ```
 
@@ -163,18 +167,21 @@ interface SaveResult {
 ### 保存（由父级回调处理）
 
 ```
-用户点击「保存」或 Ctrl+S
+用户点击「保存」或 Ctrl+S（iframe 上报 saveRequested）
   │
   ▼
-postMessage getData → iframe 返回当前脑图 JSON
+编辑器内部：
+  ① postMessage getData → 获取脑图 JSON
+  ② postMessage exportXmind → iframe 内 transformToXmind() → 返回 base64
+  ③ 组装 SaveResult { json, xmindBase64 }
   │
   ▼
-调用 props.onSave(data)
+调用 props.onSave(result)
   │
   ▼
-父级处理持久化逻辑（示例）：
-  ├─ 源文件为 MD  → md-mindmap-convert 逆向转 Markdown → POST save API → fs.writeFile
-  └─ 源文件为 XMind → postMessage exportXmind → base64 → POST save API → fs.writeFile
+父级处理持久化逻辑：
+  ├─ 源文件为 MD  → mindMapToModules(json) → modulesToMarkdown() → Markdown 文本 → 写回文件
+  └─ 源文件为 XMind → xmindBase64 → Buffer.from(base64) → 写回 .xmind
 ```
 
 ### 导出
@@ -321,7 +328,7 @@ function modulesToMarkdown(tree: UsecaseModule[]): string
 
 - **上传 .xmind**：主应用读取文件 → FileReader → ArrayBuffer → base64 → `bridge.importXmindFile(base64)` → iframe 内 parseXmindFile 加载
 - **上传 .md**：主应用读取文件文本 → `parseTestcaseMarkdown` → `modulesToMindMap` → `bridge.init(data)`
-- **粘贴 Markdown**：监听剪贴板 → 同上流程
+- **粘贴 Markdown**：编辑器整体区域监听 `paste` 事件，检测剪贴板纯文本 → 尝试 `parseTestcaseMarkdown` 解析 → 成功则按合并逻辑导入，失败则忽略
 - 导入后 toolbar 全部激活，进入正常编辑态
 
 ### 工具栏
@@ -341,7 +348,7 @@ function modulesToMarkdown(tree: UsecaseModule[]): string
 
 **data 不为 null（已有数据）**：弹窗确认：
 - 「替换」→ 丢弃当前数据，加载新文件
-- 「合并」→ 新文件作为当前脑图的新子节点追加到根节点下
+- 「合并」→ 去掉新文件的根节点包装，将根节点的所有子节点追加到当前脑图根节点下
 - 「取消」→ 不做任何操作
 
 ### 状态管理
