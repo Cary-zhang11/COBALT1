@@ -26,6 +26,19 @@
 - 主应用通过 postMessage 协议与 iframe 通信
 - Excel 支持留到后续迭代
 
+### MindMapData 类型定义
+
+```ts
+// simple-mind-map 使用的脑图节点树结构
+interface MindMapData {
+  data: {
+    text: string;              // 节点标题
+    [key: string]: unknown;    // 扩展字段（优先级标签等）
+  };
+  children: MindMapData[];
+}
+```
+
 ---
 
 ## 一、整体架构
@@ -105,25 +118,29 @@
 interface CaseEditorProps {
   data: MindMapData | null;      // null → 空画布，显示导入入口
   fileName?: string;             // 纯展示（工具栏显示）
-  onSave: (data: MindMapData) => Promise<void>;     // 保存回调，父级负责持久化
+  onSave: (result: SaveResult) => Promise<void>;     // 保存回调，父级负责持久化
   onExportToKnowledge: (data: MindMapData) => Promise<void>;  // 反哺知识库
+}
+
+interface SaveResult {
+  json: MindMapData;          // 脑图 JSON，MD 源文件可直接用
+  xmindBase64: string;        // XMind zip 文件的 base64，XMind 源文件用
 }
 ```
 
 ### 三种入口
 
-**入口 A：向导第三步传入**
+**入口 A：生成完成后切换 Tab 传入**
 ```
-GenerateWizard onComplete(usecaseTree)
-  → modulesToMindMap(usecaseTree)
+用例生成完成 → 用户切换到编辑器 Tab
+  → 父级将 usecaseTree 通过 modulesToMindMap() 转为 MindMapData
   → <CaseEditor data={mindMapData} fileName="xxx.md" onSave={...} />
 ```
 
-**入口 B：历史列表选中已有任务**
+**入口 B：历史列表进入（后续迭代）**
 ```
-HistoryList → 加载任务文件 (MD 或 XMind)
-  → 解析为 MindMapData
-  → <CaseEditor data={mindMapData} fileName={...} onSave={...} />
+需要增加 page.tsx 导航逻辑，支持 taskId → 加载文件 → 编辑器 Tab。
+本次不包含，留到后续迭代。
 ```
 
 **入口 C：空数据（导入编辑）**
@@ -131,7 +148,7 @@ HistoryList → 加载任务文件 (MD 或 XMind)
 <CaseEditor data={null} onSave={...} />
   → 显示导入入口
   → 用户上传 .xmind / .md → 解析 → iframe 渲染
-  → 编辑完成后 onSave 回调，父级创建新文件
+  → 编辑完成后 onSave 回调，父级创建新文件和任务
 ```
 
 ### 编辑过程
@@ -315,8 +332,17 @@ function modulesToMarkdown(tree: UsecaseModule[]): string
 | 🔄 重做 | 始终可用 | postMessage `redo` |
 | 💾 保存 | data != null 时可用 | 触发 onSave 回调 |
 | 📥 下载 XMind | data != null 时可用 | iframe 内 transformToXmind → 浏览器下载 |
-| 📂 导入 | 始终可用 | 点击弹出文件选择器（`.xmind`、`.md`） |
+| 📂 导入 | 始终可用 | 点击弹出文件选择器（`.xmind`、`.md`），行为见下方 |
 | 🔗 反哺知识库 | data != null 时可用 | 触发 onExportToKnowledge 回调 |
+
+### 导入行为
+
+**data 为 null（空画布）**：直接加载，替换空状态为脑图。
+
+**data 不为 null（已有数据）**：弹窗确认：
+- 「替换」→ 丢弃当前数据，加载新文件
+- 「合并」→ 新文件作为当前脑图的新子节点追加到根节点下
+- 「取消」→ 不做任何操作
 
 ### 状态管理
 
