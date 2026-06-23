@@ -332,3 +332,6 @@ export function parseTestcaseMarkdown(markdown: string): ParseResult {
     dimensions: parseDimensionCoverage(markdown),
   };
 }
+
+// Re-export from md-mindmap-convert for single source of truth
+export { modulesToMarkdown } from "@/lib/md-mindmap-convert";

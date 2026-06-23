@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseTestcaseMarkdown } from "@/lib/parse-testcase-md";
+import { parseTestcaseMarkdown, modulesToMarkdown } from "@/lib/parse-testcase-md";
 
 const SAMPLE_MD = `# 卖车页面改版 — 测试用例文档
 
@@ -188,5 +188,16 @@ describe("parseTestcaseMarkdown", () => {
     // 冒烟测试清单 section should NOT be parsed as cases
     const cases = result.tree!.flatMap((m) => m.cases);
     expect(cases.length).toBe(1);
+  });
+});
+
+describe("modulesToMarkdown", () => {
+  it("generates markdown that can be re-parsed", () => {
+    const original = parseTestcaseMarkdown(SAMPLE_MD);
+    if (!original.tree) throw new Error("parse failed");
+    const md = modulesToMarkdown(original.tree);
+    const reparsed = parseTestcaseMarkdown(md);
+    expect(reparsed.tree).not.toBeNull();
+    expect(reparsed.summary.totalCases).toBe(original.summary.totalCases);
   });
 });
