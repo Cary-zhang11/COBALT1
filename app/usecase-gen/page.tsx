@@ -9,6 +9,7 @@ import { Dashboard } from "@/components/usecase-gen/dashboard";
 import { KnowledgeBase } from "@/components/usecase-gen/knowledge-base";
 import { HistoryList } from "@/components/usecase-gen/history-list";
 import type { UsecaseModule } from "@/components/usecase-gen/shared/types";
+import { modulesToMindMap } from "@/lib/md-mindmap-convert";
 
 const TAB_KEYS = ["generate", "history", "editor", "dashboard", "knowledge"];
 const TAB_INDEX: Record<string, number> = Object.fromEntries(TAB_KEYS.map((k, i) => [k, i]));
@@ -88,7 +89,15 @@ function UsecaseGenPageContent() {
           ))}
         {activeTab === 2 && (
           <div className="max-w-7xl mx-auto w-full">
-            <CaseEditor usecaseTree={usecaseTree} />
+            <CaseEditor
+              data={usecaseTree && usecaseTree.length > 0 ? modulesToMindMap(usecaseTree, "测试用例") : null}
+              onSave={async () => {
+                // Future iteration: call POST /api/tasks/[id]/save-usecase
+              }}
+              onExportToKnowledge={async () => {
+                // Future iteration: POST to knowledge API
+              }}
+            />
           </div>
         )}
         {activeTab === 3 && (

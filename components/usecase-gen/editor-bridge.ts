@@ -84,14 +84,14 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
       post({ type: "init", payload: { data, fileName } });
     },
 
-    getData: () => {
+    getData: (): Promise<MindMapData> => {
       post({ type: "getData" });
-      return waitFor("data");
+      return waitFor("data") as Promise<MindMapData>;
     },
 
-    exportXmind: () => {
+    exportXmind: (): Promise<string> => {
       post({ type: "exportXmind" });
-      return waitFor("xmindBlob");
+      return waitFor("xmindBlob") as Promise<string>;
     },
 
     importXmindFile: (base64: string) => {
