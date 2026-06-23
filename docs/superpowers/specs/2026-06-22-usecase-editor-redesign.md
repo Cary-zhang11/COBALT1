@@ -59,7 +59,7 @@ interface MindMapData {
 │  └───────────────────────┘   │   <iframe>                  │ │
 │                              │   /editor/mind-map.html     │ │
 │  ┌───────────────────────┐   │                             │ │
-│  │ md-mindmap-convert.ts │   │   simple-mind-map (CDN)     │ │
+│  │ md-mindmap-convert.ts │   │   simple-mind-map (本地UMD)  │ │
 │  │ MD ↔ 脑图 JSON 互转    │   │   - 脑图渲染                 │ │
 │  └───────────────────────┘   │   - 节点增删改/拖拽           │ │
 │                              │   - 撤销/重做/快捷键          │ │
@@ -91,8 +91,7 @@ interface MindMapData {
 
 ### 依赖
 
-- `simple-mind-map`：npm 安装，UMD 包拷贝到 `public/vendor/`，iframe 内通过 `<script>` 引用
-- 无新增 npm 依赖
+- `simple-mind-map`：新增 npm 依赖，构建时将 UMD 包拷贝到 `public/vendor/`，iframe 内通过 `<script>` 引用
 
 ---
 
@@ -202,7 +201,6 @@ interface SaveResult {
 { type: "redo" }
 { type: "exportXmind" }
 { type: "importXmind", payload: { base64: string } }    // 导入 .xmind 文件
-{ type: "triggerSave" }                                  // 外部触发保存（如 Ctrl+S 转换）
 ```
 
 ### iframe → 主应用（事件上报）
@@ -228,6 +226,7 @@ const base64 = await bridge.exportXmind(); // 导出 XMind base64
 bridge.importXmindFile(base64);        // 导入 .xmind 文件
 bridge.onDirty((dirty) => { ... });    // 监听未保存状态
 bridge.onSaveRequested(() => { ... }); // 监听 iframe 内 Ctrl+S
+bridge.onError((msg) => { ... });      // 监听 iframe 内错误
 ```
 
 ### Dirty 追踪（含 undo 到原始状态）
@@ -338,7 +337,7 @@ function modulesToMarkdown(tree: UsecaseModule[]): string
 | 🔄 撤销 | 始终可用 | postMessage `undo` |
 | 🔄 重做 | 始终可用 | postMessage `redo` |
 | 💾 保存 | data != null 时可用 | 触发 onSave 回调 |
-| 📥 下载 XMind | data != null 时可用 | iframe 内 transformToXmind → 浏览器下载 |
+| 📥 下载 XMind | data != null 时可用 | postMessage `exportXmind` → 获取 base64 → 主应用转 blob → 触发下载 |
 | 📂 导入 | 始终可用 | 点击弹出文件选择器（`.xmind`、`.md`），行为见下方 |
 | 🔗 反哺知识库 | data != null 时可用 | 触发 onExportToKnowledge 回调 |
 
