@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "seed": "tsx scripts/seed-skills.ts",
     "db:setup": "bash scripts/setup-db.sh",
-    "db:setup:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-db.ps1"
+    "db:setup:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-db.ps1",
+    "postinstall": "node -e \"const fs=require('fs');fs.mkdirSync('public/vendor',{recursive:true});fs.copyFileSync('node_modules/simple-mind-map/dist/simpleMindMap.umd.min.js','public/vendor/simple-mind-map.umd.min.js')\""
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
