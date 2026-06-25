@@ -8,8 +8,6 @@ import { CaseEditor } from "@/components/usecase-gen/case-editor";
 import { Dashboard } from "@/components/usecase-gen/dashboard";
 import { KnowledgeBase } from "@/components/usecase-gen/knowledge-base";
 import { HistoryList } from "@/components/usecase-gen/history-list";
-import type { UsecaseModule } from "@/components/usecase-gen/shared/types";
-import { modulesToMindMap } from "@/lib/md-mindmap-convert";
 
 const TAB_KEYS = ["generate", "history", "editor", "dashboard", "knowledge"];
 const TAB_INDEX: Record<string, number> = Object.fromEntries(TAB_KEYS.map((k, i) => [k, i]));
@@ -23,8 +21,7 @@ function UsecaseGenPageContent() {
     return tab && TAB_INDEX[tab] !== undefined ? TAB_INDEX[tab] : 0;
   });
   const taskId = searchParams.get("taskId") || null;
-
-  const [usecaseTree, setUsecaseTree] = useState<UsecaseModule[] | null>(null);
+  const editorFilePath = searchParams.get("filePath") || null;
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -37,22 +34,29 @@ function UsecaseGenPageContent() {
     window.scrollTo(0, 0);
   }, [activeTab]);
 
-  const setActiveTab = useCallback((i: number) => {
+  const setActiveTab = useCallback((i: number, extraParams?: Record<string, string>) => {
     setActiveTabState(i);
-    router.replace(`/usecase-gen?tab=${TAB_KEYS[i]}`, { scroll: false });
+    const params = new URLSearchParams();
+    params.set("tab", TAB_KEYS[i]);
+    if (extraParams) {
+      for (const [k, v] of Object.entries(extraParams)) {
+        if (v) params.set(k, v);
+      }
+    }
+    router.replace(`/usecase-gen?${params.toString()}`, { scroll: false });
   }, [router]);
 
   const skillId = process.env.NEXT_PUBLIC_USECASE_SKILL_ID;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto p-6">
+      <div className={`flex-1 ${activeTab === 2 ? "" : "overflow-auto p-6"}`}>
         {activeTab === 0 && (
           <div className="max-w-7xl mx-auto w-full">
             <GenerateWizard
               key="generate"
               initialTaskId={null}
-              onComplete={(tree) => setUsecaseTree(tree)}
+              onComplete={() => {}}
               skillId={skillId}
               onNavigateToTab={setActiveTab}
             />
@@ -71,7 +75,7 @@ function UsecaseGenPageContent() {
               <GenerateWizard
                 key={taskId}
                 initialTaskId={taskId}
-                onComplete={(tree) => setUsecaseTree(tree)}
+                onComplete={() => {}}
                 skillId={skillId}
                 onNavigateToTab={setActiveTab}
               />
@@ -88,11 +92,35 @@ function UsecaseGenPageContent() {
             </div>
           ))}
         {activeTab === 2 && (
-          <div className="max-w-7xl mx-auto w-full">
+          <div className="w-full h-full flex flex-col">
             <CaseEditor
-              data={usecaseTree && usecaseTree.length > 0 ? modulesToMindMap(usecaseTree, "测试用例") : null}
-              onSave={async () => {
-                // Future iteration: call POST /api/tasks/[id]/save-usecase
+              taskId={taskId}
+              filePath={editorFilePath}
+              onBack={() => {
+                if (taskId) {
+                  router.replace(`/usecase-gen?tab=history&taskId=${taskId}`, { scroll: false });
+                  setActiveTabState(TAB_INDEX["history"]);
+                } else {
+                  setActiveTab(TAB_INDEX["generate"]);
+                }
+              }}
+              onSave={async (result) => {
+                if (!taskId || !editorFilePath) throw new Error("缺少 taskId 或 filePath");
+                const res = await fetch(`/api/tasks/${taskId}/save`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    filePath: editorFilePath,
+                    xmindBase64: result.xmindBase64,
+                    // ★ Server uses this to (a) regenerate the sibling .md report
+                    // so task detail / KPI stay in sync with the xmind edits.
+                    treeJson: result.json,
+                  }),
+                });
+                if (!res.ok) {
+                  const err = await res.json().catch(() => ({ error: "保存失败" }));
+                  throw new Error(err.error || "保存失败");
+                }
               }}
               onExportToKnowledge={async () => {
                 // Future iteration: POST to knowledge API

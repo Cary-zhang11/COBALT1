@@ -11,7 +11,22 @@ interface InitPayload {
 type MessageHandler = (e: MessageEvent) => void;
 type DirtyCallback = (dirty: boolean) => void;
 type SaveRequestedCallback = () => void;
-type ErrorCallback = (message: string) => void;
+type ErrorCallback = (error: string) => void;
+
+// Module-level flag: persists across StrictMode double-mount so the second
+// bridge instance can resolve waitReady immediately when the iframe has
+// already sent its one-time "ready" message.
+let globalReadyReceived = false;
+
+/** Mark iframe as ready from outside (e.g. onLoad) — for when postMessage arrives before listener is set up */
+export function markGlobalReady() {
+  globalReadyReceived = true;
+}
+
+/** Reset the global ready flag — exposed for testing only */
+export function resetGlobalReadyState() {
+  globalReadyReceived = false;
+}
 
 export function createEditorBridge(iframeRef: HTMLIFrameElement) {
   const pendingResolvers = new Map<string, (value: unknown) => void>();
@@ -27,6 +42,7 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
 
     switch (msg.type) {
       case "ready":
+        globalReadyReceived = true;
         resolveAll("ready", null);
         break;
       case "data":
@@ -57,6 +73,11 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
   }
 
   function waitFor(type: string, timeoutMs = 5000): Promise<unknown> {
+    // If iframe already sent "ready" (e.g. before StrictMode double-mount),
+    // resolve immediately instead of waiting for a message that will never come.
+    if (type === "ready" && globalReadyReceived) {
+      return Promise.resolve();
+    }
     return new Promise((resolve, reject) => {
       const id = `${type}:${msgId++}`;
       pendingResolvers.set(id, resolve);

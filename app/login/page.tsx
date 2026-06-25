@@ -22,8 +22,14 @@ function LoginPageContent() {
     setErrorMsg("");
     try {
       const res = await fetch("/api/auth/qr/generate");
-      if (!res.ok) throw new Error("生成二维码失败");
+      console.log("[Login] QR generate response:", res.status, res.statusText);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        console.error("[Login] QR generate failed:", errBody);
+        throw new Error(errBody.error || "生成二维码失败");
+      }
       const data = await res.json();
+      console.log("[Login] QR generated, uuid:", data.uuid);
       uuidRef.current = data.uuid;
       setQrImage(data.qrBase64);
       setStatus("pending");
@@ -65,6 +71,7 @@ function LoginPageContent() {
   };
 
   useEffect(() => {
+    console.log("[Login] useEffect fired, calling generateQR...");
     generateQR();
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);

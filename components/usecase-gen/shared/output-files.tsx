@@ -8,7 +8,7 @@ import { FilePreviewModal } from "./file-preview";
 interface OutputFilesProps {
   taskId: string | null;
   files: FileInfo[];
-  onEditMarkdown?: (file: FileInfo) => void;
+  onEditXmind?: (file: FileInfo) => void;
   /** 由外层 WizardSection 提供标题与边框 */
   sectioned?: boolean;
   /** 是否正在生成中。有文件时不转圈，无文件且有此标记时展示"生成中..." */
@@ -25,6 +25,10 @@ function isPreviewable(name: string): boolean {
   return name.endsWith(".md");
 }
 
+function isEditable(name: string): boolean {
+  return name.endsWith(".xmind");
+}
+
 /** 12px + 固定行高，避免 10px 在 Windows 缩放下发糊 */
 const fileActionBtn =
   "inline-flex items-center justify-center h-7 px-2.5 text-xs font-medium leading-none rounded-md whitespace-nowrap shrink-0";
@@ -39,7 +43,7 @@ function downloadFile(taskId: string, file: FileInfo) {
   document.body.removeChild(a);
 }
 
-export function OutputFiles({ taskId, files, onEditMarkdown, sectioned, isGenerating }: OutputFilesProps) {
+export function OutputFiles({ taskId, files, onEditXmind, sectioned, isGenerating }: OutputFilesProps) {
   const displayable = files.filter((f) => isDisplayable(f.name));
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
 
@@ -72,10 +76,10 @@ export function OutputFiles({ taskId, files, onEditMarkdown, sectioned, isGenera
                   预览
                 </button>
               )}
-              {isPreviewable(f.name) && taskId && onEditMarkdown && (
+              {isEditable(f.name) && taskId && onEditXmind && (
                 <button
                   type="button"
-                  onClick={() => onEditMarkdown(f)}
+                  onClick={() => onEditXmind(f)}
                   className={`${fileActionBtn} bg-primary text-primary-foreground hover:bg-primary/90 transition-colors`}
                 >
                   编辑

@@ -7,7 +7,7 @@ const PUBLIC_PATHS = [
   "/login",
 ];
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   if (!AUTH_ENABLED) {
     return NextResponse.next();
   }
@@ -42,5 +42,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|_next/webpack-hmr|__nextjs_font|vendor/|editor/|favicon.ico).*)"],
 };

@@ -9,6 +9,9 @@ async function collectFilesRecursive(dir: string): Promise<string[]> {
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
+      // Skip the archive/ sub-directory entirely — it contains legacy
+      // snapshots and must not be exposed in the wizard / history file lists.
+      if (entry.isDirectory() && entry.name === "archive") continue;
       if (entry.isDirectory()) {
         const subFiles = await collectFilesRecursive(path.join(dir, entry.name));
         results.push(...subFiles);
@@ -51,6 +54,13 @@ export async function GET(
     const filePath = path.resolve(outputDir, fileParam);
     if (!validatePath(filePath, taskId)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    // Check if file exists before reading
+    try {
+      await fs.access(filePath);
+    } catch {
+      return NextResponse.json({ error: `File not found: ${fileParam}` }, { status: 404 });
     }
 
     const content = await fs.readFile(filePath);

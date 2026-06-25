@@ -1,25 +1,28 @@
 (function () {
   "use strict";
 
-  var MindMap = window.simpleMindMap;
-  var xmind = MindMap.xmind;
+  if (!window.simpleMindMap) {
+    window.parent.postMessage(
+      { type: "error", payload: { message: "脑图核心库加载失败，请检查网络连接后刷新页面" } },
+      window.location.origin
+    );
+    return;
+  }
+
+  // simple-mind-map UMD may export constructor directly or as { default: Constructor }
+  var smm = window.simpleMindMap;
+  var MindMap = typeof smm === "function" ? smm : (smm.default || smm);
+  var xmind = smm.xmind || (smm.default && smm.default.xmind);
 
   // --- State ---
   var mindMap = null;
   var originalSnapshot = null;
   var dirty = false;
+  var resizeObserver = null;
 
-  // --- Init ---
-  function createMindMap() {
-    mindMap = new MindMap({
-      el: document.getElementById("mindMapContainer"),
-      data: { data: { text: "" }, children: [] },
-      layout: "logicalStructure",
-      theme: "classic4",
-      readonly: false,
-      enableFreeDrag: true,
-      mousewheelAction: "zoom",
-    });
+  // --- PostMessage to parent ---
+  function post(msg) {
+    window.parent.postMessage(msg, window.location.origin);
   }
 
   // --- Dirty tracking ---
@@ -33,14 +36,76 @@
     }
   }
 
+  // Reset baseline snapshot — call after load/save to mark current state as clean.
   function snapshot() {
     if (!mindMap) return;
     originalSnapshot = JSON.stringify(mindMap.getData());
-    dirty = false;
-    post({ type: "dirty", payload: false });
+    if (dirty) {
+      dirty = false;
+      post({ type: "dirty", payload: false });
+    }
   }
 
-  // --- Save handler (Ctrl+S) ---
+  function expandAllNodes(node) {
+    if (!node) return;
+    if (node.data) node.data.expand = true;
+    if (node.children && node.children.length > 0) {
+      for (var i = 0; i < node.children.length; i++) {
+        expandAllNodes(node.children[i]);
+      }
+    }
+  }
+
+  function bindListeners() {
+    if (!mindMap) return;
+    mindMap.on("data_change", updateDirty);
+    // Theme change updates the internal data but should not flag dirty.
+    mindMap.on("view_theme_change_config", function () {
+      if (!dirty && mindMap) {
+        originalSnapshot = JSON.stringify(mindMap.getData());
+      }
+    });
+  }
+
+  function fitViewSoon() {
+    if (mindMap && mindMap.view && mindMap.view.fit) {
+      setTimeout(function () { mindMap.view.fit(); }, 100);
+    }
+  }
+
+  function observeResize() {
+    if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
+    if (!window.ResizeObserver) return;
+    resizeObserver = new ResizeObserver(function () {
+      if (mindMap && mindMap.view && mindMap.view.fit) {
+        mindMap.view.fit();
+      }
+    });
+    resizeObserver.observe(document.getElementById("mindMapContainer"));
+  }
+
+  function createMindMap(initialData) {
+    mindMap = new MindMap({
+      el: document.getElementById("mindMapContainer"),
+      data: initialData || { data: { text: "" }, children: [] },
+      layout: "logicalStructure",
+      theme: "classic",
+      readonly: false,
+      enableFreeDrag: true,
+      mousewheelAction: "zoom",
+    });
+    // Dirty tracking is wired here so every code path (boot / init / import)
+    // gets identical event-binding semantics.
+    bindListeners();
+    snapshot();
+    // Re-snapshot after async layout/render settles, otherwise the very first
+    // data_change after render fires a false-positive dirty.
+    setTimeout(snapshot, 500);
+    fitViewSoon();
+    observeResize();
+  }
+
+  // --- Save shortcut (Ctrl/Cmd + S) ---
   document.addEventListener("keydown", function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") {
       e.preventDefault();
@@ -48,15 +113,110 @@
     }
   });
 
-  // --- PostMessage sender ---
-  function post(msg) {
-    window.parent.postMessage(msg, window.location.origin);
+  // --- Init handler (load from in-memory JSON tree) ---
+  function handleInit(payload) {
+    try {
+      if (!payload) return;
+      if (mindMap) {
+        mindMap.destroy();
+        mindMap = null;
+      }
+      var hasData =
+        payload.data &&
+        payload.data.data &&
+        payload.data.children &&
+        payload.data.children.length > 0;
+      if (hasData) {
+        expandAllNodes(payload.data);
+        createMindMap(payload.data);
+      } else {
+        createMindMap();
+      }
+      post({ type: "ready" });
+    } catch (err) {
+      console.error("[mind-map] handleInit error:", err);
+      post({
+        type: "error",
+        payload: { message: "脑图初始化失败: " + (err && err.message ? err.message : String(err)) },
+      });
+    }
   }
 
-  // --- Message handler ---
+  // --- XMind import (base64 zip → parse → setData) ---
+  async function handleImportXmind(payload) {
+    if (!payload || !payload.base64) {
+      post({ type: "error", payload: { message: "导入数据为空" } });
+      return;
+    }
+    try {
+      var binaryStr = atob(payload.base64);
+      var bytes = new Uint8Array(binaryStr.length);
+      for (var i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      var blob = new Blob([bytes.buffer], { type: "application/x-zip-compressed" });
+      var file = new File([blob], "imported.xmind", { type: "application/x-zip-compressed" });
+
+      if (!xmind || typeof xmind.parseXmindFile !== "function") {
+        post({ type: "error", payload: { message: "脑图库未导出 xmind 解析器" } });
+        return;
+      }
+
+      var data = await xmind.parseXmindFile(file);
+      // simple-mind-map@0.14: setFullData expects { root, layout, ... };
+      // parseXmindFile returns a plain node tree, so use setData.
+      mindMap.setData(data);
+      snapshot();
+      setTimeout(snapshot, 500);
+      fitViewSoon();
+      post({ type: "ready" });
+    } catch (err) {
+      console.error("[mind-map] importXmind error:", err);
+      post({
+        type: "error",
+        payload: { message: "文件格式损坏，无法加载: " + (err && err.message ? err.message : String(err)) },
+      });
+    }
+  }
+
+  // --- XMind export (delegate to simple-mind-map's built-in transformToXmind) ---
+  function blobToBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var full = reader.result;
+        resolve(full.slice(full.indexOf(",") + 1));
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function handleExportXmind() {
+    try {
+      if (!xmind || typeof xmind.transformToXmind !== "function") {
+        post({ type: "error", payload: { message: "脑图库未导出 xmind 生成器" } });
+        return;
+      }
+      var data = mindMap.getData();
+      // simple-mind-map's transformToXmind internally calls getTextFromHtml,
+      // so rich-text node titles (<p>...</p>) are flattened to plain text.
+      var rootText = (data && data.data && data.data.text) || "用例";
+      var blob = await xmind.transformToXmind(data, rootText);
+      var base64 = await blobToBase64(blob);
+      post({ type: "xmindBlob", payload: { base64: base64 } });
+    } catch (err) {
+      console.error("[mind-map] exportXmind error:", err);
+      post({
+        type: "error",
+        payload: { message: "导出 XMind 失败: " + (err && err.message ? err.message : String(err)) },
+      });
+    }
+  }
+
+  // --- Message dispatcher ---
   window.addEventListener("message", function (e) {
     if (e.origin !== window.location.origin) return;
-
     var msg = e.data;
     if (!msg || !msg.type) return;
 
@@ -85,79 +245,13 @@
     }
   });
 
-  // --- Init handler ---
-  function handleInit(payload) {
-    if (!payload) return;
-    if (mindMap) {
-      mindMap.destroy();
-      mindMap = null;
-    }
-    createMindMap();
-
-    if (payload.data && payload.data.data) {
-      mindMap.setFullData(payload.data);
-    } else {
-      mindMap.setData({ data: { text: "测试用例" }, children: [] });
-    }
-
-    if (payload.data) {
-      // Listen for data changes
-      mindMap.on("data_change", updateDirty);
-      mindMap.on("view_theme_change_config", function () {
-        // Re-snapshot after theme change to avoid false dirty
-        if (!dirty && mindMap) {
-          originalSnapshot = JSON.stringify(mindMap.getData());
-        }
-      });
-    }
-
-    // Post-ready THEN snapshot (so init data isn't counted as dirty)
-    post({ type: "ready" });
-    snapshot();
-  }
-
-  // --- XMind import (base64 → parse) ---
-  async function handleImportXmind(payload) {
-    if (!payload || !payload.base64) {
-      post({ type: "error", payload: { message: "导入数据为空" } });
-      return;
-    }
-    try {
-      var binaryStr = atob(payload.base64);
-      var bytes = new Uint8Array(binaryStr.length);
-      for (var i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i);
-      }
-      var blob = new Blob([bytes.buffer], { type: "application/x-zip-compressed" });
-      var file = new File([blob], "imported.xmind", { type: "application/x-zip-compressed" });
-
-      var data = await xmind.parseXmindFile(file);
-      mindMap.setFullData(data);
-      snapshot();
-      post({ type: "ready" });
-    } catch (err) {
-      post({ type: "error", payload: { message: "文件格式损坏，无法加载" } });
-    }
-  }
-
-  // --- XMind export (mind map data → base64 blob) ---
-  async function handleExportXmind() {
-    try {
-      var data = mindMap.getData();
-      var blob = await xmind.transformToXmind(data, "export");
-      var reader = new FileReader();
-      reader.onload = function () {
-        var full = reader.result;
-        var base64 = full.slice(full.indexOf(",") + 1);
-        post({ type: "xmindBlob", payload: { base64: base64 } });
-      };
-      reader.readAsDataURL(blob);
-    } catch (err) {
-      post({ type: "error", payload: { message: "导出 XMind 失败" } });
-    }
-  }
-
   // --- Boot ---
-  createMindMap();
-  post({ type: "ready" });
+  try {
+    createMindMap();
+    post({ type: "ready" });
+  } catch (err) {
+    var bootMsg = "脑图初始化失败: " + (err && err.message ? err.message : String(err));
+    console.error("[mind-map]", bootMsg, err);
+    post({ type: "error", payload: { message: bootMsg } });
+  }
 })();

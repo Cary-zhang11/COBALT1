@@ -9,7 +9,6 @@ import {
   LogOut,
   Cpu,
   Wand2,
-  FileText,
   Clock,
   BarChart3,
   BookOpen,
@@ -19,7 +18,6 @@ import {
 const navItems = [
   { href: "/usecase-gen?tab=generate", label: "用例生成", icon: Wand2 },
   { href: "/usecase-gen?tab=history", label: "历史记录", icon: Clock },
-  { href: "/usecase-gen?tab=editor", label: "用例编辑", icon: FileText },
   { href: "/usecase-gen?tab=dashboard", label: "数据看板", icon: BarChart3 },
   { href: "/usecase-gen?tab=knowledge", label: "知识库管理", icon: BookOpen },
 ];

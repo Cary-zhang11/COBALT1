@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createEditorBridge } from "../editor-bridge";
+import { createEditorBridge, resetGlobalReadyState } from "../editor-bridge";
 
 describe("createEditorBridge", () => {
   let capturedHandler: ((e: MessageEvent) => void) | null = null;
@@ -8,6 +8,7 @@ describe("createEditorBridge", () => {
   beforeEach(() => {
     originalAddEventListener = window.addEventListener;
     capturedHandler = null;
+    resetGlobalReadyState();
   });
 
   afterEach(() => {

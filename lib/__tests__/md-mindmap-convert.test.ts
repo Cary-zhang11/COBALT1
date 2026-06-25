@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { modulesToMindMap, mindMapToModules, modulesToMarkdown } from "@/lib/md-mindmap-convert";
+import { modulesToMindMap, mindMapToModules, modulesToMarkdown, mindMapTreeToMarkdown, treeToMindMapData } from "@/lib/md-mindmap-convert";
+import type { MindMapData } from "@/lib/md-mindmap-convert";
+import { parseMarkdownToTree } from "@/lib/parse-testcase-md";
 import type { UsecaseModule } from "@/lib/parse-testcase-md";
 
 const sampleModules: UsecaseModule[] = [
@@ -35,9 +37,9 @@ describe("modulesToMindMap", () => {
     const case1 = mod1.children[0];
     expect(case1.data.text).toBe("tc-001 P0 正常登录");
     expect(case1.children).toHaveLength(3);
-    expect(case1.children[0].data.text).toBe("前置条件：用户已注册");
-    expect(case1.children[1].data.text).toBe("步骤：输入账号密码");
-    expect(case1.children[2].data.text).toBe("预期：跳转首页");
+    expect(case1.children[0].data.text).toBe("用户已注册");
+    expect(case1.children[1].data.text).toBe("输入账号密码");
+    expect(case1.children[2].data.text).toBe("跳转首页");
   });
 
   it("skips empty fields in case node children", () => {
@@ -49,7 +51,7 @@ describe("modulesToMindMap", () => {
     const result = modulesToMindMap(modules, "Root");
     const caseNode = result.children[0].children[0];
     expect(caseNode.children).toHaveLength(1);
-    expect(caseNode.children[0].data.text).toBe("预期：E1");
+    expect(caseNode.children[0].data.text).toBe("E1");
   });
 });
 
@@ -98,5 +100,100 @@ describe("modulesToMarkdown", () => {
   it("generates empty markdown for empty tree", () => {
     const md = modulesToMarkdown([]);
     expect(md).toContain("## 一、测试用例");
+  });
+});
+
+describe("mindMapTreeToMarkdown", () => {
+  it("round-trips: parse → treeToMindMap → mindMapTreeToMarkdown → parse again keeps same structure", () => {
+    const md = [
+      "# 卖车页面改版 — 测试用例文档",
+      "",
+      "## 一、测试用例",
+      "",
+      "### 1.1 可配置项",
+      "",
+      "#### 1.1.1 头图",
+      "",
+      "- tc-001-p0：静态图片正常展示",
+      "  - 后端返回静态图片",
+      "    - 头图通顶展示",
+      "    - 图片正常渲染",
+      "",
+      "### 1.2 固定写死",
+      "",
+      "- tc-002-p0：入口固定展示",
+      "  - 进入卖车页面",
+      "    - 入口固定展示",
+    ].join("\n");
+
+    const tree = parseMarkdownToTree(md);
+    const rootNode = tree.children.length === 1 ? tree.children[0] : tree;
+    const mindMap = treeToMindMapData(rootNode);
+    const regenerated = mindMapTreeToMarkdown(mindMap);
+    const reTree = parseMarkdownToTree(regenerated);
+
+    // Should produce the same tree structure
+    const reRoot = reTree.children.length === 1 ? reTree.children[0] : reTree;
+    expect(reRoot.title).toBe(rootNode.title);
+    expect(reRoot.children.length).toBe(rootNode.children.length);
+  });
+
+  it("strips rich-text HTML from node titles (simple-mind-map RichText output)", () => {
+    // simple-mind-map@0.14 stores node text as <p>...</p>. The converter must
+    // flatten it to plain text so the saved .md doesn't leak HTML markup.
+    const mindMap: MindMapData = {
+      data: { text: "<p>卖车页面改版</p>" },
+      children: [
+        {
+          data: { text: "<p>一、测试用例</p>" },
+          children: [
+            {
+              data: { text: "1.1 模块" },
+              children: [
+                {
+                  data: { text: "<p>tc-001-p0：<strong>测试</strong></p>" },
+                  children: [
+                    { data: { text: "前置&nbsp;A<br/>前置 B" }, children: [] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = mindMapTreeToMarkdown(mindMap);
+    // No raw HTML tags should leak into the markdown output.
+    expect(md).not.toMatch(/<[^>]+>/);
+    expect(md).not.toContain("&nbsp;");
+    expect(md).toContain("# 卖车页面改版");
+    expect(md).toContain("## 一、测试用例");
+    expect(md).toContain("tc-001-p0：测试");
+  });
+
+  it("preserves case items as list items with indented details", () => {
+    const mindMap: MindMapData = {
+      data: { text: "Root" },
+      children: [
+        { data: { text: "一、测试用例" }, children: [
+          { data: { text: "1.1 模块" }, children: [
+            { data: { text: "tc-001-p0：测试" }, children: [
+              { data: { text: "前置条件" }, children: [
+                { data: { text: "预期结果" }, children: [] },
+              ]},
+            ]},
+          ]},
+        ]},
+      ],
+    };
+
+    const md = mindMapTreeToMarkdown(mindMap);
+    expect(md).toContain("# Root");
+    expect(md).toContain("## 一、测试用例");
+    expect(md).toContain("### 1.1 模块");
+    expect(md).toContain("- tc-001-p0：测试");
+    expect(md).toContain("  - 前置条件");
+    expect(md).toContain("    - 预期结果");
   });
 });

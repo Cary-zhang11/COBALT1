@@ -16,6 +16,7 @@
     "postinstall": "node -e \"const fs=require('fs');fs.mkdirSync('public/vendor',{recursive:true});fs.copyFileSync('node_modules/simple-mind-map/dist/simpleMindMap.umd.min.js','public/vendor/simple-mind-map.umd.min.js')\""
   },
   "dependencies": {
+    "@next/swc-win32-x64-msvc": "^14.2.33",
     "@prisma/client": "^5.22.0",
     "@tanstack/react-query": "^5.100.13",
     "adm-zip": "^0.5.17",

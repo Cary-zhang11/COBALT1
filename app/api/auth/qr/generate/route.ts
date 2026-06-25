@@ -15,6 +15,7 @@ export async function GET() {
     });
 
     if (!res.ok) {
+      console.error("[QR Generate] External API HTTP error:", res.status, res.statusText);
       return NextResponse.json(
         { error: "外部 API 请求失败" },
         { status: 502 }
@@ -22,9 +23,11 @@ export async function GET() {
     }
 
     const result = await res.json();
+    console.log("[QR Generate] External API response:", JSON.stringify(result).slice(0, 200));
 
     if (result.code !== 200 || result.status !== 1) {
       const msg = result.info || result.message || "API 返回错误";
+      console.error("[QR Generate] Business error:", msg);
       return NextResponse.json({ error: msg }, { status: 502 });
     }
 
@@ -50,10 +53,10 @@ export async function GET() {
     return NextResponse.json({ uuid, qrBase64, status }, {
       headers: { "Cache-Control": "no-store" },
     });
-  } catch (err) {
-    console.error("QR generate error:", err);
+  } catch (err: any) {
+    console.error("[QR Generate] Unexpected error:", err?.message || err, err?.cause || "");
     return NextResponse.json(
-      { error: "二维码生成失败" },
+      { error: `二维码生成失败: ${err?.message || "未知错误"}` },
       { status: 500 }
     );
   }

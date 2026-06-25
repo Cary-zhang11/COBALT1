@@ -1,16 +1,19 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import { CaseEditor } from "../case-editor";
-import type { MindMapData } from "@/lib/md-mindmap-convert";
+
+// Mock fetch for XMind download
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 // Mock the bridge
 vi.mock("../editor-bridge", () => ({
   createEditorBridge: vi.fn(() => ({
     waitReady: vi.fn(() => Promise.resolve()),
     init: vi.fn(),
+    importXmindFile: vi.fn(),
     getData: vi.fn(() => Promise.resolve({ data: { text: "Root" }, children: [] })),
     exportXmind: vi.fn(() => Promise.resolve("dGVzdA==")),
-    importXmindFile: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
     onDirty: vi.fn(),
@@ -18,86 +21,77 @@ vi.mock("../editor-bridge", () => ({
     onError: vi.fn(),
     destroy: vi.fn(),
   })),
+  markGlobalReady: vi.fn(),
+  resetGlobalReadyState: vi.fn(),
 }));
 
-const mockData: MindMapData = {
-  data: { text: "测试用例" },
-  children: [
-    {
-      data: { text: "登录模块" },
-      children: [
-        {
-          data: { text: "tc-001 P0 正常登录" },
-          children: [
-            { data: { text: "前置条件：用户已注册" }, children: [] },
-            { data: { text: "预期：跳转首页" }, children: [] },
-          ],
-        },
-      ],
-    },
-  ],
-};
+/** Helper: trigger iframe onLoad */
+function fireIframeLoad() {
+  const iframe = document.querySelector("iframe");
+  if (iframe) {
+    act(() => {
+      iframe.dispatchEvent(new Event("load"));
+    });
+  }
+}
 
 describe("CaseEditor", () => {
-  it("renders toolbar buttons when data is provided", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it("renders toolbar buttons", async () => {
     render(
       <CaseEditor
-        data={mockData}
-        fileName="test.md"
         onSave={vi.fn()}
         onExportToKnowledge={vi.fn()}
       />
     );
-    expect(screen.getByText("保存")).toBeDefined();
+    fireIframeLoad();
+    await waitFor(() => {
+      expect(screen.getByText("保存")).toBeDefined();
+    });
     expect(screen.getByText("下载 XMind")).toBeDefined();
-    expect(screen.getByText("导入")).toBeDefined();
+    expect(screen.getByText("反哺知识库")).toBeDefined();
   });
 
-  it("renders filename in toolbar", () => {
+  it("disables save/download/knowledge when no data", async () => {
     render(
       <CaseEditor
-        data={mockData}
-        fileName="test.md"
         onSave={vi.fn()}
         onExportToKnowledge={vi.fn()}
       />
     );
-    expect(screen.getByText("test.md")).toBeDefined();
-  });
-
-  it("disables save/download/knowledge when data is null", () => {
-    render(
-      <CaseEditor
-        data={null}
-        onSave={vi.fn()}
-        onExportToKnowledge={vi.fn()}
-      />
-    );
+    fireIframeLoad();
+    await waitFor(() => {
+      expect(screen.queryByText("加载脑图画布...")).toBeNull();
+    });
     const saveBtn = screen.getByText("保存").closest("button");
     const downloadBtn = screen.getByText("下载 XMind").closest("button");
+    const knowledgeBtn = screen.getByText("反哺知识库").closest("button");
     expect(saveBtn?.disabled).toBe(true);
     expect(downloadBtn?.disabled).toBe(true);
+    expect(knowledgeBtn?.disabled).toBe(true);
   });
 
-  it("shows empty state upload prompt when data is null", async () => {
+  it("shows empty state message when no taskId/filePath", async () => {
     render(
       <CaseEditor
-        data={null}
         onSave={vi.fn()}
         onExportToKnowledge={vi.fn()}
       />
     );
+    fireIframeLoad();
     await waitFor(() => {
-      expect(screen.getByText("导入用例开始编辑")).toBeDefined();
+      expect(screen.getByText("请从任务结果页进入编辑")).toBeDefined();
     });
-    expect(screen.getByText(/拖拽/)).toBeDefined();
   });
 
   it("renders iframe element", () => {
     render(
       <CaseEditor
-        data={mockData}
-        fileName="test.md"
+        taskId="test-task"
+        filePath="test.xmind"
         onSave={vi.fn()}
         onExportToKnowledge={vi.fn()}
       />
@@ -105,5 +99,18 @@ describe("CaseEditor", () => {
     const iframe = document.querySelector("iframe");
     expect(iframe).not.toBeNull();
     expect(iframe?.getAttribute("src")).toBe("/editor/mind-map.html");
+  });
+
+  it("renders back button when onBack provided", () => {
+    render(
+      <CaseEditor
+        taskId="test-task"
+        filePath="test.xmind"
+        onSave={vi.fn()}
+        onExportToKnowledge={vi.fn()}
+        onBack={vi.fn()}
+      />
+    );
+    expect(screen.getByTitle("返回详情")).toBeDefined();
   });
 });

@@ -1244,7 +1244,7 @@ export function GenerateWizard({
                     sectioned
                     taskId={taskId}
                     files={mergedOutputFiles}
-                    onEditMarkdown={() => onNavigateToTab?.(2)}
+                    onEditXmind={(f) => onNavigateToTab?.(2, taskId ? { taskId, filePath: f.relativePath } : undefined)}
                     isGenerating={generating}
                   />
                 </WizardSection>
@@ -1356,7 +1356,7 @@ export function GenerateWizard({
         onScrollToRating={() => {
           document.getElementById("step3-rating")?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
-        onNavigateToEditor={() => onNavigateToTab?.(2)}
+        onNavigateToEditor={() => onNavigateToTab?.(2, taskId ? { taskId } : undefined)}
       />
     </div>
   );
