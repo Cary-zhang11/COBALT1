@@ -13,6 +13,8 @@ import {
   BarChart3,
   BookOpen,
   Users,
+  Package,
+  Plus,
 } from "lucide-react";
 
 const navItems = [
@@ -91,6 +93,36 @@ export function Sidebar() {
         {user && isAdminClient(user) && (
           <>
             <div className="my-2 border-t" />
+            <Link
+              href="/tasks/new"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                pathname === "/tasks/new"
+                  ? "bg-blue-50 text-blue-700 shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <Plus className={cn(
+                "w-4 h-4 transition-colors",
+                pathname === "/tasks/new" ? "text-blue-600" : "text-muted-foreground"
+              )} />
+              新建任务
+            </Link>
+            <Link
+              href="/skills"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                pathname.startsWith("/skills")
+                  ? "bg-blue-50 text-blue-700 shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <Package className={cn(
+                "w-4 h-4 transition-colors",
+                pathname.startsWith("/skills") ? "text-blue-600" : "text-muted-foreground"
+              )} />
+              技能管理
+            </Link>
             <Link
               href="/"
               className={cn(

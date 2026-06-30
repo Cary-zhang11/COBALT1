@@ -20,7 +20,7 @@ export default function proxy(request: NextRequest) {
 
   if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth/")) {
     const token = request.cookies.get("token")?.value;
-    if (!token) {
+    if (!token) {d
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
