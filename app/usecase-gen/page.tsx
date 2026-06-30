@@ -122,9 +122,6 @@ function UsecaseGenPageContent() {
                   throw new Error(err.error || "保存失败");
                 }
               }}
-              onExportToKnowledge={async () => {
-                // Future iteration: POST to knowledge API
-              }}
             />
           </div>
         )}

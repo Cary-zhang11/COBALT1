@@ -41,46 +41,30 @@ describe("CaseEditor", () => {
   });
 
   it("renders toolbar buttons", async () => {
-    render(
-      <CaseEditor
-        onSave={vi.fn()}
-        onExportToKnowledge={vi.fn()}
-      />
-    );
+    render(<CaseEditor onSave={vi.fn()} />);
     fireIframeLoad();
     await waitFor(() => {
       expect(screen.getByText("保存")).toBeDefined();
     });
     expect(screen.getByText("下载 XMind")).toBeDefined();
-    expect(screen.getByText("反哺知识库")).toBeDefined();
+    // Knowledge export button has been removed from the toolbar.
+    expect(screen.queryByText("反哺知识库")).toBeNull();
   });
 
-  it("disables save/download/knowledge when no data", async () => {
-    render(
-      <CaseEditor
-        onSave={vi.fn()}
-        onExportToKnowledge={vi.fn()}
-      />
-    );
+  it("disables save/download when no data", async () => {
+    render(<CaseEditor onSave={vi.fn()} />);
     fireIframeLoad();
     await waitFor(() => {
       expect(screen.queryByText("加载脑图画布...")).toBeNull();
     });
     const saveBtn = screen.getByText("保存").closest("button");
     const downloadBtn = screen.getByText("下载 XMind").closest("button");
-    const knowledgeBtn = screen.getByText("反哺知识库").closest("button");
     expect(saveBtn?.disabled).toBe(true);
     expect(downloadBtn?.disabled).toBe(true);
-    expect(knowledgeBtn?.disabled).toBe(true);
   });
 
   it("shows empty state message when no taskId/filePath", async () => {
-    render(
-      <CaseEditor
-        onSave={vi.fn()}
-        onExportToKnowledge={vi.fn()}
-      />
-    );
+    render(<CaseEditor onSave={vi.fn()} />);
     fireIframeLoad();
     await waitFor(() => {
       expect(screen.getByText("请从任务结果页进入编辑")).toBeDefined();
@@ -93,7 +77,6 @@ describe("CaseEditor", () => {
         taskId="test-task"
         filePath="test.xmind"
         onSave={vi.fn()}
-        onExportToKnowledge={vi.fn()}
       />
     );
     const iframe = document.querySelector("iframe");
@@ -107,7 +90,6 @@ describe("CaseEditor", () => {
         taskId="test-task"
         filePath="test.xmind"
         onSave={vi.fn()}
-        onExportToKnowledge={vi.fn()}
         onBack={vi.fn()}
       />
     );

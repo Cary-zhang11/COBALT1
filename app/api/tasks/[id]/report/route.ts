@@ -22,7 +22,14 @@ async function findLatestMdFile(outputDir: string): Promise<string | null> {
       if (entry.isDirectory()) {
         if (entry.name === "archive") continue;
         await walk(fullPath);
-      } else if (entry.name.includes("测试用例") && entry.name.endsWith(".md")) {
+      } else if (
+        entry.name.includes("测试用例") &&
+        entry.name.endsWith(".md") &&
+        // Detail / wizard step3 must always reflect the original source md.
+        // The .edited.md sibling produced by the xmind editor is intentionally
+        // ignored here so user edits don't mutate the parsed tree / KPI.
+        !entry.name.includes(".edited.")
+      ) {
         const m = entry.name.match(/_v(\d+)\.md$/);
         candidates.push({
           path: fullPath,

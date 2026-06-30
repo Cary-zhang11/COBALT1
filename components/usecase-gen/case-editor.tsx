@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Undo2, Redo2, Save, Download, BookOpen, ArrowLeft } from "lucide-react";
+import { Undo2, Redo2, Save, Download, ArrowLeft } from "lucide-react";
 import { createEditorBridge, markGlobalReady, type EditorBridge } from "./editor-bridge";
 import type { MindMapData } from "@/lib/md-mindmap-convert";
 
@@ -12,14 +12,13 @@ interface SaveResult {
 
 interface CaseEditorProps {
   onSave: (result: SaveResult) => Promise<void>;
-  onExportToKnowledge: (data: MindMapData) => Promise<void>;
   onBack?: () => void;
   taskId?: string | null;
   filePath?: string | null;
   fileName?: string;
 }
 
-export function CaseEditor({ fileName, onSave, onExportToKnowledge, onBack, taskId, filePath }: CaseEditorProps) {
+export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseEditorProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<EditorBridge | null>(null);
 
@@ -220,17 +219,6 @@ export function CaseEditor({ fileName, onSave, onExportToKnowledge, onBack, task
     }
   }, []);
 
-  const handleExportKnowledge = useCallback(async () => {
-    if (!bridgeRef.current) return;
-    try {
-      const json = await bridgeRef.current.getData();
-      await onExportToKnowledge(json);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "反哺失败";
-      setErrorMsg(msg);
-    }
-  }, [onExportToKnowledge]);
-
   // Retry loading
   const handleRetry = useCallback(() => {
     setErrorMsg(null);
@@ -321,18 +309,6 @@ export function CaseEditor({ fileName, onSave, onExportToKnowledge, onBack, task
           >
             <Download className="w-3.5 h-3.5" />
             下载 XMind
-          </button>
-          <button
-            onClick={handleExportKnowledge}
-            disabled={!hasData}
-            className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 ${
-              hasData
-                ? "hover:bg-muted"
-                : "text-muted-foreground cursor-not-allowed"
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            反哺知识库
           </button>
         </div>
         {displayName && (
