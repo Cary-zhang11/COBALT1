@@ -1,0 +1,74 @@
+<h2>"需求数" 轻量去重方案</h2>
+<p class="subtitle">放弃全文本 MD5，改用更轻量的识别方式</p>
+
+<div class="options">
+  <div class="option" data-choice="light-a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>按上传文件名去重（推荐）</h3>
+      <p>从 inputFiles 中提取文件名，去掉上传时间戳前缀，归一化后去重。如 "1780581436572-卖车页面改版.docx" → "卖车页面改版.docx"。同一文档多次上传，文件名相同即算 1 个需求。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="light-b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>按 input 前 100 字符哈希去重</h3>
+      <p>只取 input 的前 100 个字符做哈希。PRD 的开头通常是标题/概述，足够区分不同文档。比全文字段轻很多。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="light-c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>新增 digest 字段，创建任务时预计算</h3>
+      <p>在 task 表加一个 <code>inputDigest</code> 字段，创建任务时就对 input 前 N 字符取哈希存下来。查询时直接 <code>COUNT(DISTINCT inputDigest)</code>，零额外开销。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>对比</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <tr style="background:#f1f5f9">
+      <th style="padding:8px 12px;border:1px solid #e2e8f0"></th>
+      <th style="padding:8px 12px;border:1px solid #e2e8f0">A 文件名</th>
+      <th style="padding:8px 12px;border:1px solid #e2e8f0">B 前100字</th>
+      <th style="padding:8px 12px;border:1px solid #e2e8f0">C 预计算</th>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0">查询性能</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#22c55e">轻量</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#f59e0b">中等</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#22c55e">最轻</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0">准确度</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0">高（同文档同文件名）</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0">较高</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0">高</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0">改造量</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#22c55e">无需改表</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#22c55e">无需改表</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#f59e0b">需加字段+迁移</td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0">缺点</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">依赖用户上传文件;<br>纯粘贴文本的需求区分不了</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">前100字相同但实际是不同<br>需求的低概率误判</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">需迁移历史数据补算</td>
+    </tr>
+  </table>
+</div>
+
+<div class="section">
+  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;font-size:13px;color:#166534">
+    <strong>推荐方案 A（文件名去重）</strong>，理由：
+    <ul style="margin:8px 0 0 0;padding-left:18px;line-height:1.8">
+      <li>零 schema 变更，不读 input 全文，查询只需解析 <code>inputFiles</code> 数组</li>
+      <li>实际使用中绝大多数需求都来自文件上传（看 uploads 目录，文件命名已有规律）</li>
+      <li>文件名提取逻辑简单：去掉时间戳前缀，保留原名</li>
+      <li>对于粘贴文本的需求（无文件），可回退用 <code>input</code> 前 50 字符作为标识</li>
+    </ul>
+  </div>
+</div>

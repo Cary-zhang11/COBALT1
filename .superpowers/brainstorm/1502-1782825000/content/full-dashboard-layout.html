@@ -1,0 +1,171 @@
+<h2>调整后的数据看板 KPI 卡片布局</h2>
+<p class="subtitle">移除 AI 平均质量分 · 月活改周活 · 新增任务数/周 + 需求数/周 · 修复耗时折行</p>
+
+<div class="section">
+  <h3>📊 调整前 vs 调整后</h3>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">调整前（5 卡片）</div>
+    <div class="mockup-body" style="font-family:system-ui,sans-serif;font-size:12px;padding:12px;background:#f8fafc">
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:10px;text-align:center">
+          <div style="font-size:9px;color:#94a3b8">累计用例数</div>
+          <div style="font-size:20px;font-weight:700;color:#0f172a">2,401</div>
+          <div style="font-size:9px;color:#94a3b8">周同比</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:10px;text-align:center">
+          <div style="font-size:9px;color:#94a3b8">月活跃用户</div>
+          <div style="font-size:20px;font-weight:700;color:#0f172a">38</div>
+          <div style="font-size:9px;color:#94a3b8">周同比</div>
+        </div>
+        <div style="background:#fef2f2;border-radius:8px;border:2px dashed #ef4444;padding:10px;text-align:center">
+          <div style="font-size:9px;color:#ef4444">✕ AI 平均质量分</div>
+          <div style="font-size:20px;font-weight:700;color:#ef4444">86</div>
+          <div style="font-size:9px;color:#ef4444">移除</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:10px;text-align:center">
+          <div style="font-size:9px;color:#94a3b8">平均耗时</div>
+          <div style="font-size:14px;font-weight:700;color:#0f172a;line-height:1.2">
+            <span style="display:block">3.8</span>
+            <span style="display:block;font-size:10px;font-weight:400">分钟</span>
+          </div>
+          <div style="font-size:9px;color:#ef4444">⚠ 折行</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:10px;text-align:center">
+          <div style="font-size:9px;color:#94a3b8">用户平均评分</div>
+          <div style="font-size:20px;font-weight:700;color:#0f172a">4.2</div>
+          <div style="font-size:9px;color:#94a3b8">周同比</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">调整后（6 卡片 · 含时间筛选）</div>
+    <div class="mockup-body" style="font-family:system-ui,sans-serif;font-size:12px;padding:12px;background:#f8fafc">
+      <!-- 全局时间筛选 -->
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;padding:6px 10px;background:white;border-radius:6px;border:1px solid #e2e8f0">
+        <span style="color:#64748b;font-weight:500;font-size:10px">时间范围</span>
+        <span style="padding:3px 8px;background:#3b82f6;color:white;border-radius:4px;font-size:10px;font-weight:500">近 7 天</span>
+        <span style="padding:3px 8px;background:#f1f5f9;color:#64748b;border-radius:4px;font-size:10px">近 30 天</span>
+        <span style="padding:3px 8px;background:#f1f5f9;color:#64748b;border-radius:4px;font-size:10px">近 90 天</span>
+      </div>
+      <!-- 6卡片 · 2行×3列 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <!-- 1. 累计用例数 -->
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:12px">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">累计用例数</div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">2,401</div>
+          <div style="font-size:10px;color:#22c55e;margin-top:3px">▲ 12.5% 周同比</div>
+        </div>
+        <!-- 2. 周活跃用户（新） -->
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:12px">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">周活跃用户</div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">38</div>
+          <div style="display:flex;gap:8px;margin-top:3px">
+            <span style="font-size:9px;color:#94a3b8">本周 38</span>
+            <span style="font-size:9px;color:#94a3b8">上周 42</span>
+          </div>
+          <div style="font-size:10px;color:#ef4444;margin-top:1px">▼ 9.5% 较上周</div>
+        </div>
+        <!-- 3. 平均耗时（修复折行） -->
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:12px">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">平均耗时</div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a;display:flex;align-items:baseline;gap:2px">
+            <span>3.8</span>
+            <span style="font-size:12px;color:#94a3b8;font-weight:400">分钟</span>
+          </div>
+          <div style="font-size:10px;color:#22c55e;margin-top:3px">▼ 8.0% 周同比</div>
+        </div>
+        <!-- 4. 用户平均评分 -->
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:12px">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">用户平均评分</div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">4.2</div>
+          <div style="font-size:10px;color:#22c55e;margin-top:3px">▲ 6.8% 周同比</div>
+        </div>
+        <!-- 5. 任务数/周 🆕 -->
+        <div style="background:#f0fdf4;border-radius:8px;border:2px solid #22c55e;padding:12px">
+          <div style="font-size:10px;color:#16a34a;margin-bottom:4px;display:flex;align-items:center;gap:4px">
+            <span style="background:#22c55e;color:white;font-size:8px;padding:1px 4px;border-radius:2px">NEW</span>
+            任务数/周
+          </div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">24</div>
+          <div style="display:flex;gap:8px;margin-top:3px">
+            <span style="font-size:9px;color:#94a3b8">本周 24</span>
+            <span style="font-size:9px;color:#94a3b8">上周 18</span>
+          </div>
+          <div style="font-size:10px;color:#22c55e;margin-top:1px">▲ 33.3% 周同比</div>
+        </div>
+        <!-- 6. 需求数/周 🆕 -->
+        <div style="background:#eff6ff;border-radius:8px;border:2px solid #3b82f6;padding:12px">
+          <div style="font-size:10px;color:#2563eb;margin-bottom:4px;display:flex;align-items:center;gap:4px">
+            <span style="background:#3b82f6;color:white;font-size:8px;padding:1px 4px;border-radius:2px">NEW</span>
+            需求数/周
+          </div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">15</div>
+          <div style="display:flex;gap:8px;margin-top:3px">
+            <span style="font-size:9px;color:#94a3b8">本周 15</span>
+            <span style="font-size:9px;color:#94a3b8">上周 12</span>
+          </div>
+          <div style="font-size:10px;color:#22c55e;margin-top:1px">▲ 25.0% 周同比</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>变更汇总</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:#f1f5f9;text-align:left">
+        <th style="padding:8px 12px;border:1px solid #e2e8f0">#</th>
+        <th style="padding:8px 12px;border:1px solid #e2e8f0">变更项</th>
+        <th style="padding:8px 12px;border:1px solid #e2e8f0">位置</th>
+        <th style="padding:8px 12px;border:1px solid #e2e8f0">说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">1</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">✕ 移除 AI 平均质量分</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">已删除</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">原第 3 个卡片位置空出</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">2</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">🔧 修复平均耗时折行</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">第 3 卡片</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">数字 + "分钟" 同行 flex 布局</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">3</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">🔄 月活 → 周活跃用户</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">第 2 卡片</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">显示本周/上周数量 + 幅度</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">4</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">🆕 任务数/周 同比幅度</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">第 5 卡片（新增）</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">绿色边框标识，显示本周/上周 + 幅度</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">5</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">🆕 需求数/周 同比幅度</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">第 6 卡片（新增）</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">蓝色边框标识，显示本周/上周 + 幅度</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h3>布局说明</h3>
+  <p style="font-size:13px;color:#475569;line-height:1.8">
+    调整后共 <strong>6 个 KPI 卡片</strong>，采用 <strong>2 行 × 3 列</strong> 网格布局（原 5 卡片为单行 5 列）。<br>
+    新增的「任务数/周」和「需求数/周」放在第二行后两列，用绿色/蓝色边框高亮区分，各卡片均显示<strong>本周数值 + 上周对比 + 周同比幅度</strong>。
+  </p>
+</div>

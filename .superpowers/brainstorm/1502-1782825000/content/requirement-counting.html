@@ -1,0 +1,74 @@
+<h2>"需求数" 统计算法方案</h2>
+<p class="subtitle">同样的 PRD 文档可能生成多次用例，如何定义"一个需求"？</p>
+
+<div class="section">
+  <h3>数据源参考</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
+    <tr style="background:#f1f5f9">
+      <th style="padding:8px 12px;border:1px solid #e2e8f0">字段</th>
+      <th style="padding:8px 12px;border:1px solid #e2e8f0">含义</th>
+      <th style="padding:8px 12px;border:1px solid #e2e8f0">示例</th>
+    </tr>
+    <tr><td style="padding:8px 12px;border:1px solid #e2e8f0"><code>inputFiles</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0">上传的原始文档路径列表</td><td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:11px;color:#64748b">["uploads/1780581436572-卖车页面改版.docx"]</td></tr>
+    <tr><td style="padding:8px 12px;border:1px solid #e2e8f0"><code>input</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0">PRD 完整文本（由文档解析而来）</td><td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:11px;color:#64748b">"# 卖车页面改版\n## 功能概述\n..."</td></tr>
+    <tr><td style="padding:8px 12px;border:1px solid #e2e8f0"><code>businessType</code></td><td style="padding:8px 12px;border:1px solid #e2e8f0">业务类型标签</td><td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:11px;color:#64748b">"二手车" / "新车"</td></tr>
+  </table>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>按 input 文本 MD5 去重</h3>
+      <p>对 input 字段取 MD5，相同哈希值 = 同一个需求。同一份文档多次上传，只要内容一致就算 1 个需求。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>按上传文件名去重</h3>
+      <p>对 inputFiles 中的文件名（去路径和上传时间戳前缀）做归一化后去重。如 "卖车页面改版.docx" 多次上传算 1 个需求。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>按 input 前 200 字相似度去重</h3>
+      <p>取 input 前 200 字符做哈希，同一份 PRD 即使有小修改，开头通常不变，仍识别为同一需求。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>我的推荐</h3>
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px;font-size:13px;color:#1e40af">
+    <strong>推荐方案 A（input MD5 去重）</strong>：
+    <ul style="margin:8px 0 0 0;padding-left:18px;line-height:1.8">
+      <li>语义最准确 — 内容相同就是同一个需求，不受文件名变化影响</li>
+      <li>实现简单 — 后端对 <code>input</code> 做 MD5 后 groupBy 即可</li>
+      <li>PRD 内容即使有微小修改也会被正确识别为新需求（符合实际）</li>
+      <li>不依赖用户是否上传文件（input 字段始终有值）</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section">
+  <h3>两个指标定义（确认后敲定）</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <tr style="background:#f1f5f9">
+      <th style="padding:8px 12px;border:1px solid #e2e8f0">指标</th>
+      <th style="padding:8px 12px;border:1px solid #e2e8f0">统计口径</th>
+      <th style="padding:8px 12px;border:1px solid #e2e8f0">SQL 思路</th>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0"><strong>任务数/周</strong></td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0">时间窗口内完成的 task 数量</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:11px;color:#64748b"><code>COUNT(task) WHERE status IN ('completed','paused') AND createdAt IN [window]</code></td>
+    </tr>
+    <tr>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0"><strong>需求数/周</strong></td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0">时间窗口内去重后的 PRD 文档数</td>
+      <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:11px;color:#64748b"><code>COUNT(DISTINCT MD5(input)) WHERE status IN ('completed','paused') AND createdAt IN [window]</code></td>
+    </tr>
+  </table>
+</div>

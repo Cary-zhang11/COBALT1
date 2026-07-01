@@ -1,0 +1,110 @@
+<h2>人员使用排行改进方案</h2>
+<p class="subtitle">从 Top 10 固定图表 → 全员可滚动列表 · 解决名字看不清问题</p>
+
+<div class="options">
+  <div class="option" data-choice="list-a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>可滚动列表（推荐）</h3>
+      <p>改成带滚动条的列表，每行显示：排名、完整姓名、任务数、占比条。不截断名字，全部人员可滚动查看。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="list-b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>保留柱状图 + 增大高度 + tooltip</h3>
+      <p>图表高度自适应人数增长，悬停显示完整姓名。但人数多时图表会很高，反而不好看。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="list-c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>简洁表格</h3>
+      <p>去掉柱状图，纯表格三列：排名 | 姓名 | 任务数。最简洁，信息密度最高，适合人数多时查看。</p>
+    </div>
+  </div>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">方案 A · 可滚动列表</div>
+    <div class="mockup-body" style="font-family:system-ui,sans-serif;font-size:11px;padding:12px;background:white;border-radius:8px;border:1px solid #e2e8f0">
+      <div style="font-weight:600;font-size:12px;margin-bottom:8px;color:#0f172a">人员使用排行 <span style="font-size:9px;color:#94a3b8;font-weight:400">全部</span></div>
+      <div style="max-height:180px;overflow-y:auto">
+        <div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #f1f5f9;gap:8px">
+          <span style="width:16px;color:#94a3b8;font-size:10px">1</span>
+          <span style="flex:1;font-weight:500;white-space:nowrap">张三</span>
+          <div style="flex:2;height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:85%;background:#3b82f6;border-radius:3px"></div>
+          </div>
+          <span style="width:24px;text-align:right;color:#64748b;font-size:10px">128</span>
+        </div>
+        <div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #f1f5f9;gap:8px">
+          <span style="width:16px;color:#94a3b8;font-size:10px">2</span>
+          <span style="flex:1;font-weight:500;white-space:nowrap">李四</span>
+          <div style="flex:2;height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:72%;background:#3b82f6;border-radius:3px"></div>
+          </div>
+          <span style="width:24px;text-align:right;color:#64748b;font-size:10px">96</span>
+        </div>
+        <div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #f1f5f9;gap:8px">
+          <span style="width:16px;color:#94a3b8;font-size:10px">3</span>
+          <span style="flex:1;font-weight:500;white-space:nowrap">王五</span>
+          <div style="flex:2;height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:60%;background:#3b82f6;border-radius:3px"></div>
+          </div>
+          <span style="width:24px;text-align:right;color:#64748b;font-size:10px">74</span>
+        </div>
+        <div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #f1f5f9;gap:8px">
+          <span style="width:16px;color:#94a3b8;font-size:10px">4</span>
+          <span style="flex:1;font-weight:500;white-space:nowrap">赵六</span>
+          <div style="flex:2;height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:48%;background:#3b82f6;border-radius:3px"></div>
+          </div>
+          <span style="width:24px;text-align:right;color:#64748b;font-size:10px">52</span>
+        </div>
+        <div style="display:flex;align-items:center;padding:5px 0;gap:8px">
+          <span style="width:16px;color:#94a3b8;font-size:10px">5</span>
+          <span style="flex:1;font-weight:500;white-space:nowrap">孙七</span>
+          <div style="flex:2;height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:35%;background:#3b82f6;border-radius:3px"></div>
+          </div>
+          <span style="width:24px;text-align:right;color:#64748b;font-size:10px">31</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">方案 C · 简洁表格</div>
+    <div class="mockup-body" style="font-family:system-ui,sans-serif;font-size:11px;padding:12px;background:white;border-radius:8px;border:1px solid #e2e8f0">
+      <div style="font-weight:600;font-size:12px;margin-bottom:8px;color:#0f172a">人员使用排行 <span style="font-size:9px;color:#94a3b8;font-weight:400">全部</span></div>
+      <div style="max-height:180px;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <tr style="border-bottom:1px solid #e2e8f0;color:#94a3b8;font-size:10px">
+            <th style="text-align:left;padding:4px 0;width:24px">#</th>
+            <th style="text-align:left;padding:4px 0">姓名</th>
+            <th style="text-align:right;padding:4px 0">任务数</th>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9"><td style="padding:4px 0;color:#94a3b8">1</td><td style="padding:4px 0;font-weight:500">张三</td><td style="padding:4px 0;text-align:right">128</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9"><td style="padding:4px 0;color:#94a3b8">2</td><td style="padding:4px 0;font-weight:500">李四</td><td style="padding:4px 0;text-align:right">96</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9"><td style="padding:4px 0;color:#94a3b8">3</td><td style="padding:4px 0;font-weight:500">王五</td><td style="padding:4px 0;text-align:right">74</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9"><td style="padding:4px 0;color:#94a3b8">4</td><td style="padding:4px 0;font-weight:500">赵六</td><td style="padding:4px 0;text-align:right">52</td></tr>
+          <tr><td style="padding:4px 0;color:#94a3b8">5</td><td style="padding:4px 0;font-weight:500">孙七</td><td style="padding:4px 0;text-align:right">31</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px;font-size:13px;color:#1e40af">
+    <strong>推荐方案 A（可滚动列表）</strong>：
+    <ul style="margin:8px 0 0 0;padding-left:18px;line-height:1.8">
+      <li><strong>名字完整显示</strong> — flex 布局不截断，长名字自然换行或横向滚动</li>
+      <li><strong>全员可见</strong> — max-height + overflow-y:auto，人数再多也能滚动浏览</li>
+      <li><strong>保留可视化</strong> — 每人后面有占比条，直观对比，比纯表格更友好</li>
+      <li><strong>紧凑信息</strong> — 排名 · 姓名 · 占比条 · 任务数，一行搞定</li>
+    </ul>
+  </div>
+</div>

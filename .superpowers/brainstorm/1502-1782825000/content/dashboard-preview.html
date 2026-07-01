@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据看板 · 最终效果预览</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: system-ui, -apple-system, sans-serif; background:#f5f7fa; color:#1e293b; padding:24px; max-width:1100px; margin:0 auto; }
+h1 { font-size:22px; font-weight:700; margin-bottom:4px; }
+.subtitle { font-size:13px; color:#94a3b8; margin-bottom:24px; }
+
+/* 时间筛选器 */
+.filter-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.filter-bar .section-label { font-weight:600; font-size:14px; }
+.filter-pills { display:flex; gap:4px; background:white; border:1px solid #e2e8f0; border-radius:6px; padding:3px; }
+.filter-pill { padding:4px 12px; border-radius:4px; font-size:11px; font-weight:500; cursor:pointer; border:none; background:transparent; color:#64748b; }
+.filter-pill.active { background:#3b82f6; color:white; }
+
+/* KPI 卡片 */
+.kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+.kpi-card { background:white; border-radius:10px; border:1px solid #e2e8f0; padding:16px; transition:box-shadow 0.15s; }
+.kpi-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.kpi-card.new { border-width:2px; }
+.kpi-card.new.task { border-color:#22c55e; }
+.kpi-card.new.req { border-color:#3b82f6; }
+.kpi-label { font-size:10px; color:#94a3b8; margin-bottom:4px; display:flex; align-items:center; gap:4px; }
+.kpi-label .badge { font-size:8px; padding:1px 5px; border-radius:3px; color:white; font-weight:600; }
+.badge-new-task { background:#22c55e; }
+.badge-new-req { background:#3b82f6; }
+.kpi-value { font-size:26px; font-weight:700; color:#0f172a; line-height:1.2; }
+.kpi-value .unit { font-size:13px; color:#94a3b8; font-weight:400; }
+.kpi-sub { display:flex; gap:8px; margin-top:4px; font-size:10px; color:#94a3b8; }
+.kpi-trend { font-size:10px; margin-top:2px; font-weight:500; }
+.kpi-trend.up { color:#16a34a; }
+.kpi-trend.down { color:#dc2626; }
+
+/* 分隔线 */
+.divider { border-top:1px dashed #cbd5e1; margin:20px 0; }
+
+/* 图表区域 */
+.chart-grid { display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-bottom:16px; }
+.chart-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+.chart-card { background:white; border-radius:10px; border:1px solid #e2e8f0; overflow:hidden; }
+.chart-head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid #f1f5f9; }
+.chart-head h4 { font-size:12px; font-weight:600; }
+.chart-head select { font-size:10px; padding:3px 8px; border:1px solid #e2e8f0; border-radius:4px; color:#64748b; background:white; cursor:pointer; }
+.chart-body { padding:16px; }
+.chart-placeholder { height:160px; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-size:12px; }
+
+/* 人员列表 */
+.user-list { max-height:240px; overflow-y:auto; }
+.user-list::-webkit-scrollbar { width:4px; }
+.user-list::-webkit-scrollbar-thumb { background:#e2e8f0; border-radius:2px; }
+.user-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid #f8fafc; gap:10px; }
+.user-row:last-child { border-bottom:none; }
+.user-rank { width:20px; color:#94a3b8; font-size:10px; text-align:center; }
+.user-name { flex:1; font-size:12px; font-weight:500; white-space:nowrap; min-width:0; }
+.user-bar-wrap { flex:2.5; height:6px; background:#f1f5f9; border-radius:3px; overflow:hidden; }
+.user-bar { height:100%; background:#3b82f6; border-radius:3px; transition:width 0.4s; }
+.user-count { width:32px; text-align:right; font-size:11px; color:#64748b; font-weight:500; }
+
+/* 最近记录 */
+.records { margin-top:16px; }
+.records table { width:100%; font-size:11px; border-collapse:collapse; }
+.records th { text-align:left; padding:8px 12px; background:#f8fafc; color:#64748b; font-weight:500; font-size:10px; border-bottom:1px solid #e2e8f0; }
+.records td { padding:8px 12px; border-bottom:1px solid #f1f5f9; color:#475569; }
+</style>
+</head>
+<body>
+
+<!-- 标题 -->
+<h1>数据看板</h1>
+<p class="subtitle">用例生成统计 · 质量与用户评价概览</p>
+
+<!-- ===== KPI 区域 ===== -->
+<div class="filter-bar">
+  <span class="section-label">📊 核心指标</span>
+  <div class="filter-pills">
+    <button class="filter-pill active" onclick="switchKpi(this,'week')">本周</button>
+    <button class="filter-pill" onclick="switchKpi(this,'month')">本月</button>
+    <button class="filter-pill" onclick="switchKpi(this,'30d')">近30天</button>
+  </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid">
+  <!-- 通过JS动态渲染 -->
+</div>
+
+<div class="divider"></div>
+
+<!-- ===== 趋势图 ===== -->
+<div class="chart-grid">
+  <div class="chart-card">
+    <div class="chart-head">
+      <h4>每日生成量 &amp; 质量分趋势</h4>
+      <select><option>近 7 天</option><option>近 30 天</option><option selected>近 90 天</option></select>
+    </div>
+    <div class="chart-body">
+      <div class="chart-placeholder" id="trendChart">📈 折线图 · 双Y轴（数据联动时间筛选）</div>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-head">
+      <h4>需求类型分布</h4>
+      <select><option>近 7 天</option><option selected>近 30 天</option></select>
+    </div>
+    <div class="chart-body">
+      <div class="chart-placeholder">🍩 饼图（数据联动时间筛选）</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 第三行：覆盖维度 + 用户评价 + 人员使用 ===== -->
+<div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:12px;margin-bottom:16px">
+  <div class="chart-card">
+    <div class="chart-head">
+      <h4>覆盖维度分布</h4>
+      <select><option>近 7 天</option><option selected>近 30 天</option></select>
+    </div>
+    <div class="chart-body">
+      <div class="chart-placeholder" style="height:120px">📊 覆盖率柱状图</div>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-head">
+      <h4>用户评价分布</h4>
+      <select><option>近 7 天</option><option selected>近 30 天</option></select>
+    </div>
+    <div class="chart-body">
+      <div class="chart-placeholder" style="height:120px">⭐ 1–5 星占比</div>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-head">
+      <h4>人员使用排行 <span style="color:#94a3b8;font-weight:400;font-size:10px">全部</span></h4>
+      <select><option>近 7 天</option><option selected>近 30 天</option></select>
+    </div>
+    <div class="chart-body" style="padding-top:8px">
+      <div class="user-list" id="userList">
+        <!-- 通过JS动态渲染 -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 最近记录 ===== -->
+<div class="chart-card">
+  <div class="chart-head">
+    <h4>最近记录</h4>
+    <select><option>近 7 天</option><option selected>近 30 天</option><option>近 90 天</option></select>
+  </div>
+  <div class="chart-body" style="padding:0">
+    <div style="max-height:200px;overflow-y:auto">
+      <table>
+        <thead><tr><th>时间</th><th>用户</th><th>需求</th><th>用例数</th><th>质量分</th><th>用户评价</th></tr></thead>
+        <tbody id="recordBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 模拟数据 =====
+const dataMap = {
+  week: {
+    totalCases: 2401, wauCurrent: 38, wauPrevious: 42, wauChange: -9.5,
+    avgDuration: 3.8, durChange: -8.0,
+    avgRating: 4.2, ratingChange: 6.8,
+    tasksCurrent: 24, tasksPrevious: 18, tasksChange: 33.3,
+    reqsCurrent: 8, reqsPrevious: 5, reqsChange: 60.0,
+  },
+  month: {
+    totalCases: 2401, wauCurrent: 52, wauPrevious: 48, wauChange: 8.3,
+    avgDuration: 4.1, durChange: -2.4,
+    avgRating: 4.0, ratingChange: 2.6,
+    tasksCurrent: 87, tasksPrevious: 72, tasksChange: 20.8,
+    reqsCurrent: 21, reqsPrevious: 17, reqsChange: 23.5,
+  },
+  '30d': {
+    totalCases: 2401, wauCurrent: 45, wauPrevious: 38, wauChange: 18.4,
+    avgDuration: 3.6, durChange: -12.2,
+    avgRating: 4.3, ratingChange: 7.5,
+    tasksCurrent: 112, tasksPrevious: 95, tasksChange: 17.9,
+    reqsCurrent: 28, reqsPrevious: 22, reqsChange: 27.3,
+  }
+};
+
+const userData = [
+  { name:'张伟明', count:128 },
+  { name:'李思远', count:96 },
+  { name:'王建国', count:74 },
+  { name:'赵丽华', count:52 },
+  { name:'孙志强', count:31 },
+  { name:'周小红', count:18 },
+  { name:'吴大伟', count:12 },
+  { name:'郑晓峰', count:9 },
+  { name:'陈俊杰', count:7 },
+  { name:'刘美玲', count:5 },
+  { name:'黄文斌', count:3 },
+  { name:'杨雪琴', count:2 },
+];
+
+const recordData = [
+  { time:'2026/6/30', user:'张伟明', req:'卖车页面改版 · 详情页优化', count:28, score:92, rating:'⭐⭐⭐⭐⭐' },
+  { time:'2026/6/29', user:'李思远', req:'二手车点评26版·C端店铺二期', count:16, score:85, rating:'⭐⭐⭐⭐' },
+  { time:'2026/6/29', user:'王建国', req:'通用用例模板更新', count:12, score:78, rating:'⭐⭐⭐' },
+  { time:'2026/6/28', user:'赵丽华', req:'卖车页面改版（重新生成）', count:14, score:88, rating:'⭐⭐⭐⭐⭐' },
+  { time:'2026/6/28', user:'张伟明', req:'用户中心改版需求', count:20, score:90, rating:'⭐⭐⭐⭐' },
+];
+
+function trendHTML(change, isPercent, compareLabel) {
+  if (change == null) return '';
+  const up = change > 0;
+  const arrow = up ? '▲' : '▼';
+  const cls = up ? 'up' : 'down';
+  const val = Math.abs(change);
+  return `<span class="kpi-trend ${cls}">${arrow} ${val}${isPercent ? '%' : ''} ${compareLabel}</span>`;
+}
+
+const labelMap = { week:'周同比', month:'月同比', '30d':'30天同比' };
+
+function renderKPIs(mode) {
+  const d = dataMap[mode];
+  const lbl = labelMap[mode];
+  const cards = [
+    { label:'累计用例数', value:d.totalCases.toLocaleString(), sub:'', trend:trendHTML(12.5, true, lbl), cls:'' },
+    { label:'周活跃用户', value:d.wauCurrent, sub:`本周 ${d.wauCurrent} · 上周 ${d.wauPrevious}`, trend:trendHTML(d.wauChange, true, lbl), cls:'' },
+    { label:'平均耗时', value:`${d.avgDuration}<span class="unit"> 分钟</span>`, sub:'', trend:trendHTML(d.durChange, true, lbl), cls:'' },
+    { label:'用户平均评分', value:d.avgRating, sub:'', trend:trendHTML(d.ratingChange, true, lbl), cls:'' },
+    { label:'任务数/周', value:d.tasksCurrent, sub:`本周 ${d.tasksCurrent} · 上周 ${d.tasksPrevious}`, trend:trendHTML(d.tasksChange, true, lbl), cls:'new task' },
+    { label:'需求数/周', value:d.reqsCurrent, sub:`本周 ${d.reqsCurrent} · 上周 ${d.reqsPrevious}`, trend:trendHTML(d.reqsChange, true, lbl), cls:'new req' },
+  ];
+  return cards.map(c => `
+    <div class="kpi-card ${c.cls}">
+      <div class="kpi-label">
+        ${c.cls.includes('task') ? '<span class="badge badge-new-task">NEW</span>' : ''}
+        ${c.cls.includes('req') ? '<span class="badge badge-new-req">NEW</span>' : ''}
+        ${c.label}
+      </div>
+      <div class="kpi-value">${c.value}</div>
+      ${c.sub ? `<div class="kpi-sub">${c.sub}</div>` : ''}
+      ${c.trend}
+    </div>
+  `).join('');
+}
+
+function renderUserList() {
+  const max = Math.max(...userData.map(u => u.count));
+  return userData.map((u,i) => `
+    <div class="user-row">
+      <span class="user-rank">${i+1}</span>
+      <span class="user-name">${u.name}</span>
+      <div class="user-bar-wrap"><div class="user-bar" style="width:${(u.count/max*100)}%"></div></div>
+      <span class="user-count">${u.count}</span>
+    </div>
+  `).join('');
+}
+
+function renderRecords() {
+  return recordData.map(r => `
+    <tr>
+      <td>${r.time}</td><td>${r.user}</td><td>${r.req}</td>
+      <td>${r.count}</td><td>${r.score}</td><td>${r.rating}</td>
+    </tr>
+  `).join('');
+}
+
+function switchKpi(btn, mode) {
+  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('kpiGrid').innerHTML = renderKPIs(mode);
+}
+
+// 初始化
+document.getElementById('kpiGrid').innerHTML = renderKPIs('week');
+document.getElementById('userList').innerHTML = renderUserList();
+document.getElementById('recordBody').innerHTML = renderRecords();
+</script>
+
+</body>
+</html>

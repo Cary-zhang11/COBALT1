@@ -6,10 +6,11 @@ import { Dashboard } from "../dashboard";
 const mockStats = {
   kpi: {
     totalCases: 100,
-    monthlyActiveUsers: 5,
-    avgQualityScore: 85,
+    weeklyActiveUsers: 5,
     avgDuration: 120000,
     avgUserRating: 4.2,
+    tasksPerWeek: 12,
+    requirementsPerWeek: 8,
   },
   dailyTrend: [{ date: "2026-06-01", count: 3, avgScore: 80 }],
   categoryDistribution: [{ category: "功能", count: 2 }],
@@ -24,10 +25,11 @@ const mockStats = {
   ],
   kpiTrend: {
     totalCases: { current: 12, previous: 10, changePercent: 20 },
-    monthlyActiveUsers: { current: 3, previous: 2, changePercent: 50 },
-    avgQualityScore: { current: 85, previous: 80, changePercent: 6 },
+    weeklyActiveUsers: { current: 3, previous: 2, changePercent: 50 },
     avgDuration: { current: 110000, previous: 120000, changePercent: -8 },
     avgUserRating: { current: 4, previous: 4, changePercent: 0 },
+    tasksPerWeek: { current: 12, previous: 10, changePercent: 20 },
+    requirementsPerWeek: { current: 8, previous: 6, changePercent: 33 },
   },
   userRatingRate: { percent: 67, ratedCount: 2, completedCount: 3 },
   recentRecords: [
@@ -70,11 +72,14 @@ describe("Dashboard", () => {
     await waitFor(() => {
       expect(screen.getByText("用户平均评分")).toBeDefined();
       expect(screen.getByText("用户评价分布")).toBeDefined();
-      expect(screen.getByText("AI 平均质量分")).toBeDefined();
+      expect(screen.getByText("任务数/7天")).toBeDefined();
+      expect(screen.getByText("需求数/7天")).toBeDefined();
       expect(screen.getByText("AI质量分")).toBeDefined();
       expect(screen.getByText("5 星")).toBeDefined();
     });
     expect(screen.queryByText("生成效率统计")).toBeNull();
+    expect(screen.queryByText("AI 平均质量分")).toBeNull();
+    expect(screen.queryByText("累计用例数")).toBeNull();
   });
 
   it("renders user rating column in recent records", async () => {

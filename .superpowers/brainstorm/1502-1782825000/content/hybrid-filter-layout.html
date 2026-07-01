@@ -1,0 +1,189 @@
+<h2>时间筛选方案：混合模式</h2>
+<p class="subtitle">6 个 KPI 卡片共用顶部筛选 · 下方图表各自独立时间筛选</p>
+
+<div class="mockup">
+  <div class="mockup-header">最终方案：KPI 区统一筛选 + 图表区独立筛选</div>
+  <div class="mockup-body" style="font-family:system-ui,sans-serif;font-size:12px;padding:16px;background:#f8fafc">
+
+    <!-- ===== KPI 区域 ===== -->
+    <div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-weight:600;font-size:13px;color:#0f172a">📊 核心指标</span>
+        <!-- 统一时间筛选 -->
+        <div style="display:flex;align-items:center;gap:4px;background:white;border:1px solid #e2e8f0;border-radius:6px;padding:3px">
+          <span style="font-size:10px;color:#94a3b8;padding:0 4px">时间</span>
+          <span style="padding:3px 8px;background:#3b82f6;color:white;border-radius:4px;font-size:10px;font-weight:500">本周</span>
+          <span style="padding:3px 8px;background:#f1f5f9;color:#64748b;border-radius:4px;font-size:10px">本月</span>
+          <span style="padding:3px 8px;background:#f1f5f9;color:#64748b;border-radius:4px;font-size:10px">近 30 天</span>
+        </div>
+      </div>
+      <!-- 6 卡片 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:10px">
+          <div style="font-size:9px;color:#94a3b8">累计用例数</div>
+          <div style="font-size:20px;font-weight:700;color:#0f172a">2,401</div>
+          <div style="font-size:9px;color:#22c55e">▲ 12.5%</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:10px">
+          <div style="font-size:9px;color:#94a3b8">周活跃用户</div>
+          <div style="font-size:20px;font-weight:700;color:#0f172a">38</div>
+          <div style="display:flex;gap:6px;font-size:8px;color:#94a3b8">本周38 · 上周42</div>
+          <div style="font-size:9px;color:#ef4444">▼ 9.5%</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:10px">
+          <div style="font-size:9px;color:#94a3b8">平均耗时</div>
+          <div style="font-size:20px;font-weight:700;color:#0f172a">3.8<span style="font-size:11px;color:#94a3b8;font-weight:400"> 分钟</span></div>
+          <div style="font-size:9px;color:#22c55e">▼ 8.0%</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:10px">
+          <div style="font-size:9px;color:#94a3b8">用户平均评分</div>
+          <div style="font-size:20px;font-weight:700;color:#0f172a">4.2</div>
+          <div style="font-size:9px;color:#22c55e">▲ 6.8%</div>
+        </div>
+        <div style="background:#f0fdf4;border-radius:8px;border:2px solid #22c55e;padding:10px">
+          <div style="font-size:9px;color:#16a34a">🆕 任务数/周</div>
+          <div style="font-size:20px;font-weight:700;color:#0f172a">24</div>
+          <div style="display:flex;gap:6px;font-size:8px;color:#94a3b8">本周24 · 上周18</div>
+          <div style="font-size:9px;color:#22c55e">▲ 33.3%</div>
+        </div>
+        <div style="background:#eff6ff;border-radius:8px;border:2px solid #3b82f6;padding:10px">
+          <div style="font-size:9px;color:#2563eb">🆕 需求数/周</div>
+          <div style="font-size:20px;font-weight:700;color:#0f172a">15</div>
+          <div style="display:flex;gap:6px;font-size:8px;color:#94a3b8">本周15 · 上周12</div>
+          <div style="font-size:9px;color:#22c55e">▲ 25.0%</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:8px">
+        <span style="font-size:9px;color:#64748b;background:#f1f5f9;padding:2px 8px;border-radius:4px">⬆ 上方 6 个卡片统一使用右侧「本周」筛选</span>
+      </div>
+    </div>
+
+    <!-- ===== 分隔线 ===== -->
+    <div style="border-top:1px dashed #cbd5e1;margin:16px 0"></div>
+
+    <!-- ===== 图表区域 ===== -->
+    <div style="margin-bottom:16px">
+      <div style="font-weight:600;font-size:13px;color:#0f172a;margin-bottom:10px">📈 趋势与分布</div>
+
+      <!-- 趋势图 -->
+      <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <span style="font-weight:600;font-size:11px;color:#0f172a">每日生成量 &amp; 质量分趋势</span>
+            <div style="font-size:9px;color:#94a3b8;margin-top:2px">折线图 · 双Y轴</div>
+          </div>
+          <select style="font-size:10px;padding:3px 8px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b;background:white">
+            <option>近 7 天</option>
+            <option>近 30 天</option>
+            <option selected>近 90 天</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 分布图行 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:600;font-size:11px;color:#0f172a">需求类型分布</span>
+            <select style="font-size:10px;padding:3px 8px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b">
+              <option>近 7 天</option>
+              <option selected>近 30 天</option>
+            </select>
+          </div>
+          <div style="font-size:9px;color:#94a3b8;margin-top:2px">饼图</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:600;font-size:11px;color:#0f172a">用户评价分布</span>
+            <select style="font-size:10px;padding:3px 8px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b">
+              <option>近 7 天</option>
+              <option selected>近 30 天</option>
+            </select>
+          </div>
+          <div style="font-size:9px;color:#94a3b8;margin-top:2px">1–5 星占比</div>
+        </div>
+      </div>
+
+      <!-- 底部图表 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:600;font-size:11px;color:#0f172a">覆盖维度分布</span>
+            <select style="font-size:10px;padding:3px 8px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b">
+              <option>近 7 天</option>
+              <option selected>近 30 天</option>
+            </select>
+          </div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:600;font-size:11px;color:#0f172a">人员使用 Top 10</span>
+            <select style="font-size:10px;padding:3px 8px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b">
+              <option>近 7 天</option>
+              <option selected>近 30 天</option>
+            </select>
+          </div>
+          <div style="font-size:9px;color:#94a3b8;margin-top:2px">水平柱状图</div>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:8px">
+        <span style="font-size:9px;color:#64748b;background:#f1f5f9;padding:2px 8px;border-radius:4px">⬆ 每个图表右上角有独立时间下拉框，可各自切换不同时间范围</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <h3>筛选逻辑总结</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:#f1f5f9;text-align:left">
+        <th style="padding:8px 12px;border:1px solid #e2e8f0">区域</th>
+        <th style="padding:8px 12px;border:1px solid #e2e8f0">筛选方式</th>
+        <th style="padding:8px 12px;border:1px solid #e2e8f0">可选范围</th>
+        <th style="padding:8px 12px;border:1px solid #e2e8f0">说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0"><strong>6 个 KPI 卡片</strong></td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">🔗 <strong>统一筛选</strong></td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">本周 / 本月 / 近30天</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">一个切换全局生效，保证核心指标在同一时间基线</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0"><strong>趋势图</strong></td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">🔓 <strong>独立筛选</strong></td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">近7天 / 近30天 / 近90天</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">可单独拉长时间看趋势，不强制与 KPI 卡片同步</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0"><strong>饼图 / 分布图</strong></td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">🔓 <strong>独立筛选</strong></td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0">近7天 / 近30天</td>
+        <td style="padding:8px 12px;border:1px solid #e2e8f0;color:#64748b">各图表右上角有下拉框，自由切换</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>优点</h4>
+    <ul>
+      <li>KPI 卡片保持同一时间基线，避免对比混乱</li>
+      <li>图表可独立探索更大时间范围，灵活性强</li>
+      <li>筛选器不冗余 — KPI 区只有 1 个，图表区按需各自 1 个</li>
+      <li>后端 API 按区域分别传参，实现清晰</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>注意事项</h4>
+    <ul>
+      <li>KPI 和图表时间范围可能不一致，需在 UI 上明确标注当前时间窗口</li>
+      <li>后端需支持各端点独立接收 timeRange 参数</li>
+    </ul>
+  </div>
+</div>

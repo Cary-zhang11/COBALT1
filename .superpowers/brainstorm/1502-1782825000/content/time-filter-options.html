@@ -1,0 +1,137 @@
+<h2>时间筛选方案对比</h2>
+<p class="subtitle">每个 KPI 参数增加时间范围筛选 — 整体全局筛选 vs 各数据独立筛选</p>
+
+<div class="options">
+  <div class="option" data-choice="global" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>方案 A：顶部全局时间筛选器</h3>
+      <p>在 KPI 卡片区域上方放一个统一的时间范围选择器（如"近 7 天 / 近 30 天 / 近 90 天"），所有卡片和图表统一切换。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="per-metric" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>方案 B：每个 KPI 卡片独立筛选</h3>
+      <p>每个 KPI 指标卡片右上角各有一个小时间选择器，各数据独立设置时间范围，灵活但复杂。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>布局对比预览</h3>
+  <p class="subtitle">上方为方案 A（全局筛选），下方为方案 B（独立筛选）</p>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">方案 A · 全局时间筛选</div>
+    <div class="mockup-body" style="font-family:system-ui,sans-serif;font-size:12px;padding:16px;background:#f8fafc">
+      <!-- 全局时间筛选栏 -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;background:white;border-radius:8px;border:1px solid #e2e8f0">
+        <span style="color:#64748b;font-weight:500;font-size:11px">时间范围</span>
+        <div style="display:flex;gap:4px">
+          <span style="padding:4px 10px;background:#3b82f6;color:white;border-radius:4px;font-size:11px;font-weight:500">近 7 天</span>
+          <span style="padding:4px 10px;background:#f1f5f9;color:#64748b;border-radius:4px;font-size:11px">近 30 天</span>
+          <span style="padding:4px 10px;background:#f1f5f9;color:#64748b;border-radius:4px;font-size:11px">近 90 天</span>
+        </div>
+      </div>
+      <!-- KPI 卡片行 -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">累计用例数</div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">2,401</div>
+          <div style="font-size:10px;color:#22c55e;margin-top:2px">▲ 12.5% 周同比</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">周活跃用户</div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">38 <span style="font-size:11px;color:#94a3b8;font-weight:400">本周</span></div>
+          <div style="font-size:10px;color:#ef4444;margin-top:2px">▼ 5.2% 较上周</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">平均耗时</div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">3.8 分钟</div>
+          <div style="font-size:10px;color:#22c55e;margin-top:2px">▲ 3.1% 周同比</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">用户平均评分</div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">4.2</div>
+          <div style="font-size:10px;color:#22c55e;margin-top:2px">▲ 6.8% 周同比</div>
+        </div>
+      </div>
+      <!-- 图表区域保持原样 -->
+      <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px;text-align:center;color:#94a3b8;font-size:11px">📈 趋势图表 · 饼图 · 分布图（统一使用所选时间范围）</div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">方案 B · 每个卡片独立筛选</div>
+    <div class="mockup-body" style="font-family:system-ui,sans-serif;font-size:12px;padding:16px;background:#f8fafc">
+      <!-- 无全局筛选，每个卡片自己带 -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:10px;color:#94a3b8">累计用例数</div>
+            <select style="font-size:9px;padding:1px 3px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b">
+              <option>本周</option><option>本月</option>
+            </select>
+          </div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">2,401</div>
+          <div style="font-size:10px;color:#22c55e;margin-top:2px">▲ 12.5% 周同比</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:10px;color:#94a3b8">周活跃用户</div>
+            <select style="font-size:9px;padding:1px 3px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b">
+              <option>本周</option><option>本月</option>
+            </select>
+          </div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">38</div>
+          <div style="font-size:10px;color:#ef4444;margin-top:2px">▼ 5.2% 较上周</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:10px;color:#94a3b8">平均耗时</div>
+            <select style="font-size:9px;padding:1px 3px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b">
+              <option>本周</option><option>本月</option>
+            </select>
+          </div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">3.8 分钟</div>
+          <div style="font-size:10px;color:#22c55e;margin-top:2px">▲ 3.1% 周同比</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:10px;color:#94a3b8">用户平均评分</div>
+            <select style="font-size:9px;padding:1px 3px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b">
+              <option>本周</option><option>本月</option>
+            </select>
+          </div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a">4.2</div>
+          <div style="font-size:10px;color:#22c55e;margin-top:2px">▲ 6.8% 周同比</div>
+        </div>
+      </div>
+      <!-- 下方图表也需要独立时间筛选 -->
+      <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;color:#64748b">📈 趋势图表</span>
+        <select style="font-size:9px;padding:2px 6px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b"><option>近 7 天</option><option>近 30 天</option></select>
+      </div>
+      <div style="background:white;border-radius:8px;border:1px solid #e2e8f0;padding:14px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;color:#64748b">🍩 分布图</span>
+        <select style="font-size:9px;padding:2px 6px;border:1px solid #e2e8f0;border-radius:4px;color:#64748b"><option>近 7 天</option><option>近 30 天</option></select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>我的推荐</h3>
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px;font-size:13px;color:#1e40af">
+    <strong>推荐方案 A（全局时间筛选）</strong>，理由如下：
+    <ul style="margin:8px 0 0 0;padding-left:18px;line-height:1.8">
+      <li>数据看板的核心价值是<strong>同一时间窗口下的全局视图</strong>，各指标混用不同时间范围反而引起混淆</li>
+      <li>方案 B 在每个卡片上都放筛选器，会产生大量重复 UI 元素，视觉嘈杂</li>
+      <li>方案 A 更简洁，一次切换即可全局刷新，操作效率更高</li>
+      <li>统计 API 也只需传一个时间参数，后端实现更简单</li>
+    </ul>
+  </div>
+</div>

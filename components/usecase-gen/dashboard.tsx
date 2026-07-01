@@ -1,22 +1,32 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
 import {
-  BarChart3, Users, Target, Clock, Loader2, Star,
+  BarChart3, Users, Clock, Loader2, Star,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, Legend, ResponsiveContainer,
 } from "recharts";
+import type { KpiRange, ChartRange } from "@/lib/stats-time-range";
+import {
+  KPI_LABELS,
+  KPI_TREND_LABELS,
+  KPI_PERIOD_LABELS,
+  KPI_PERIOD_UNIT,
+  CHART_LABELS,
+  shortChartOptions,
+} from "@/lib/stats-time-range";
 
 interface StatsData {
   kpi: {
     totalCases: number;
-    monthlyActiveUsers: number;
-    avgQualityScore: number;
+    weeklyActiveUsers: number;
     avgDuration: number;
     avgUserRating: number;
+    tasksPerWeek: number;
+    requirementsPerWeek: number;
   };
   dailyTrend: { date: string; count: number; avgScore: number }[];
   categoryDistribution: { category: string; count: number }[];
@@ -29,11 +39,12 @@ interface StatsData {
     completedCount: number;
   };
   kpiTrend: {
-    totalCases:        { current: number; previous: number; changePercent: number | null };
-    monthlyActiveUsers:{ current: number; previous: number; changePercent: number | null };
-    avgQualityScore:   { current: number; previous: number; changePercent: number | null };
-    avgDuration:       { current: number; previous: number; changePercent: number | null };
-    avgUserRating:     { current: number; previous: number; changePercent: number | null };
+    totalCases:         { current: number; previous: number; changePercent: number | null };
+    weeklyActiveUsers:  { current: number; previous: number; changePercent: number | null };
+    avgDuration:        { current: number; previous: number; changePercent: number | null };
+    avgUserRating:      { current: number; previous: number; changePercent: number | null };
+    tasksPerWeek:       { current: number; previous: number; changePercent: number | null };
+    requirementsPerWeek:{ current: number; previous: number; changePercent: number | null };
   };
   recentRecords: {
     time: string;
@@ -50,7 +61,6 @@ interface StatsData {
 
 const PIE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
-/** 与 prd-to-tests 技能一致：D1–D7 为核心覆盖维度 */
 const MAIN_DIMENSIONS: { code: string; names: string[] }[] = [
   { code: "D1", names: ["主流程"] },
   { code: "D2", names: ["分支流程"] },
@@ -84,15 +94,20 @@ function filterMainDimensions(
     .map((x) => x.item);
 }
 
-/** 对齐 preview .ant-stat-card / .ant-chart-card */
 const STAT_CARD =
-  "bg-card rounded-lg border border-border/60 px-6 py-5 flex items-start justify-between";
+  "bg-card rounded-lg border border-border/60 px-4 py-3 flex items-start justify-between";
 const CHART_CARD = "bg-card rounded-lg border border-border/60 overflow-hidden";
 const CHART_HEAD = "flex items-center justify-between gap-2 flex-wrap px-6 pt-4";
 const CHART_BODY = "px-6 pb-6 pt-3 h-[200px]";
 
 function formatDuration(ms: number): string {
   return (ms / 60000).toFixed(1) + " 分钟";
+}
+
+function formatTrendValue(trendKey: string, value: number): string {
+  if (trendKey === "avgDuration") return formatDuration(value);
+  if (trendKey === "avgUserRating") return value.toFixed(1);
+  return value.toString();
 }
 
 function DashboardPageHeader() {
@@ -114,7 +129,7 @@ function DashboardChartCard({
   bodyClass = "",
 }: {
   title: string;
-  extra?: string;
+  extra?: ReactNode;
   children: ReactNode;
   className?: string;
   bodyClass?: string;
@@ -123,10 +138,84 @@ function DashboardChartCard({
     <div className={`${CHART_CARD} ${className}`}>
       <div className={CHART_HEAD}>
         <span className="font-semibold text-sm text-foreground/85">{title}</span>
-        {extra ? <span className="text-xs text-muted-foreground">{extra}</span> : null}
+        {extra != null ? <>{extra}</> : null}
       </div>
       <div className={`${CHART_BODY} ${bodyClass}`}>{children}</div>
     </div>
+  );
+}
+
+type CustomDates = { start: string; end: string };
+
+const DATE_INPUT_cls = "border border-border rounded px-1.5 py-1 text-xs bg-background focus:outline-none focus:ring-2 focus:ring-primary/40";
+
+function KpiTimeFilter({
+  value,
+  onChange,
+  customDates,
+  onCustomDatesChange,
+}: {
+  value: KpiRange;
+  onChange: (v: KpiRange) => void;
+  customDates: CustomDates;
+  onCustomDatesChange: (d: CustomDates) => void;
+}) {
+  if (value === "custom") {
+    return (
+      <div className="flex items-center gap-1">
+        <input type="date" value={customDates.start} onChange={(e) => onCustomDatesChange({ ...customDates, start: e.target.value })} className={DATE_INPUT_cls} />
+        <span className="text-xs text-muted-foreground">~</span>
+        <input type="date" value={customDates.end} onChange={(e) => onCustomDatesChange({ ...customDates, end: e.target.value })} className={DATE_INPUT_cls} />
+        <button onClick={() => onChange("week")} className="text-muted-foreground hover:text-foreground text-sm px-1 leading-none" title="返回预设">×</button>
+      </div>
+    );
+  }
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as KpiRange)}
+      className="border border-border rounded px-2 py-1 text-xs bg-background cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
+    >
+      {(Object.keys(KPI_LABELS) as KpiRange[]).map((k) => (
+        <option key={k} value={k}>{KPI_LABELS[k]}</option>
+      ))}
+    </select>
+  );
+}
+
+function ChartTimeFilter({
+  value,
+  onChange,
+  options = ["all", "7d", "30d", "90d", "custom"] as ChartRange[],
+  customDates,
+  onCustomDatesChange,
+}: {
+  value: ChartRange;
+  onChange: (v: ChartRange) => void;
+  options?: ChartRange[];
+  customDates: CustomDates;
+  onCustomDatesChange: (d: CustomDates) => void;
+}) {
+  if (value === "custom") {
+    return (
+      <div className="flex items-center gap-1">
+        <input type="date" value={customDates.start} onChange={(e) => onCustomDatesChange({ ...customDates, start: e.target.value })} className={DATE_INPUT_cls} />
+        <span className="text-xs text-muted-foreground">~</span>
+        <input type="date" value={customDates.end} onChange={(e) => onCustomDatesChange({ ...customDates, end: e.target.value })} className={DATE_INPUT_cls} />
+        <button onClick={() => onChange("30d")} className="text-muted-foreground hover:text-foreground text-sm px-1 leading-none" title="返回预设">×</button>
+      </div>
+    );
+  }
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as ChartRange)}
+      className="border border-border rounded px-2 py-1 text-xs bg-background cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
+    >
+      {options.map((opt) => (
+        <option key={opt} value={opt}>{CHART_LABELS[opt]}</option>
+      ))}
+    </select>
   );
 }
 
@@ -192,7 +281,7 @@ function UserRatingDistributionBars({
   );
 }
 
-function TopUsersHorizontalBars({
+function TopUsersScrollableList({
   users,
 }: {
   users: { userName: string; count: number }[];
@@ -208,10 +297,11 @@ function TopUsersHorizontalBars({
   }
 
   return (
-    <div className="h-full flex flex-col justify-center gap-2">
-      {users.map((u) => (
-        <div key={u.userName} className="flex items-center gap-2 text-xs">
-          <span className="w-10 text-muted-foreground truncate shrink-0" title={u.userName}>
+    <div className="h-full max-h-[200px] overflow-y-auto flex flex-col gap-1.5 pr-1">
+      {users.map((u, i) => (
+        <div key={`${u.userName}-${i}`} className="flex items-center gap-2 text-xs shrink-0">
+          <span className="w-6 text-muted-foreground/70 tabular-nums text-right shrink-0">{i + 1}</span>
+          <span className="w-20 text-muted-foreground shrink-0" title={u.userName}>
             {u.userName}
           </span>
           <div className="flex-1 h-5 bg-muted/50 rounded overflow-hidden">
@@ -334,7 +424,48 @@ function CoverageBarChart({ data }: { data: { name: string; covered: number; tot
   );
 }
 
-function DashboardBody({ data }: { data: StatsData }) {
+interface DashboardBodyProps {
+  data: StatsData;
+  kpiRange: KpiRange;
+  setKpiRange: (v: KpiRange) => void;
+  kpiCustom: CustomDates;
+  setKpiCustom: (d: CustomDates) => void;
+  trendRange: ChartRange;
+  setTrendRange: (v: ChartRange) => void;
+  trendCustom: CustomDates;
+  setTrendCustom: (d: CustomDates) => void;
+  categoryRange: ChartRange;
+  setCategoryRange: (v: ChartRange) => void;
+  categoryCustom: CustomDates;
+  setCategoryCustom: (d: CustomDates) => void;
+  dimensionRange: ChartRange;
+  setDimensionRange: (v: ChartRange) => void;
+  dimensionCustom: CustomDates;
+  setDimensionCustom: (d: CustomDates) => void;
+  ratingRange: ChartRange;
+  setRatingRange: (v: ChartRange) => void;
+  ratingCustom: CustomDates;
+  setRatingCustom: (d: CustomDates) => void;
+  userRange: ChartRange;
+  setUserRange: (v: ChartRange) => void;
+  userCustom: CustomDates;
+  setUserCustom: (d: CustomDates) => void;
+  recordRange: ChartRange;
+  setRecordRange: (v: ChartRange) => void;
+  recordCustom: CustomDates;
+  setRecordCustom: (d: CustomDates) => void;
+}
+
+function DashboardBody({
+  data,
+  kpiRange, setKpiRange, kpiCustom, setKpiCustom,
+  trendRange, setTrendRange, trendCustom, setTrendCustom,
+  categoryRange, setCategoryRange, categoryCustom, setCategoryCustom,
+  dimensionRange, setDimensionRange, dimensionCustom, setDimensionCustom,
+  ratingRange, setRatingRange, ratingCustom, setRatingCustom,
+  userRange, setUserRange, userCustom, setUserCustom,
+  recordRange, setRecordRange, recordCustom, setRecordCustom,
+}: DashboardBodyProps) {
   const [recordSearch, setRecordSearch] = useState("");
   const [recordFilter, setRecordFilter] = useState<RecordFilter>("all");
 
@@ -343,10 +474,13 @@ function DashboardBody({ data }: { data: StatsData }) {
     [data.recentRecords, recordSearch, recordFilter],
   );
 
+  // 根据 kpiRange 动态生成周期后缀
+  const periodSuffix = kpiRange === "all" ? "" : `/${KPI_PERIOD_UNIT[kpiRange]}`;
+  const activeUserPrefix = KPI_PERIOD_UNIT[kpiRange];
+
   const kpis = [
-    { label: "累计用例数", value: data.kpi.totalCases.toLocaleString(), icon: BarChart3, bg: "bg-primary/10", iconColor: "text-primary", trendKey: "totalCases" as const },
-    { label: "月活跃用户", value: data.kpi.monthlyActiveUsers.toString(), icon: Users, bg: "bg-emerald-100", iconColor: "text-emerald-600", trendKey: "monthlyActiveUsers" as const },
-    { label: "AI 平均质量分", value: data.kpi.avgQualityScore.toString(), icon: Target, bg: "bg-amber-100", iconColor: "text-amber-600", trendKey: "avgQualityScore" as const },
+    { label: "用例数", value: data.kpi.totalCases.toLocaleString(), icon: BarChart3, bg: "bg-primary/10", iconColor: "text-primary", trendKey: "totalCases" as const },
+    { label: `${activeUserPrefix}活跃用户`, value: data.kpi.weeklyActiveUsers.toString(), icon: Users, bg: "bg-emerald-100", iconColor: "text-emerald-600", trendKey: "weeklyActiveUsers" as const },
     { label: "平均耗时", value: formatDuration(data.kpi.avgDuration), icon: Clock, bg: "bg-violet-100", iconColor: "text-violet-600", trendKey: "avgDuration" as const },
     {
       label: "用户平均评分",
@@ -356,43 +490,59 @@ function DashboardBody({ data }: { data: StatsData }) {
       iconColor: "text-amber-700",
       trendKey: "avgUserRating" as const,
     },
+    { label: `任务数${periodSuffix}`, value: data.kpi.tasksPerWeek.toString(), icon: BarChart3, bg: "bg-emerald-50", iconColor: "text-emerald-600", trendKey: "tasksPerWeek" as const },
+    { label: `需求数${periodSuffix}`, value: data.kpi.requirementsPerWeek.toString(), icon: BarChart3, bg: "bg-blue-50", iconColor: "text-blue-600", trendKey: "requirementsPerWeek" as const },
   ];
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+      <div className="flex justify-end mb-2">
+        <KpiTimeFilter value={kpiRange} onChange={setKpiRange} customDates={kpiCustom} onCustomDatesChange={setKpiCustom} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
+          const trend = data.kpiTrend[kpi.trendKey];
+          const isUp = (trend.changePercent ?? 0) > 0;
+          const isDown = (trend.changePercent ?? 0) < 0;
+          const colorClass = isUp ? "text-emerald-600" : isDown ? "text-red-500" : "text-muted-foreground";
+          const arrow = isUp ? "↑" : isDown ? "↓" : "";
+          const periodLabels = kpiRange !== "all" ? KPI_PERIOD_LABELS[kpiRange] : null;
+          const hasTrend = kpiRange !== "all" && trend.changePercent !== null;
+
           return (
             <div key={kpi.label} className={STAT_CARD}>
               <div className="min-w-0">
-                <p className="text-sm text-muted-foreground mb-2">{kpi.label}</p>
-                <p className="text-[30px] leading-[38px] font-semibold tabular-nums text-foreground/85">
+                <p className="text-xs text-muted-foreground mb-1">{kpi.label}</p>
+                <p className="text-2xl leading-7 font-semibold tabular-nums text-foreground/85 whitespace-nowrap">
                   {kpi.value}
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {(() => {
-                    const trend = data.kpiTrend[kpi.trendKey];
-                    if (trend.changePercent === null) {
-                      return <span className="text-muted-foreground/70">—</span>;
-                    }
-                    const isUp = trend.changePercent > 0;
-                    const isDown = trend.changePercent < 0;
-                    const colorClass = isUp ? "text-emerald-600" : isDown ? "text-red-500" : "text-muted-foreground";
-                    const arrow = isUp ? "↑" : isDown ? "↓" : "";
-                    return (
-                      <span className={`${colorClass} font-medium`}>
-                        {arrow} {Math.abs(trend.changePercent)}%
-                      </span>
-                    );
-                  })()}
-                  <span className="ml-1">周同比</span>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {kpiRange !== "all" ? (
+                    <>
+                      {hasTrend ? (
+                        <span className={`${colorClass} font-medium`}>
+                          {arrow} {Math.abs(trend.changePercent!)}%
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/70">—</span>
+                      )}
+                      <span className="ml-1">{KPI_TREND_LABELS[kpiRange]}</span>
+                      {periodLabels && (
+                        <span className="block text-[10px] text-muted-foreground/70 mt-0.5">
+                          {periodLabels.current} {formatTrendValue(kpi.trendKey, trend.current)} · {periodLabels.previous} {formatTrendValue(kpi.trendKey, trend.previous)}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground/70">—</span>
+                  )}
                 </p>
               </div>
               <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ml-4 ${kpi.bg}`}
+                className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ml-3 ${kpi.bg}`}
               >
-                <Icon className={`w-5 h-5 ${kpi.iconColor}`} />
+                <Icon className={`w-4 h-4 ${kpi.iconColor}`} />
               </div>
             </div>
           );
@@ -403,13 +553,16 @@ function DashboardBody({ data }: { data: StatsData }) {
         <div className="lg:col-span-2 bg-card rounded-xl border border-border/60 p-5">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h4 className="font-semibold text-sm text-foreground/85">每日生成量 &amp; 质量分趋势</h4>
-            <TrendLegend />
+            <div className="flex items-center gap-3">
+              <TrendLegend />
+              <ChartTimeFilter value={trendRange} onChange={setTrendRange} customDates={trendCustom} onCustomDatesChange={setTrendCustom} />
+            </div>
           </div>
           <div className="h-[176px] w-full [&_.recharts-wrapper]:outline-none">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data.dailyTrend}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" tickFormatter={(d: string) => d.slice(5).replace("-", "/")} />
                 <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
                 <Tooltip />
@@ -420,7 +573,11 @@ function DashboardBody({ data }: { data: StatsData }) {
           </div>
         </div>
 
-        <DashboardChartCard title="需求类型分布" bodyClass="overflow-visible">
+        <DashboardChartCard
+          title="需求类型分布"
+          bodyClass="overflow-visible"
+          extra={<ChartTimeFilter value={categoryRange} onChange={setCategoryRange} options={shortChartOptions()} customDates={categoryCustom} onCustomDatesChange={setCategoryCustom} />}
+        >
           <PieChartCentered>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -451,19 +608,29 @@ function DashboardBody({ data }: { data: StatsData }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-        <DashboardChartCard title="覆盖维度分布" extra="覆盖率">
+        <DashboardChartCard
+          title="覆盖维度分布"
+          extra={<ChartTimeFilter value={dimensionRange} onChange={setDimensionRange} options={shortChartOptions()} customDates={dimensionCustom} onCustomDatesChange={setDimensionCustom} />}
+        >
           <CoverageBarChart data={data.dimensionCoverage} />
         </DashboardChartCard>
 
-        <DashboardChartCard title="用户评价分布" extra="近 30 天 · 1–5 星占比">
+        <DashboardChartCard
+          title="用户评价分布"
+          extra={<ChartTimeFilter value={ratingRange} onChange={setRatingRange} options={shortChartOptions()} customDates={ratingCustom} onCustomDatesChange={setRatingCustom} />}
+        >
           <UserRatingDistributionBars
             rows={data.userRatingDistribution}
             rate={data.userRatingRate}
           />
         </DashboardChartCard>
 
-        <DashboardChartCard title="人员使用 Top 10" extra="近 30 天" className="md:col-span-2 xl:col-span-2">
-          <TopUsersHorizontalBars users={data.topUsers} />
+        <DashboardChartCard
+          title="人员使用排行"
+          className="md:col-span-2 xl:col-span-2"
+          extra={<ChartTimeFilter value={userRange} onChange={setUserRange} options={shortChartOptions()} customDates={userCustom} onCustomDatesChange={setUserCustom} />}
+        >
+          <TopUsersScrollableList users={data.topUsers} />
         </DashboardChartCard>
       </div>
 
@@ -488,6 +655,7 @@ function DashboardBody({ data }: { data: StatsData }) {
               <option value="rated">有评价</option>
               <option value="unrated">无评价</option>
             </select>
+            <ChartTimeFilter value={recordRange} onChange={setRecordRange} customDates={recordCustom} onCustomDatesChange={setRecordCustom} />
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -560,25 +728,111 @@ function DashboardBody({ data }: { data: StatsData }) {
 }
 
 export function Dashboard() {
-  const { data, isLoading, error } = useQuery<StatsData>({
-    queryKey: ["stats"],
-    queryFn: () => fetch("/api/stats").then((r) => r.json()),
+  const [kpiRange, setKpiRange] = useState<KpiRange>("7d");
+  const [kpiCustom, setKpiCustom] = useState<CustomDates>({ start: "", end: "" });
+  const [trendRange, setTrendRange] = useState<ChartRange>("30d");
+  const [trendCustom, setTrendCustom] = useState<CustomDates>({ start: "", end: "" });
+  const [categoryRange, setCategoryRange] = useState<ChartRange>("30d");
+  const [categoryCustom, setCategoryCustom] = useState<CustomDates>({ start: "", end: "" });
+  const [dimensionRange, setDimensionRange] = useState<ChartRange>("30d");
+  const [dimensionCustom, setDimensionCustom] = useState<CustomDates>({ start: "", end: "" });
+  const [ratingRange, setRatingRange] = useState<ChartRange>("30d");
+  const [ratingCustom, setRatingCustom] = useState<CustomDates>({ start: "", end: "" });
+  const [userRange, setUserRange] = useState<ChartRange>("30d");
+  const [userCustom, setUserCustom] = useState<CustomDates>({ start: "", end: "" });
+  const [recordRange, setRecordRange] = useState<ChartRange>("30d");
+  const [recordCustom, setRecordCustom] = useState<CustomDates>({ start: "", end: "" });
+
+  const params = new URLSearchParams({
+    kpiRange,
+    trendRange,
+    categoryRange,
+    dimensionRange,
+    ratingRange,
+    userRange,
+    recordRange,
+  });
+  if (kpiRange === "custom" && kpiCustom.start && kpiCustom.end) {
+    params.set("kpiStart", kpiCustom.start);
+    params.set("kpiEnd", kpiCustom.end);
+  }
+  if (trendRange === "custom" && trendCustom.start && trendCustom.end) {
+    params.set("trendStart", trendCustom.start);
+    params.set("trendEnd", trendCustom.end);
+  }
+  if (categoryRange === "custom" && categoryCustom.start && categoryCustom.end) {
+    params.set("categoryStart", categoryCustom.start);
+    params.set("categoryEnd", categoryCustom.end);
+  }
+  if (dimensionRange === "custom" && dimensionCustom.start && dimensionCustom.end) {
+    params.set("dimensionStart", dimensionCustom.start);
+    params.set("dimensionEnd", dimensionCustom.end);
+  }
+  if (ratingRange === "custom" && ratingCustom.start && ratingCustom.end) {
+    params.set("ratingStart", ratingCustom.start);
+    params.set("ratingEnd", ratingCustom.end);
+  }
+  if (userRange === "custom" && userCustom.start && userCustom.end) {
+    params.set("userStart", userCustom.start);
+    params.set("userEnd", userCustom.end);
+  }
+  if (recordRange === "custom" && recordCustom.start && recordCustom.end) {
+    params.set("recordStart", recordCustom.start);
+    params.set("recordEnd", recordCustom.end);
+  }
+
+  const { data, error, isFetching } = useQuery<StatsData>({
+    queryKey: ["stats", kpiRange, kpiCustom, trendRange, trendCustom, categoryRange, categoryCustom, dimensionRange, dimensionCustom, ratingRange, ratingCustom, userRange, userCustom, recordRange, recordCustom],
+    queryFn: () => fetch(`/api/stats?${params}`).then((r) => r.json()),
     refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
   });
 
   return (
     <div className="pb-16 min-h-0">
       <DashboardPageHeader />
-      {isLoading ? (
+      {!data ? (
         <div className={`${CHART_CARD} py-24 flex items-center justify-center`}>
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
-      ) : error || !data ? (
+      ) : error ? (
         <div className={`${CHART_CARD} py-24 flex items-center justify-center text-muted-foreground text-sm`}>
           数据加载失败
         </div>
       ) : (
-        <DashboardBody data={data} />
+        <div className={isFetching ? "opacity-70 transition-opacity" : "transition-opacity"}>
+        <DashboardBody
+          data={data}
+          kpiRange={kpiRange}
+          setKpiRange={setKpiRange}
+          kpiCustom={kpiCustom}
+          setKpiCustom={setKpiCustom}
+          trendRange={trendRange}
+          setTrendRange={setTrendRange}
+          trendCustom={trendCustom}
+          setTrendCustom={setTrendCustom}
+          categoryRange={categoryRange}
+          setCategoryRange={setCategoryRange}
+          categoryCustom={categoryCustom}
+          setCategoryCustom={setCategoryCustom}
+          dimensionRange={dimensionRange}
+          setDimensionRange={setDimensionRange}
+          dimensionCustom={dimensionCustom}
+          setDimensionCustom={setDimensionCustom}
+          ratingRange={ratingRange}
+          setRatingRange={setRatingRange}
+          ratingCustom={ratingCustom}
+          setRatingCustom={setRatingCustom}
+          userRange={userRange}
+          setUserRange={setUserRange}
+          userCustom={userCustom}
+          setUserCustom={setUserCustom}
+          recordRange={recordRange}
+          setRecordRange={setRecordRange}
+          recordCustom={recordCustom}
+          setRecordCustom={setRecordCustom}
+        />
+        </div>
       )}
     </div>
   );
