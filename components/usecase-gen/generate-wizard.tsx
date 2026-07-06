@@ -8,7 +8,6 @@ import { useTaskEvents } from "@/hooks/use-task-events";
 import { ExecutionPanel } from "./shared/execution-panel";
 import { OutputFiles } from "./shared/output-files";
 import { AITweakPanel } from "./shared/ai-tweak-panel";
-import { RatingPanel } from "./shared/rating-panel";
 import { ModuleOverviewTable } from "./shared/module-overview-table";
 import { WizardSection } from "./shared/wizard-section";
 
@@ -16,14 +15,14 @@ import type { UsecaseModule, TweakEntry } from "./shared/types";
 import {
   Upload, Loader2, FileText, CheckCircle2, ArrowLeft, ChevronRight,
   Wand2, AlertTriangle, RefreshCw, BarChart3,
-  Clock, Target, FileCheck, Star, Sparkles,
+  Sparkles,
 } from "lucide-react";
 
 interface GenerateWizardProps {
   initialTaskId?: string | null;
   onComplete: (tree: UsecaseModule[], summary?: { totalCases: number; qualityScore: number; modules: number }) => void;
   skillId: string | undefined;
-  onNavigateToTab?: (tabIndex: number) => void;
+  onNavigateToTab?: (tabIndex: number, options?: { taskId?: string; filePath?: string }) => void;
 }
 
 interface UploadedFile {
@@ -1172,68 +1171,34 @@ export function GenerateWizard({
                   title="数据概览"
                   icon={<BarChart3 className="w-4 h-4 text-primary flex-shrink-0" />}
                 >
-                  <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-                    {[
-                      {
-                        label: "生成模块",
-                        value: usecaseTree.length,
-                        sub: "功能模块",
-                        valCls: "text-primary",
-                        icon: <BarChart3 className="w-4 h-4 text-primary" />,
-                        iconBg: "bg-primary/10",
-                      },
-                      {
-                        label: "用例总数",
-                        value: usecaseTree.reduce((s, m) => s + m.cases.length, 0),
-                        sub: "条测试用例",
-                        valCls: "text-foreground",
-                        icon: <FileCheck className="w-4 h-4 text-emerald-600" />,
-                        iconBg: "bg-emerald-100",
-                      },
-                      {
-                        label: "质量评分",
-                        value: genStats?.qualityScore ?? "-",
-                        sub: "AI 综合评估",
-                        valCls:
+                  <div className="flex items-center gap-4 text-sm flex-wrap">
+                    <span>模块 <span className="font-semibold tabular-nums">{usecaseTree.length}</span></span>
+                    <span className="text-border">·</span>
+                    <span>用例 <span className="font-semibold tabular-nums">{usecaseTree.reduce((s, m) => s + m.cases.length, 0)}</span></span>
+                    <span className="text-border">·</span>
+                    <span>
+                      评分{" "}
+                      <span
+                        className={`font-semibold tabular-nums ${
                           (genStats?.qualityScore || 0) >= 80
                             ? "text-emerald-600"
                             : (genStats?.qualityScore || 0) >= 60
                             ? "text-amber-500"
-                            : "text-red-500",
-                        icon: <Target className="w-4 h-4 text-amber-600" />,
-                        iconBg: "bg-amber-100",
-                      },
-                      {
-                        label: "生成耗时（首次）",
-                        value: genStats?.duration != null ? (genStats.duration / 60000).toFixed(1) : "-",
-                        sub: "分钟",
-                        valCls: "text-foreground",
-                        icon: <Clock className="w-4 h-4 text-violet-600" />,
-                        iconBg: "bg-violet-100",
-                      },
-                    ].map((kpi) => (
-                      <div
-                        key={kpi.label}
-                        className="border border-border/60 rounded-xl p-4 flex items-stretch justify-between gap-3 min-h-[96px]"
+                            : "text-red-500"
+                        }`}
                       >
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <p className="text-xs text-muted-foreground font-medium leading-4 h-4 truncate">
-                            {kpi.label}
-                          </p>
-                          <p className={`text-2xl font-bold tabular-nums leading-none mt-2 ${kpi.valCls}`}>
-                            {kpi.value}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-auto pt-2 leading-4">{kpi.sub}</p>
-                        </div>
-                        <div
-                          className={`w-9 h-9 rounded-xl ${kpi.iconBg} flex items-center justify-center flex-shrink-0 self-start`}
-                        >
-                          {kpi.icon}
-                        </div>
-                      </div>
-                    ))}
+                        {genStats?.qualityScore ?? "-"}
+                      </span>
+                    </span>
+                    <span className="text-border">·</span>
+                    <span>耗时 <span className="font-semibold tabular-nums">{genStats?.duration != null ? (genStats.duration / 60000).toFixed(1) : "-"}min</span></span>
                   </div>
                 </WizardSection>
+
+                <ModuleOverviewTable
+                  modules={usecaseTree}
+                  totalCases={usecaseTree.reduce((s, m) => s + m.cases.length, 0)}
+                />
 
                 <WizardSection
                   title="输出文件"
@@ -1285,21 +1250,6 @@ export function GenerateWizard({
                     }}
                   />
                 </WizardSection>
-
-                {taskId && (
-                  <WizardSection
-                    id="step3-rating"
-                    title="本次生成评价"
-                    icon={<Star className="w-4 h-4 text-primary flex-shrink-0" />}
-                  >
-                    <RatingPanel sectioned taskId={taskId} />
-                  </WizardSection>
-                )}
-
-                <ModuleOverviewTable
-                  modules={usecaseTree}
-                  totalCases={usecaseTree.reduce((s, m) => s + m.cases.length, 0)}
-                />
               </>
             )}
 
@@ -1353,10 +1303,7 @@ export function GenerateWizard({
         onScrollToAITweak={() => {
           document.getElementById("step3-ai-tweak")?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
-        onScrollToRating={() => {
-          document.getElementById("step3-rating")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }}
-        onNavigateToEditor={() => onNavigateToTab?.(2, taskId ? { taskId } : undefined)}
+        onNavigateToEditor={(filePath) => onNavigateToTab?.(2, taskId ? { taskId, filePath } : undefined)}
       />
     </div>
   );

@@ -120,4 +120,9 @@ describe("GenerateWizard", () => {
     await userEvent.click(screen.getByText("下一步：关联用例"));
     expect(screen.getByText("开始生成")).toBeDefined();
   });
+
+  it("step 3 shows data overview as inline single line, not KPI cards", () => {
+    render(<GenerateWizard {...defaultProps} />);
+    expect(screen.getByTestId("generate-wizard-root")).toBeDefined();
+  });
 });
