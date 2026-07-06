@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
-import { CheckCircle2, Download, MessageSquare, Edit3, Star } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { CheckCircle2, Download, MessageSquare, Edit3 } from "lucide-react";
 import type { FileInfo } from "@/hooks/use-output-scanner";
+import { FileActionModal } from "./file-action-modal";
+import { RatingPanel } from "./rating-panel";
+import { isDisplayable } from "./output-files";
 
 const WORKFLOW_NODES: { name: string; key: string }[] = [
   { name: "文档解析", key: "source" },
@@ -27,8 +30,7 @@ interface ExecutionPanelProps {
   logStages?: Set<string>;
   onDownloadFile: (file: FileInfo) => void;
   onScrollToAITweak: () => void;
-  onScrollToRating: () => void;
-  onNavigateToEditor: () => void;
+  onNavigateToEditor: (filePath?: string) => void;
 }
 
 function PanelShell({ children }: { children: ReactNode }) {
@@ -189,48 +191,38 @@ function DoneBanner() {
 }
 
 function QuickActions({
-  mdFile,
-  xmindFile,
-  onDownloadFile,
+  onOpenDownloadModal,
+  onOpenEditModal,
   onScrollToAITweak,
-  onScrollToRating,
-  onNavigateToEditor,
 }: {
-  mdFile: FileInfo | null;
-  xmindFile: FileInfo | null;
-  onDownloadFile: (file: FileInfo) => void;
+  onOpenDownloadModal: () => void;
+  onOpenEditModal: () => void;
   onScrollToAITweak: () => void;
-  onScrollToRating: () => void;
-  onNavigateToEditor: () => void;
 }) {
   return (
     <div className="mt-4 pt-3 border-t border-border">
       <p className="text-xs font-semibold mb-2">快捷操作</p>
       <div className="space-y-1.5">
-        {mdFile && (
-          <button
-            type="button"
-            onClick={() => onDownloadFile(mdFile)}
-            className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-border hover:bg-muted/40 text-left"
-          >
-            <span className="flex items-center gap-2">
-              <Download className="w-4 h-4 text-primary shrink-0" />
-              下载 Markdown
-            </span>
-          </button>
-        )}
-        {xmindFile && (
-          <button
-            type="button"
-            onClick={() => onDownloadFile(xmindFile)}
-            className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-border hover:bg-muted/40 text-left"
-          >
-            <span className="flex items-center gap-2">
-              <Download className="w-4 h-4 text-primary shrink-0" />
-              下载 XMind
-            </span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onOpenDownloadModal}
+          className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-border hover:bg-muted/40 text-left"
+        >
+          <span className="flex items-center gap-2">
+            <Download className="w-4 h-4 text-primary shrink-0" />
+            下载文件
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenEditModal}
+          className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-border hover:bg-muted/40 text-left"
+        >
+          <span className="flex items-center gap-2">
+            <Edit3 className="w-4 h-4 text-primary shrink-0" />
+            编辑脑图
+          </span>
+        </button>
         <button
           type="button"
           onClick={onScrollToAITweak}
@@ -242,33 +234,13 @@ function QuickActions({
           </span>
           <span className="text-xs text-muted-foreground shrink-0">↓主区</span>
         </button>
-        <button
-          type="button"
-          onClick={onScrollToRating}
-          className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-amber-200/80 bg-amber-50/50 hover:bg-amber-50 text-left"
-        >
-          <span className="flex items-center gap-2">
-            <Star className="w-4 h-4 text-primary shrink-0" />
-            评价
-          </span>
-          <span className="text-xs text-muted-foreground shrink-0">↓主区</span>
-        </button>
-        <button
-          type="button"
-          onClick={onNavigateToEditor}
-          className="w-full flex items-center justify-between gap-2 text-sm leading-none px-3 py-2.5 rounded-lg border border-border hover:bg-muted/40 text-left"
-        >
-          <span className="flex items-center gap-2">
-            <Edit3 className="w-4 h-4 text-primary shrink-0" />
-            编辑
-          </span>
-        </button>
       </div>
     </div>
   );
 }
 
 export function ExecutionPanel({
+  taskId,
   generating,
   wizStep,
   hasResult,
@@ -278,7 +250,6 @@ export function ExecutionPanel({
   logStages,
   onDownloadFile,
   onScrollToAITweak,
-  onScrollToRating,
   onNavigateToEditor,
 }: ExecutionPanelProps) {
   const nodes = useMemo(
@@ -286,23 +257,30 @@ export function ExecutionPanel({
     [foundFiles, generating, logStages]
   );
 
-  const pickLatestFiles = () => {
-    const mdFiles = foundFiles
-      .filter((f) => f.name.includes("测试用例") && f.name.endsWith(".md"))
-      .sort((a, b) => {
-        const va = parseInt(a.name.match(/_v(\d+)\.md$/)?.[1] || "0", 10);
-        const vb = parseInt(b.name.match(/_v(\d+)\.md$/)?.[1] || "0", 10);
-        return vb - va;
-      });
-    const xmindFiles = foundFiles
-      .filter((f) => f.name.endsWith(".xmind"))
-      .sort((a, b) => {
-        const va = parseInt(a.name.match(/_v(\d+)\.xmind$/)?.[1] || "0", 10);
-        const vb = parseInt(b.name.match(/_v(\d+)\.xmind$/)?.[1] || "0", 10);
-        return vb - va;
-      });
-    return { mdFile: mdFiles[0] || null, xmindFile: xmindFiles[0] || null };
-  };
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+
+  const downloadFiles = useMemo(() => {
+    const displayable = foundFiles.filter((f) => isDisplayable(f.name));
+    const pickLatest = (ext: string) => {
+      const files = displayable
+        .filter((f) => f.name.endsWith(ext))
+        .sort((a, b) => {
+          const va = parseInt(a.name.match(/_v(\d+)\./)?.[1] || "0", 10);
+          const vb = parseInt(b.name.match(/_v(\d+)\./)?.[1] || "0", 10);
+          return vb - va;
+        });
+      return files[0] || null;
+    };
+    return [pickLatest(".md"), pickLatest(".xmind"), pickLatest(".xlsx")].filter(
+      Boolean
+    ) as FileInfo[];
+  }, [foundFiles]);
+
+  const xmindFiles = useMemo(
+    () => foundFiles.filter((f) => isDisplayable(f.name) && f.name.endsWith(".xmind")),
+    [foundFiles]
+  );
 
   if (wizStep < 2) {
     return (
@@ -326,21 +304,43 @@ export function ExecutionPanel({
   }
 
   if (wizStep === 2 && !generating && (foundFiles.length > 0 || hasResult)) {
-    const { mdFile, xmindFile } = pickLatestFiles();
     return (
       <PanelShell>
         <SidebarCard>
           <WorkflowTimeline nodes={nodes} title="执行轨迹" />
           <DoneBanner />
           <QuickActions
-            mdFile={mdFile}
-            xmindFile={xmindFile}
-            onDownloadFile={onDownloadFile}
+            onOpenDownloadModal={() => setDownloadModalOpen(true)}
+            onOpenEditModal={() => setEditModalOpen(true)}
             onScrollToAITweak={onScrollToAITweak}
-            onScrollToRating={onScrollToRating}
-            onNavigateToEditor={onNavigateToEditor}
           />
+          {taskId && (
+            <div className="mt-4 pt-3 border-t border-border">
+              <p className="text-xs font-semibold mb-2">本次生成评价</p>
+              <RatingPanel sectioned taskId={taskId} />
+            </div>
+          )}
         </SidebarCard>
+
+        <FileActionModal
+          open={downloadModalOpen}
+          onClose={() => setDownloadModalOpen(false)}
+          title="下载文件"
+          files={downloadFiles}
+          actionLabel="下载"
+          onAction={(file) => onDownloadFile(file)}
+          emptyText="暂无可下载文件"
+        />
+
+        <FileActionModal
+          open={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          title="编辑脑图"
+          files={xmindFiles}
+          actionLabel="编辑"
+          onAction={(file) => onNavigateToEditor(file.relativePath)}
+          emptyText="暂无可编辑的脑图文件"
+        />
       </PanelShell>
     );
   }
