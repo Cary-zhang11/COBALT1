@@ -15,7 +15,7 @@ interface OutputFilesProps {
   isGenerating?: boolean;
 }
 
-function isDisplayable(name: string): boolean {
+export function isDisplayable(name: string): boolean {
   if (name.includes("_source")) return false;
   if (name.includes("archive/")) return false;
   return name.endsWith(".md") || name.endsWith(".xmind") || name.endsWith(".xlsx");
@@ -31,7 +31,7 @@ function isEditable(name: string): boolean {
 
 /** 12px + 固定行高，避免 10px 在 Windows 缩放下发糊 */
 const fileActionBtn =
-  "inline-flex items-center justify-center h-7 px-2.5 text-xs font-medium leading-none rounded-md whitespace-nowrap shrink-0";
+  "inline-flex items-center justify-center h-6 px-2 text-xs font-medium leading-none rounded-md whitespace-nowrap shrink-0";
 
 function downloadFile(taskId: string, file: FileInfo) {
   const url = `/api/tasks/${taskId}/download?file=${encodeURIComponent(file.relativePath)}`;
@@ -62,7 +62,7 @@ export function OutputFiles({ taskId, files, onEditXmind, sectioned, isGeneratin
         {displayable.map((f, i) => (
           <div
             key={i}
-            className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2 min-h-[44px] text-sm"
+            className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2 min-h-[32px] text-sm"
           >
             <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             <span className="truncate flex-1 min-w-0 text-sm font-medium leading-5">{f.name}</span>
