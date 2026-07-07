@@ -14,7 +14,7 @@ import { WizardSection } from "./shared/wizard-section";
 import type { UsecaseModule, TweakEntry } from "./shared/types";
 import {
   Upload, Loader2, FileText, CheckCircle2, ArrowLeft, ChevronRight,
-  Wand2, AlertTriangle, RefreshCw, BarChart3,
+  Wand2, AlertTriangle, RefreshCw,
   Sparkles,
 } from "lucide-react";
 
@@ -1167,52 +1167,12 @@ export function GenerateWizard({
             {/* Result display */}
             {usecaseTree && usecaseTree.length > 0 && genStatus !== "生成失败" && (
               <>
-                <WizardSection
-                  title="数据概览"
-                  icon={<BarChart3 className="w-4 h-4 text-primary flex-shrink-0" />}
-                >
-                  <div className="flex items-center gap-4 text-sm flex-wrap">
-                    <span>模块 <span className="font-semibold tabular-nums">{usecaseTree.length}</span></span>
-                    <span className="text-border">·</span>
-                    <span>用例 <span className="font-semibold tabular-nums">{usecaseTree.reduce((s, m) => s + m.cases.length, 0)}</span></span>
-                    <span className="text-border">·</span>
-                    <span>
-                      评分{" "}
-                      <span
-                        className={`font-semibold tabular-nums ${
-                          (genStats?.qualityScore || 0) >= 80
-                            ? "text-emerald-600"
-                            : (genStats?.qualityScore || 0) >= 60
-                            ? "text-amber-500"
-                            : "text-red-500"
-                        }`}
-                      >
-                        {genStats?.qualityScore ?? "-"}
-                      </span>
-                    </span>
-                    <span className="text-border">·</span>
-                    <span>耗时 <span className="font-semibold tabular-nums">{genStats?.duration != null ? (genStats.duration / 60000).toFixed(1) : "-"}min</span></span>
-                  </div>
-                </WizardSection>
-
                 <ModuleOverviewTable
                   modules={usecaseTree}
                   totalCases={usecaseTree.reduce((s, m) => s + m.cases.length, 0)}
+                  qualityScore={genStats?.qualityScore ?? null}
+                  duration={genStats?.duration ?? null}
                 />
-
-                <WizardSection
-                  title="输出文件"
-                  icon={<FileText className="w-4 h-4 text-primary flex-shrink-0" />}
-                  meta={step3OutputCount > 0 ? `${step3OutputCount} 个` : undefined}
-                >
-                  <OutputFiles
-                    sectioned
-                    taskId={taskId}
-                    files={mergedOutputFiles}
-                    onEditXmind={(f) => onNavigateToTab?.(2, taskId ? { taskId, filePath: f.relativePath } : undefined)}
-                    isGenerating={generating}
-                  />
-                </WizardSection>
 
                 <WizardSection
                   id="step3-ai-tweak"
@@ -1248,6 +1208,20 @@ export function GenerateWizard({
                     onTweakHistoryUpdate={(history) => {
                       setTweakHistory(history);
                     }}
+                  />
+                </WizardSection>
+
+                <WizardSection
+                  title="输出文件"
+                  icon={<FileText className="w-4 h-4 text-primary flex-shrink-0" />}
+                  meta={step3OutputCount > 0 ? `${step3OutputCount} 个` : undefined}
+                >
+                  <OutputFiles
+                    sectioned
+                    taskId={taskId}
+                    files={mergedOutputFiles}
+                    onEditXmind={(f) => onNavigateToTab?.(2, taskId ? { taskId, filePath: f.relativePath } : undefined)}
+                    isGenerating={generating}
                   />
                 </WizardSection>
               </>

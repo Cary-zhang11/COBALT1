@@ -260,22 +260,10 @@ export function ExecutionPanel({
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
 
-  const downloadFiles = useMemo(() => {
-    const displayable = foundFiles.filter((f) => isDisplayable(f.name));
-    const pickLatest = (ext: string) => {
-      const files = displayable
-        .filter((f) => f.name.endsWith(ext))
-        .sort((a, b) => {
-          const va = parseInt(a.name.match(/_v(\d+)\./)?.[1] || "0", 10);
-          const vb = parseInt(b.name.match(/_v(\d+)\./)?.[1] || "0", 10);
-          return vb - va;
-        });
-      return files[0] || null;
-    };
-    return [pickLatest(".md"), pickLatest(".xmind"), pickLatest(".xlsx")].filter(
-      Boolean
-    ) as FileInfo[];
-  }, [foundFiles]);
+  const downloadFiles = useMemo(
+    () => foundFiles.filter((f) => isDisplayable(f.name)),
+    [foundFiles]
+  );
 
   const xmindFiles = useMemo(
     () => foundFiles.filter((f) => isDisplayable(f.name) && f.name.endsWith(".xmind")),

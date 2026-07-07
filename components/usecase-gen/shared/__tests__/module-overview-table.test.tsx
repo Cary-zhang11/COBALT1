@@ -96,4 +96,22 @@ describe("ModuleOverviewTable", () => {
     expect(screen.getByText(/跳转到首页/)).toBeDefined();
     expect(screen.getByText(/登录,正向/)).toBeDefined();
   });
+
+  it("shows quality score and duration in header when provided", () => {
+    render(<ModuleOverviewTable modules={modules} totalCases={3} qualityScore={82} duration={90000} />);
+    expect(screen.getByText("82")).toBeDefined();
+    expect(screen.getByText(/1.5min/)).toBeDefined();
+  });
+
+  it("applies green color to score >= 80", () => {
+    const { container } = render(<ModuleOverviewTable modules={modules} totalCases={3} qualityScore={85} duration={60000} />);
+    const scoreEl = container.querySelector(".text-emerald-600");
+    expect(scoreEl).not.toBeNull();
+    expect(scoreEl?.textContent).toBe("85");
+  });
+
+  it("does not render stats divider when qualityScore and duration are null", () => {
+    const { container } = render(<ModuleOverviewTable modules={modules} totalCases={3} qualityScore={null} duration={null} />);
+    expect(container.querySelector(".border-l")).toBeNull();
+  });
 });

@@ -121,7 +121,7 @@ describe("GenerateWizard", () => {
     expect(screen.getByText("开始生成")).toBeDefined();
   });
 
-  it("step 3 shows data overview as inline single line, not KPI cards", () => {
+  it("renders wizard root without crash", () => {
     render(<GenerateWizard {...defaultProps} />);
     expect(screen.getByTestId("generate-wizard-root")).toBeDefined();
   });

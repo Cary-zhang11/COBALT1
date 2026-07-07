@@ -121,6 +121,31 @@ describe("ExecutionPanel", () => {
       expect(screen.getByRole("heading", { level: 3, name: "下载文件" })).toBeDefined();
     });
 
+    it("shows all displayable files in download modal, not just latest version", () => {
+      const multiVersionFiles = [
+        { name: "测试用例_v1.md", relativePath: "测试用例_v1.md" },
+        { name: "测试用例_v2.md", relativePath: "测试用例_v2.md" },
+        { name: "测试用例_v1.xmind", relativePath: "测试用例_v1.xmind" },
+        { name: "测试用例_v2.xmind", relativePath: "测试用例_v2.xmind" },
+        { name: "测试用例.xlsx", relativePath: "测试用例.xlsx" },
+      ];
+      render(
+        <ExecutionPanel
+          {...baseProps}
+          taskId="test-id"
+          wizStep={2}
+          hasResult={true}
+          foundFiles={multiVersionFiles}
+        />
+      );
+      fireEvent.click(screen.getByText("下载文件"));
+      expect(screen.getByText("测试用例_v1.md")).toBeDefined();
+      expect(screen.getByText("测试用例_v2.md")).toBeDefined();
+      expect(screen.getByText("测试用例_v1.xmind")).toBeDefined();
+      expect(screen.getByText("测试用例_v2.xmind")).toBeDefined();
+      expect(screen.getByText("测试用例.xlsx")).toBeDefined();
+    });
+
     it("calls onDownloadFile when download action clicked in modal", () => {
       const onDownload = vi.fn();
       render(

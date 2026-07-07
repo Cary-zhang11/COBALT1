@@ -1,0 +1,260 @@
+<h2>第三步完整布局方案</h2>
+<p class="subtitle">左侧主区 + 右侧边栏的新结构，从上到下展示</p>
+
+<!-- Full page mockup -->
+<div class="mockup">
+  <div class="mockup-header">第三步「生成并预览」新布局</div>
+  <div class="mockup-body" style="padding:16px;background:#f8fafc;">
+
+    <!-- Step indicator (unchanged) -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:12px;background:white;border-radius:10px;border:1px solid #e2e8f0;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#3b82f6;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">✓</div>
+      <span style="font-size:13px;color:#64748b;">输入物料</span>
+      <div style="width:24px;height:2px;background:#93c5fd;"></div>
+      <div style="width:28px;height:28px;border-radius:50%;background:#3b82f6;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">✓</div>
+      <span style="font-size:13px;color:#64748b;">关联用例</span>
+      <div style="width:24px;height:2px;background:#3b82f6;"></div>
+      <div style="width:28px;height:28px;border-radius:50%;background:#1e3a8a;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 0 0 3px rgba(59,130,246,0.25);">3</div>
+      <span style="font-size:13px;color:#1e3a8a;font-weight:600;">生成并预览</span>
+    </div>
+
+    <!-- Two column layout -->
+    <div style="display:flex;gap:16px;">
+
+      <!-- LEFT: Main area -->
+      <div style="flex:1;min-width:0;">
+
+        <!-- 1. Data Overview (inline) -->
+        <div style="background:white;border-radius:10px;border:1px solid #e2e8f0;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.5px;">数据概览</span>
+          <span style="font-size:13px;color:#475569;">模块 <b style="color:#1e3a8a;font-size:15px;">8</b></span>
+          <span style="color:#cbd5e1;">·</span>
+          <span style="font-size:13px;color:#475569;">用例 <b style="color:#1e293b;font-size:15px;">45</b></span>
+          <span style="color:#cbd5e1;">·</span>
+          <span style="font-size:13px;color:#475569;">评分 <b style="color:#059669;font-size:15px;">82</b></span>
+          <span style="color:#cbd5e1;">·</span>
+          <span style="font-size:13px;color:#475569;">耗时 <b style="color:#1e293b;font-size:15px;">3.2</b>min</span>
+        </div>
+
+        <!-- 2. Module Overview (Accordion cards) - MOVED UP -->
+        <div style="background:white;border-radius:10px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;">
+          <div style="padding:10px 16px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+            <h3 style="font-size:13px;font-weight:700;margin:0;">模块用例概览 <span style="color:#94a3b8;font-weight:400;font-size:12px;">(8 模块 · 45 用例)</span></h3>
+          </div>
+          <div style="padding:12px;">
+            <!-- Expanded module card -->
+            <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:8px;">
+              <div style="background:#eff6ff;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-weight:700;font-size:13px;">▼ 登录模块</span>
+                  <span style="background:#dbeafe;color:#1e40af;padding:1px 8px;border-radius:10px;font-size:11px;">12 用例</span>
+                </div>
+                <div style="display:flex;gap:4px;">
+                  <span style="background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:4px;font-size:11px;">P0×3</span>
+                  <span style="background:#fed7aa;color:#c2410c;padding:1px 6px;border-radius:4px;font-size:11px;">P1×5</span>
+                  <span style="background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:4px;font-size:11px;">P2×4</span>
+                </div>
+              </div>
+              <!-- Case detail -->
+              <div style="padding:10px 12px;border-top:1px solid #e2e8f0;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                  <span style="background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;">P0</span>
+                  <span style="font-weight:600;font-size:12px;">手机号+验证码登录</span>
+                </div>
+                <div style="font-size:11px;color:#64748b;line-height:1.7;margin-left:28px;">
+                  <div><b>前置:</b> 已注册手机号</div>
+                  <div><b>步骤:</b> 1.输入手机号 2.点击获取验证码 3.输入验证码 4.点击登录</div>
+                  <div><b>预期:</b> 登录成功跳转首页</div>
+                  <div><b>标签:</b> 登录 · 验证码</div>
+                </div>
+              </div>
+              <div style="padding:10px 12px;border-top:1px solid #e2e8f0;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="background:#fed7aa;color:#c2410c;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;">P1</span>
+                  <span style="font-weight:600;font-size:12px;">微信扫码登录</span>
+                </div>
+              </div>
+            </div>
+            <!-- Collapsed module card -->
+            <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+              <div style="padding:10px 12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#f8fafc;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-weight:700;font-size:13px;">▶ 注册模块</span>
+                  <span style="background:#dbeafe;color:#1e40af;padding:1px 8px;border-radius:10px;font-size:11px;">8 用例</span>
+                </div>
+                <div style="display:flex;gap:4px;">
+                  <span style="background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:4px;font-size:11px;">P0×2</span>
+                  <span style="background:#fed7aa;color:#c2410c;padding:1px 6px;border-radius:4px;font-size:11px;">P1×4</span>
+                  <span style="background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:4px;font-size:11px;">P2×2</span>
+                </div>
+              </div>
+            </div>
+            <div style="text-align:center;padding:4px;font-size:11px;color:#94a3b8;">...还有 6 个模块</div>
+          </div>
+        </div>
+
+        <!-- 3. Output Files -->
+        <div style="background:white;border-radius:10px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;">
+          <div style="padding:10px 16px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+            <h3 style="font-size:13px;font-weight:700;margin:0;">输出文件</h3>
+            <span style="font-size:11px;color:#94a3b8;">3 个</span>
+          </div>
+          <div style="padding:12px;">
+            <div style="display:flex;align-items:center;gap:8px;background:#f1f5f9;border-radius:8px;padding:8px 12px;margin-bottom:6px;">
+              <span style="font-size:14px;">📄</span>
+              <span style="font-size:12px;font-weight:500;flex:1;">测试用例_v1.md</span>
+              <span style="font-size:11px;background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:6px;cursor:pointer;">预览</span>
+              <span style="font-size:11px;background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:6px;cursor:pointer;">下载</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;background:#f1f5f9;border-radius:8px;padding:8px 12px;margin-bottom:6px;">
+              <span style="font-size:14px;">🧠</span>
+              <span style="font-size:12px;font-weight:500;flex:1;">测试用例_v1.xmind</span>
+              <span style="font-size:11px;background:#1e3a8a;color:white;padding:2px 8px;border-radius:6px;cursor:pointer;">编辑</span>
+              <span style="font-size:11px;background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:6px;cursor:pointer;">下载</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;background:#f1f5f9;border-radius:8px;padding:8px 12px;">
+              <span style="font-size:14px;">📊</span>
+              <span style="font-size:12px;font-weight:500;flex:1;">测试用例_v1.xlsx</span>
+              <span style="font-size:11px;background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:6px;cursor:pointer;">下载</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. AI Tweak -->
+        <div style="background:white;border-radius:10px;border:1px solid #e2e8f0;overflow:hidden;">
+          <div style="padding:10px 16px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
+            <h3 style="font-size:13px;font-weight:700;margin:0;">✨ AI 微调</h3>
+          </div>
+          <div style="padding:12px;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+              <span style="font-size:11px;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;color:#64748b;">补充边界场景</span>
+              <span style="font-size:11px;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;color:#64748b;">增加异常覆盖</span>
+              <span style="font-size:11px;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;color:#64748b;">精简步骤描述</span>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <input style="flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;" placeholder="描述想要的修改..." />
+              <button style="background:#1e3a8a;color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">发送</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: Sidebar -->
+      <div style="width:220px;flex-shrink:0;">
+        <div style="background:white;border-radius:10px;border:1px solid #e2e8f0;padding:14px;max-height:calc(100vh-8rem);overflow-y:auto;">
+
+          <!-- Workflow timeline -->
+          <div style="margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <h4 style="font-size:12px;font-weight:700;margin:0;">执行轨迹</h4>
+            </div>
+            <div style="font-size:11px;">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;color:#059669;">
+                <span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block;flex-shrink:0;"></span>文档解析
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;color:#059669;">
+                <span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block;flex-shrink:0;"></span>需求分析
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;color:#059669;">
+                <span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block;flex-shrink:0;"></span>用例生成
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;color:#059669;">
+                <span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block;flex-shrink:0;"></span>质量校验
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;color:#059669;">
+                <span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block;flex-shrink:0;"></span>导出格式
+              </div>
+            </div>
+          </div>
+
+          <!-- Done banner -->
+          <div style="background:#ecfdf5;border:1px solid #d1fae5;border-radius:8px;padding:6px 10px;font-size:11px;color:#059669;margin-bottom:12px;">
+            ✓ 执行完成 · 文件已就绪
+          </div>
+
+          <!-- Quick Actions - consolidated download -->
+          <div style="border-top:1px solid #e2e8f0;padding-top:12px;margin-bottom:12px;">
+            <p style="font-size:11px;font-weight:700;margin:0 0 8px 0;">快捷操作</p>
+            <div style="space-y:6px;">
+              <!-- Consolidated download button (expanded state) -->
+              <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:6px;">
+                <div style="padding:8px 10px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#f8fafc;">
+                  <span style="font-size:12px;display:flex;align-items:center;gap:6px;">
+                    <span style="font-size:14px;">⬇</span>下载文件
+                  </span>
+                  <span style="font-size:10px;color:#94a3b8;">3 个文件 ▼</span>
+                </div>
+                <!-- Expanded file list -->
+                <div style="border-top:1px solid #e2e8f0;">
+                  <div style="padding:6px 10px;font-size:11px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
+                    <span>📄 测试用例_v1.md</span>
+                    <span style="color:#3b82f6;">↓</span>
+                  </div>
+                  <div style="padding:6px 10px;font-size:11px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;border-top:1px solid #f1f5f9;">
+                    <span>🧠 测试用例_v1.xmind</span>
+                    <span style="color:#3b82f6;">↓</span>
+                  </div>
+                  <div style="padding:6px 10px;font-size:11px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;border-top:1px solid #f1f5f9;">
+                    <span>📊 测试用例_v1.xlsx</span>
+                    <span style="color:#3b82f6;">↓</span>
+                  </div>
+                </div>
+              </div>
+              <!-- Other quick actions -->
+              <button style="width:100%;display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;background:white;margin-bottom:6px;">
+                <span>💬 AI 微调</span>
+                <span style="font-size:10px;color:#94a3b8;">↓主区</span>
+              </button>
+              <button style="width:100%;display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;background:white;">
+                <span>✏️ 编辑脑图</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Rating panel - MOVED HERE -->
+          <div style="border-top:1px solid #e2e8f0;padding-top:12px;">
+            <p style="font-size:11px;font-weight:700;margin:0 0 4px 0;">本次生成评价</p>
+            <p style="font-size:10px;color:#94a3b8;margin:0 0 8px 0;">建议在 AI 微调后再评价</p>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="font-size:16px;">⭐⭐⭐⭐⭐</span>
+              <span style="font-size:10px;color:#64748b;">未评分</span>
+            </div>
+            <textarea style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px;font-size:11px;margin-top:6px;resize:none;" rows="2" placeholder="补充说明（可选）"></textarea>
+            <button style="width:100%;background:#1e3a8a;color:white;border:none;border-radius:6px;padding:6px;font-size:11px;font-weight:600;margin-top:6px;cursor:pointer;">提交评价</button>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:20px;padding:12px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;">
+  <h4 style="font-size:13px;margin:0 0 8px 0;color:#1e40af;">变更要点</h4>
+  <ul style="font-size:12px;color:#475569;margin:0;padding-left:20px;line-height:1.8;">
+    <li><b>数据概览</b>：4 卡片 → 单行内联，高度从 ~96px 降到 ~40px</li>
+    <li><b>模块用例概览</b>：从底部上移到第 2 位，改为手风琴卡片，展开看完整用例</li>
+    <li><b>侧边栏下载</b>：MD / XMind 两个下载按钮合并为一个，展开文件列表（含 xlsx）</li>
+    <li><b>评价面板</b>：从主区移到侧边栏快捷操作下方</li>
+    <li><b>顺序</b>：数据概览 → 模块用例概览 → 输出文件 → AI 微调（主区）；执行轨迹 → 快捷操作 → 评价（侧边栏）</li>
+  </ul>
+</div>
+
+<div class="options" style="margin-top:20px;">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>布局方案确认</h3>
+      <p>整体布局和各区块位置符合预期，可以开始写设计文档</p>
+    </div>
+  </div>
+  <div class="option" data-choice="adjust" onclick="toggleSelect(this)">
+    <div class="letter">✎</div>
+    <div class="content">
+      <h3>需要调整</h3>
+      <p>在终端中说明需要修改的地方</p>
+    </div>
+  </div>
+</div>

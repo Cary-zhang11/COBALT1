@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据概览 — 空间优化方案对比</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; padding: 24px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #64748b; margin-bottom: 20px; }
+
+  .option { margin-bottom: 16px; max-width: 800px; }
+  .option-label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .option-label .tag { background: #6366f1; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .option-label .tag.b { background: #10b981; }
+  .option-label .tag.c { background: #f59e0b; }
+  .option-label .tag.d { background: #ef4444; }
+  .option-label .desc { font-size: 12px; color: #64748b; }
+  .option-label .height { margin-left: auto; font-size: 11px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
+
+  /* Shared visual components */
+  .wizard-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .ws-header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; min-height: 44px; }
+  .ws-header .icon { font-size: 14px; flex-shrink: 0; }
+  .ws-header .title { font-weight: 600; font-size: 14px; }
+  .ws-body { padding: 8px 16px; }
+
+  /* Option A: current */
+  .inline-data { display: flex; align-items: center; gap: 12px; font-size: 13px; flex-wrap: wrap; padding: 6px 0; }
+  .inline-data .sep { color: #cbd5e1; }
+  .inline-data .val { font-weight: 600; }
+  .inline-data .score-good { color: #16a34a; font-weight: 600; }
+
+  /* Option B: header-only */
+  .ws-header-b { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #f1f5f9; min-height: 44px; }
+  .ws-header-b .icon { font-size: 14px; flex-shrink: 0; }
+  .ws-header-b .title { font-weight: 600; font-size: 14px; }
+  .ws-header-b .divider { color: #cbd5e1; margin: 0 4px; }
+  .ws-header-b .data { font-size: 13px; display: flex; align-items: center; gap: 10px; }
+  .ws-header-b .data .sep { color: #cbd5e1; }
+
+  /* Option C: plain bar */
+  .plain-bar { display: flex; align-items: center; gap: 12px; font-size: 13px; padding: 8px 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; min-height: 36px; }
+  .plain-bar .icon { font-size: 14px; }
+  .plain-bar .sep { color: #cbd5e1; }
+  .plain-bar .val { font-weight: 600; }
+
+  /* Option D: merged into module overview header */
+  .mod-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; min-height: 44px; }
+  .mod-header .left { display: flex; align-items: center; gap: 8px; }
+  .mod-header .left .icon { font-size: 14px; }
+  .mod-header .left .title { font-weight: 600; font-size: 14px; }
+  .mod-header .left .meta { font-weight: 400; color: #64748b; font-size: 12px; }
+  .mod-header .left .stats { font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 6px; margin-left: 8px; padding-left: 8px; border-left: 1px solid #cbd5e1; }
+  .mod-header .left .stats .val { font-weight: 600; color: #1e293b; }
+  .mod-header .left .stats .score-good { color: #16a34a; font-weight: 600; }
+  .mod-header .btns { display: flex; gap: 6px; }
+  .mod-header .btns button { font-size: 12px; padding: 4px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; }
+
+  .arrow-down { text-align: center; color: #cbd5e1; font-size: 18px; margin: 8px 0; }
+  .next-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .next-section .ws-header { border-bottom: 1px solid #e2e8f0; }
+</style>
+</head>
+<body>
+
+<h1>数据概览 — 空间优化方案对比</h1>
+<p class="subtitle">当前数据概览已改为单行内联，这里展示 4 种进一步省空间的方式</p>
+
+<!-- Option A: Current -->
+<div class="option">
+  <div class="option-label">
+    <span class="tag">A</span>
+    <span class="desc">当前方案 · WizardSection 标题栏 + 内联内容</span>
+    <span class="height">~74px</span>
+  </div>
+  <div class="wizard-section">
+    <div class="ws-header">
+      <span class="icon">📊</span>
+      <span class="title">数据概览</span>
+    </div>
+    <div class="ws-body">
+      <div class="inline-data">
+        <span>模块 <span class="val">3</span></span>
+        <span class="sep">·</span>
+        <span>用例 <span class="val">8</span></span>
+        <span class="sep">·</span>
+        <span>评分 <span class="val score-good">82</span></span>
+        <span class="sep">·</span>
+        <span>耗时 <span class="val">1.5min</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Option B: Data in header -->
+<div class="option">
+  <div class="option-label">
+    <span class="tag b">B</span>
+    <span class="desc">数据并入标题栏 · 去掉内容区，标题右侧直接显示数据</span>
+    <span class="height">~44px</span>
+  </div>
+  <div class="wizard-section">
+    <div class="ws-header-b">
+      <span class="icon">📊</span>
+      <span class="title">数据概览</span>
+      <span class="divider">—</span>
+      <div class="data">
+        <span>模块 <strong>3</strong></span>
+        <span class="sep">·</span>
+        <span>用例 <strong>8</strong></span>
+        <span class="sep">·</span>
+        <span>评分 <strong style="color:#16a34a">82</strong></span>
+        <span class="sep">·</span>
+        <span>耗时 <strong>1.5min</strong></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Option C: Plain bar -->
+<div class="option">
+  <div class="option-label">
+    <span class="tag c">C</span>
+    <span class="desc">无标题栏 · 一行内联条，图标+数据直接展示</span>
+    <span class="height">~36px</span>
+  </div>
+  <div class="plain-bar">
+    <span class="icon">📊</span>
+    <span>模块 <span class="val">3</span></span>
+    <span class="sep">·</span>
+    <span>用例 <span class="val">8</span></span>
+    <span class="sep">·</span>
+    <span>评分 <span class="val" style="color:#16a34a">82</span></span>
+    <span class="sep">·</span>
+    <span>耗时 <span class="val">1.5min</span></span>
+  </div>
+</div>
+
+<!-- Option D: Merge into module overview header -->
+<div class="option">
+  <div class="option-label">
+    <span class="tag d">D</span>
+    <span class="desc">取消数据概览独立区块 · 评分/耗时并入模块概览标题栏</span>
+    <span class="height">0px 额外</span>
+  </div>
+  <div class="next-section">
+    <div class="mod-header">
+      <div class="left">
+        <span class="icon">📋</span>
+        <span class="title">模块用例概览</span>
+        <span class="meta">(3 模块 · 8 用例)</span>
+        <div class="stats">
+          <span>评分 <span class="score-good">82</span></span>
+          <span class="sep">·</span>
+          <span>耗时 <span class="val">1.5min</span></span>
+        </div>
+      </div>
+      <div class="btns">
+        <button>全部展开</button>
+        <button>全部收起</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-down">↓ 下方接输出文件、AI 微调等区块</div>
+
+</body>
+</html>

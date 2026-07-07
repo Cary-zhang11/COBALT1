@@ -7,9 +7,11 @@ import type { UsecaseModule } from "./types";
 interface ModuleOverviewTableProps {
   modules: UsecaseModule[];
   totalCases: number;
+  qualityScore?: number | null;
+  duration?: number | null;
 }
 
-export function ModuleOverviewTable({ modules, totalCases }: ModuleOverviewTableProps) {
+export function ModuleOverviewTable({ modules, totalCases, qualityScore, duration }: ModuleOverviewTableProps) {
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
 
   const toggleModule = (index: number) => {
@@ -44,6 +46,37 @@ export function ModuleOverviewTable({ modules, totalCases }: ModuleOverviewTable
           <span className="text-muted-foreground font-normal">
             ({modules.length} 模块 · {totalCases} 用例)
           </span>
+          {(qualityScore != null || duration != null) && (
+            <span className="ml-1 pl-2 border-l border-border/60 flex items-center gap-2 text-xs text-muted-foreground font-normal">
+              {qualityScore != null && (
+                <span>
+                  评分{" "}
+                  <span
+                    className={`font-semibold tabular-nums ${
+                      qualityScore >= 80
+                        ? "text-emerald-600"
+                        : qualityScore >= 60
+                        ? "text-amber-500"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {qualityScore}
+                  </span>
+                </span>
+              )}
+              {qualityScore != null && duration != null && (
+                <span className="text-border">·</span>
+              )}
+              {duration != null && (
+                <span>
+                  耗时{" "}
+                  <span className="font-semibold tabular-nums">
+                    {(duration / 60000).toFixed(1)}min
+                  </span>
+                </span>
+              )}
+            </span>
+          )}
         </h3>
         <div className="flex items-center gap-2 shrink-0">
           <button

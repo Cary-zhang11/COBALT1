@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模块用例概览 — 方案对比</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; padding: 24px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1200px; }
+  .panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .panel-label { background: #6366f1; color: #fff; padding: 6px 16px; font-size: 12px; font-weight: 600; }
+  .panel-label.b { background: #10b981; }
+
+  /* Shared header */
+  .comp-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; min-height: 44px; }
+  .comp-header .title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+  .comp-header .title .icon { font-size: 16px; }
+  .comp-header .title .meta { font-weight: 400; color: #64748b; font-size: 12px; }
+  .comp-header .btns { display: flex; gap: 6px; }
+  .comp-header .btns button { font-size: 12px; padding: 4px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; transition: background .15s; }
+  .comp-header .btns button:hover { background: #e2e8f0; }
+  .comp-header .btns button:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* Badge */
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .badge-p0 { background: #fee2e2; color: #dc2626; }
+  .badge-p1 { background: #fed7aa; color: #c2410c; }
+  .badge-p2 { background: #e2e8f0; color: #64748b; }
+  .badge-count { background: #dbeafe; color: #1e40af; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
+
+  /* ====== Approach A: Table ====== */
+  .table-wrap { width: 100%; }
+  .table-wrap table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  .table-wrap thead th { text-align: left; padding: 8px 12px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; font-size: 12px; color: #64748b; font-weight: 600; }
+  .table-wrap thead th.center { text-align: center; }
+  .table-wrap tbody tr.mod-row { border-top: 1px solid #e2e8f0; cursor: pointer; transition: background .1s; }
+  .table-wrap tbody tr.mod-row:hover { background: #f8fafc; }
+  .table-wrap tbody tr.mod-row.expanded { background: #eff6ff; }
+  .table-wrap tbody tr.mod-row td { padding: 8px 12px; }
+  .table-wrap tbody tr.mod-row td.center { text-align: center; }
+  .table-wrap tbody tr.mod-row .arrow { display: inline-block; width: 14px; transition: transform .2s; }
+  .table-wrap tbody tr.mod-row.expanded .arrow { transform: rotate(90deg); }
+  .table-wrap tbody tr.case-row td { padding: 0; }
+  .case-detail { background: #f8fafc; padding: 10px 12px 10px 28px; border-left: 3px solid #6366f1; }
+  .case-detail .case-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .case-detail .case-head .case-title { font-weight: 600; font-size: 13px; }
+  .case-detail .field { font-size: 11px; color: #64748b; line-height: 1.6; }
+  .case-detail .field b { color: #475569; }
+
+  /* ====== Approach B: Accordion ====== */
+  .accordion { }
+  .mod-card { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+  .mod-card .mod-head { padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #fff; transition: background .1s; }
+  .mod-card .mod-head:hover { background: #f8fafc; }
+  .mod-card.open .mod-head { background: #eff6ff; }
+  .mod-card .mod-head .left { display: flex; align-items: center; gap: 8px; }
+  .mod-card .mod-head .left .arrow { display: inline-block; width: 14px; transition: transform .2s; color: #64748b; }
+  .mod-card.open .mod-head .left .arrow { transform: rotate(90deg); }
+  .mod-card .mod-head .left .name { font-weight: 600; font-size: 14px; }
+  .mod-card .mod-head .right { display: flex; align-items: center; gap: 6px; }
+  .mod-card .mod-body { display: none; }
+  .mod-card.open .mod-body { display: block; }
+  .case-card { padding: 10px 14px; border-top: 1px solid #e2e8f0; background: #fff; }
+  .case-card .case-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .case-card .case-head .case-title { font-weight: 600; font-size: 13px; }
+  .case-card .field { font-size: 11px; color: #64748b; line-height: 1.6; }
+  .case-card .field b { color: #475569; }
+
+  .note { padding: 8px 14px; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; }
+</style>
+</head>
+<body>
+
+<h1>模块用例概览 — 方案 A vs 方案 B</h1>
+<p class="subtitle">点击模块行/卡片头部可展开/折叠，点击「全部展开」「全部收起」可批量操作</p>
+
+<div class="split">
+  <!-- ========== Approach A: Table ========== -->
+  <div class="panel">
+    <div class="panel-label">方案 A · 表格展开行</div>
+    <div class="comp-header">
+      <div class="title">
+        <span class="icon">📋</span>
+        <span>模块用例概览</span>
+        <span class="meta">(3 模块 · 8 用例)</span>
+      </div>
+      <div class="btns">
+        <button onclick="expandAllA()">全部展开</button>
+        <button onclick="collapseAllA()">全部收起</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>模块</th>
+            <th class="center">用例数</th>
+            <th class="center">P0</th>
+            <th class="center">P1</th>
+            <th class="center">P2</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-a">
+          <!-- Module 1: 登录模块 (expanded) -->
+          <tr class="mod-row expanded" data-mod="0" onclick="toggleModA(0)">
+            <td><span class="arrow">▶</span> <b>登录模块</b></td>
+            <td class="center">3</td>
+            <td class="center"><span class="badge badge-p0">2</span></td>
+            <td class="center"><span class="badge badge-p1">1</span></td>
+            <td class="center"><span class="badge badge-p2">0</span></td>
+          </tr>
+          <tr class="case-row" data-cases="0">
+            <td colspan="5">
+              <div class="case-detail">
+                <div class="case-head"><span class="badge badge-p0">P0</span><span class="case-title">手机号+验证码登录</span></div>
+                <div class="field"><b>前置条件:</b> 已注册手机号</div>
+                <div class="field"><b>步骤:</b> 1.输入手机号 2.点击获取验证码 3.输入验证码 4.点击登录</div>
+                <div class="field"><b>预期结果:</b> 登录成功，跳转到首页</div>
+                <div class="field"><b>标签:</b> 登录 · 验证码 · 正向</div>
+              </div>
+              <div class="case-detail">
+                <div class="case-head"><span class="badge badge-p0">P0</span><span class="case-title">密码登录</span></div>
+                <div class="field"><b>前置条件:</b> 已注册账号</div>
+                <div class="field"><b>步骤:</b> 1.输入账号 2.输入密码 3.点击登录</div>
+                <div class="field"><b>预期结果:</b> 登录成功，跳转到首页</div>
+                <div class="field"><b>标签:</b> 登录 · 密码 · 正向</div>
+              </div>
+              <div class="case-detail">
+                <div class="case-head"><span class="badge badge-p1">P1</span><span class="case-title">微信扫码登录</span></div>
+                <div class="field"><b>前置条件:</b> 已绑定微信</div>
+                <div class="field"><b>步骤:</b> 1.点击微信登录 2.扫码确认</div>
+                <div class="field"><b>预期结果:</b> 登录成功，跳转到首页</div>
+                <div class="field"><b>标签:</b> 登录 · 微信 · 正向</div>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Module 2: 注册模块 (collapsed) -->
+          <tr class="mod-row" data-mod="1" onclick="toggleModA(1)">
+            <td><span class="arrow">▶</span> <b>注册模块</b></td>
+            <td class="center">3</td>
+            <td class="center"><span class="badge badge-p0">1</span></td>
+            <td class="center"><span class="badge badge-p1">1</span></td>
+            <td class="center"><span class="badge badge-p2">1</span></td>
+          </tr>
+          <tr class="case-row" data-cases="1" style="display:none;">
+            <td colspan="5">
+              <div class="case-detail">
+                <div class="case-head"><span class="badge badge-p0">P0</span><span class="case-title">手机号注册</span></div>
+                <div class="field"><b>前置条件:</b> 手机号未注册</div>
+                <div class="field"><b>步骤:</b> 1.输入手机号 2.获取验证码 3.输入验证码 4.设置密码 5.点击注册</div>
+                <div class="field"><b>预期结果:</b> 注册成功，跳转到登录页</div>
+                <div class="field"><b>标签:</b> 注册 · 手机号 · 正向</div>
+              </div>
+              <div class="case-detail">
+                <div class="case-head"><span class="badge badge-p1">P1</span><span class="case-title">邮箱注册</span></div>
+                <div class="field"><b>前置条件:</b> 邮箱未注册</div>
+                <div class="field"><b>步骤:</b> 1.输入邮箱 2.获取验证邮件 3.点击验证链接 4.设置密码</div>
+                <div class="field"><b>预期结果:</b> 注册成功</div>
+                <div class="field"><b>标签:</b> 注册 · 邮箱 · 正向</div>
+              </div>
+              <div class="case-detail">
+                <div class="case-head"><span class="badge badge-p2">P2</span><span class="case-title">已注册手机号重复注册</span></div>
+                <div class="field"><b>前置条件:</b> 手机号已注册</div>
+                <div class="field"><b>步骤:</b> 1.输入已注册手机号 2.获取验证码</div>
+                <div class="field"><b>预期结果:</b> 提示"该手机号已注册"</div>
+                <div class="field"><b>标签:</b> 注册 · 异常</div>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Module 3: 个人中心 (collapsed) -->
+          <tr class="mod-row" data-mod="2" onclick="toggleModA(2)">
+            <td><span class="arrow">▶</span> <b>个人中心</b></td>
+            <td class="center">2</td>
+            <td class="center"><span class="badge badge-p0">1</span></td>
+            <td class="center"><span class="badge badge-p1">0</span></td>
+            <td class="center"><span class="badge badge-p2">1</span></td>
+          </tr>
+          <tr class="case-row" data-cases="2" style="display:none;">
+            <td colspan="5">
+              <div class="case-detail">
+                <div class="case-head"><span class="badge badge-p0">P0</span><span class="case-title">查看个人信息</span></div>
+                <div class="field"><b>前置条件:</b> 用户已登录</div>
+                <div class="field"><b>步骤:</b> 1.点击头像 2.选择"个人信息"</div>
+                <div class="field"><b>预期结果:</b> 展示个人信息页</div>
+                <div class="field"><b>标签:</b> 个人中心 · 查看</div>
+              </div>
+              <div class="case-detail">
+                <div class="case-head"><span class="badge badge-p2">P2</span><span class="case-title">修改头像</span></div>
+                <div class="field"><b>前置条件:</b> 用户已登录</div>
+                <div class="field"><b>步骤:</b> 1.点击头像 2.选择"修改头像" 3.上传图片 4.点击保存</div>
+                <div class="field"><b>预期结果:</b> 头像更新成功</div>
+                <div class="field"><b>标签:</b> 个人中心 · 修改</div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note"><b>特点:</b> 信息密度高，紧凑，模块对比一目了然。表头始终可见，适合模块多的场景。</div>
+  </div>
+
+  <!-- ========== Approach B: Accordion ========== -->
+  <div class="panel">
+    <div class="panel-label b">方案 B · 手风琴卡片（当前实现）</div>
+    <div class="comp-header">
+      <div class="title">
+        <span class="icon">📋</span>
+        <span>模块用例概览</span>
+        <span class="meta">(3 模块 · 8 用例)</span>
+      </div>
+      <div class="btns">
+        <button onclick="expandAllB()">全部展开</button>
+        <button onclick="collapseAllB()">全部收起</button>
+      </div>
+    </div>
+    <div class="accordion" style="padding: 8px;">
+      <!-- Module 1: 登录模块 (expanded) -->
+      <div class="mod-card open" data-mod-b="0">
+        <div class="mod-head" onclick="toggleModB(0)">
+          <div class="left">
+            <span class="arrow">▶</span>
+            <span class="name">登录模块</span>
+            <span class="badge-count">3 用例</span>
+          </div>
+          <div class="right">
+            <span class="badge badge-p0">P0×2</span>
+            <span class="badge badge-p1">P1×1</span>
+            <span class="badge badge-p2">P2×0</span>
+          </div>
+        </div>
+        <div class="mod-body">
+          <div class="case-card">
+            <div class="case-head"><span class="badge badge-p0">P0</span><span class="case-title">手机号+验证码登录</span></div>
+            <div class="field"><b>前置条件:</b> 已注册手机号</div>
+            <div class="field"><b>步骤:</b> 1.输入手机号 2.点击获取验证码 3.输入验证码 4.点击登录</div>
+            <div class="field"><b>预期结果:</b> 登录成功，跳转到首页</div>
+            <div class="field"><b>标签:</b> 登录 · 验证码 · 正向</div>
+          </div>
+          <div class="case-card">
+            <div class="case-head"><span class="badge badge-p0">P0</span><span class="case-title">密码登录</span></div>
+            <div class="field"><b>前置条件:</b> 已注册账号</div>
+            <div class="field"><b>步骤:</b> 1.输入账号 2.输入密码 3.点击登录</div>
+            <div class="field"><b>预期结果:</b> 登录成功，跳转到首页</div>
+            <div class="field"><b>标签:</b> 登录 · 密码 · 正向</div>
+          </div>
+          <div class="case-card">
+            <div class="case-head"><span class="badge badge-p1">P1</span><span class="case-title">微信扫码登录</span></div>
+            <div class="field"><b>前置条件:</b> 已绑定微信</div>
+            <div class="field"><b>步骤:</b> 1.点击微信登录 2.扫码确认</div>
+            <div class="field"><b>预期结果:</b> 登录成功，跳转到首页</div>
+            <div class="field"><b>标签:</b> 登录 · 微信 · 正向</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module 2: 注册模块 (collapsed) -->
+      <div class="mod-card" data-mod-b="1">
+        <div class="mod-head" onclick="toggleModB(1)">
+          <div class="left">
+            <span class="arrow">▶</span>
+            <span class="name">注册模块</span>
+            <span class="badge-count">3 用例</span>
+          </div>
+          <div class="right">
+            <span class="badge badge-p0">P0×1</span>
+            <span class="badge badge-p1">P1×1</span>
+            <span class="badge badge-p2">P2×1</span>
+          </div>
+        </div>
+        <div class="mod-body">
+          <div class="case-card">
+            <div class="case-head"><span class="badge badge-p0">P0</span><span class="case-title">手机号注册</span></div>
+            <div class="field"><b>前置条件:</b> 手机号未注册</div>
+            <div class="field"><b>步骤:</b> 1.输入手机号 2.获取验证码 3.输入验证码 4.设置密码 5.点击注册</div>
+            <div class="field"><b>预期结果:</b> 注册成功，跳转到登录页</div>
+            <div class="field"><b>标签:</b> 注册 · 手机号 · 正向</div>
+          </div>
+          <div class="case-card">
+            <div class="case-head"><span class="badge badge-p1">P1</span><span class="case-title">邮箱注册</span></div>
+            <div class="field"><b>前置条件:</b> 邮箱未注册</div>
+            <div class="field"><b>步骤:</b> 1.输入邮箱 2.获取验证邮件 3.点击验证链接 4.设置密码</div>
+            <div class="field"><b>预期结果:</b> 注册成功</div>
+            <div class="field"><b>标签:</b> 注册 · 邮箱 · 正向</div>
+          </div>
+          <div class="case-card">
+            <div class="case-head"><span class="badge badge-p2">P2</span><span class="case-title">已注册手机号重复注册</span></div>
+            <div class="field"><b>前置条件:</b> 手机号已注册</div>
+            <div class="field"><b>步骤:</b> 1.输入已注册手机号 2.获取验证码</div>
+            <div class="field"><b>预期结果:</b> 提示"该手机号已注册"</div>
+            <div class="field"><b>标签:</b> 注册 · 异常</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module 3: 个人中心 (collapsed) -->
+      <div class="mod-card" data-mod-b="2">
+        <div class="mod-head" onclick="toggleModB(2)">
+          <div class="left">
+            <span class="arrow">▶</span>
+            <span class="name">个人中心</span>
+            <span class="badge-count">2 用例</span>
+          </div>
+          <div class="right">
+            <span class="badge badge-p0">P0×1</span>
+            <span class="badge badge-p1">P1×0</span>
+            <span class="badge badge-p2">P2×1</span>
+          </div>
+        </div>
+        <div class="mod-body">
+          <div class="case-card">
+            <div class="case-head"><span class="badge badge-p0">P0</span><span class="case-title">查看个人信息</span></div>
+            <div class="field"><b>前置条件:</b> 用户已登录</div>
+            <div class="field"><b>步骤:</b> 1.点击头像 2.选择"个人信息"</div>
+            <div class="field"><b>预期结果:</b> 展示个人信息页</div>
+            <div class="field"><b>标签:</b> 个人中心 · 查看</div>
+          </div>
+          <div class="case-card">
+            <div class="case-head"><span class="badge badge-p2">P2</span><span class="case-title">修改头像</span></div>
+            <div class="field"><b>前置条件:</b> 用户已登录</div>
+            <div class="field"><b>步骤:</b> 1.点击头像 2.选择"修改头像" 3.上传图片 4.点击保存</div>
+            <div class="field"><b>预期结果:</b> 头像更新成功</div>
+            <div class="field"><b>标签:</b> 个人中心 · 修改</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note"><b>特点:</b> 阅读体验更好，间距宽松，适合长文本步骤。但占用垂直空间更多。</div>
+  </div>
+</div>
+
+<script>
+// Approach A toggle
+function toggleModA(idx) {
+  const row = document.querySelector(`tr.mod-row[data-mod="${idx}"]`);
+  const cases = document.querySelector(`tr.case-row[data-cases="${idx}"]`);
+  if (row.classList.contains('expanded')) {
+    row.classList.remove('expanded');
+    cases.style.display = 'none';
+  } else {
+    row.classList.add('expanded');
+    cases.style.display = '';
+  }
+}
+function expandAllA() {
+  document.querySelectorAll('tr.mod-row').forEach((row, i) => {
+    row.classList.add('expanded');
+    document.querySelector(`tr.case-row[data-cases="${i}"]`).style.display = '';
+  });
+}
+function collapseAllA() {
+  document.querySelectorAll('tr.mod-row').forEach((row, i) => {
+    row.classList.remove('expanded');
+    document.querySelector(`tr.case-row[data-cases="${i}"]`).style.display = 'none';
+  });
+}
+
+// Approach B toggle
+function toggleModB(idx) {
+  document.querySelector(`.mod-card[data-mod-b="${idx}"]`).classList.toggle('open');
+}
+function expandAllB() {
+  document.querySelectorAll('.mod-card').forEach(c => c.classList.add('open'));
+}
+function collapseAllB() {
+  document.querySelectorAll('.mod-card').forEach(c => c.classList.remove('open'));
+}
+</script>
+
+</body>
+</html>
