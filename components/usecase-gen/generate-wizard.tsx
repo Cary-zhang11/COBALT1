@@ -853,7 +853,7 @@ export function GenerateWizard({
                   ))}
                 </div>
               )}
-              <h4 className="text-sm font-medium mb-2 mt-4">粘贴需求文本</h4>
+              <h4 className="text-sm font-medium mb-2 mt-4">粘贴需求或者补充说明</h4>
               <textarea
                 value={requirementText}
                 onChange={(e) => setRequirementText(e.target.value)}
@@ -1084,7 +1084,7 @@ export function GenerateWizard({
                 type="button"
                 onClick={() => {
                   if (!uploadedFiles.length && !requirementText.trim()) {
-                    setValidationMsg("请至少上传一个需求文档，或粘贴需求文本");
+                    setValidationMsg("请至少上传一个需求文档，或粘贴需求或者补充说明");
                     return;
                   }
                   setValidationMsg("");
