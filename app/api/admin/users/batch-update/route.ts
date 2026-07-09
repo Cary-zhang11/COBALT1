@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 
 const VALID_STATUSES = ["active", "inactive", "disabled", "locked"] as const;
+const VALID_GROUPS = ["C1C", "C1B", "C2C", "C2B", "数科", "车小妹"] as const;
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,6 +30,14 @@ export async function POST(req: NextRequest) {
     if (accountStatus !== undefined && !VALID_STATUSES.includes(accountStatus)) {
       return NextResponse.json(
         { error: `accountStatus 必须是: ${VALID_STATUSES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // 校验 group（允许 null 或空字符串清除分组）
+    if (group !== undefined && group !== null && group !== "" && !VALID_GROUPS.includes(group)) {
+      return NextResponse.json(
+        { error: `group 必须是: ${VALID_GROUPS.join(", ")}` },
         { status: 400 }
       );
     }

@@ -228,15 +228,15 @@ export async function GET(req: NextRequest) {
     const trendStart = trendRange === "custom" && trendCustomStart ? trendCustomStart : getChartStartDate(trendRange);
     const dailyTasks = await prisma.task.findMany({
       where: { ...completedFilter, ...trendDateFilter },
-      select: { createdAt: true, qualityScore: true },
+      select: { createdAt: true, userId: true },
       orderBy: { createdAt: "asc" },
     });
-    const dailyMap = new Map<string, { count: number; scores: number[] }>();
+    const dailyMap = new Map<string, { count: number; userIds: Set<string> }>();
     for (const t of dailyTasks) {
       const date = t.createdAt.toISOString().slice(0, 10);
-      const entry = dailyMap.get(date) || { count: 0, scores: [] };
+      const entry = dailyMap.get(date) || { count: 0, userIds: new Set<string>() };
       entry.count++;
-      if (t.qualityScore != null) entry.scores.push(t.qualityScore);
+      entry.userIds.add(t.userId);
       dailyMap.set(date, entry);
     }
     // 补全范围内没有任务的日期（count=0）
@@ -247,7 +247,7 @@ export async function GET(req: NextRequest) {
     while (fillCursor <= trendEndDate) {
       const dateStr = fillCursor.toISOString().slice(0, 10);
       if (!dailyMap.has(dateStr)) {
-        dailyMap.set(dateStr, { count: 0, scores: [] });
+        dailyMap.set(dateStr, { count: 0, userIds: new Set<string>() });
       }
       fillCursor.setUTCDate(fillCursor.getUTCDate() + 1);
     }
@@ -256,9 +256,7 @@ export async function GET(req: NextRequest) {
       .map(([date, v]) => ({
         date,
         count: v.count,
-        avgScore: v.scores.length > 0
-          ? Math.round(v.scores.reduce((a, b) => a + b, 0) / v.scores.length)
-          : 0,
+        userCount: v.userIds.size,
       }));
 
     // ---- Category distribution（使用 categoryRange） ----
@@ -365,7 +363,7 @@ export async function GET(req: NextRequest) {
         totalCases: true,
         qualityScore: true,
         tokenUsage: true,
-        category: true,
+        businessType: true,
         user: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -388,13 +386,14 @@ export async function GET(req: NextRequest) {
       recentRecords: recent.map((r) => {
         const fb = latestByTask.get(r.id);
         return {
+          id: r.id,
           time: r.createdAt.toLocaleDateString("zh-CN"),
           user: r.user?.name || "未知",
           req: (r.input || "").slice(0, 60),
           count: r.totalCases || 0,
           score: r.qualityScore || 0,
           tokens: r.tokenUsage || 0,
-          category: r.category || "未分类",
+          category: r.businessType || "未分类",
           userRating: fb?.rating ?? null,
           userComment: fb?.comment ?? null,
         };

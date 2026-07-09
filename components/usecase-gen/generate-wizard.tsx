@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useCreateTask, useExecuteTask, useResumeTask, useCancelTask } from "@/hooks/use-tasks";
+import { useAuthStore } from "@/stores/auth-store";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useOutputScanner, maxXmindVersion, maxMdVersion, type FileInfo } from "@/hooks/use-output-scanner";
 import { useTaskEvents } from "@/hooks/use-task-events";
@@ -81,6 +82,7 @@ function WizardStickyFooter({
 export function GenerateWizard({
   initialTaskId, onComplete, skillId, onNavigateToTab,
 }: GenerateWizardProps) {
+  const { user: currentUser } = useAuthStore();
   const createTask = useCreateTask();
   const executeTask = useExecuteTask();
   const resumeTask = useResumeTask();
@@ -119,6 +121,7 @@ export function GenerateWizard({
     mdFileName?: string;
     userName?: string;
     createdAt?: string;
+    businessType?: string | null;
   }
 
   const kbListQuery = useInfiniteQuery({
@@ -149,7 +152,7 @@ export function GenerateWizard({
       if (historyBusinessType) params.set("businessType", historyBusinessType);
       const res = await fetch(`/api/knowledge?${params}`);
       if (!res.ok) throw new Error("Failed to load uploaded history");
-      return res.json() as Promise<WizardListPage & { items: { id: string; title: string; content: string }[] }>;
+      return res.json() as Promise<WizardListPage & { items: { id: string; title: string; content: string; businessType: string | null }[] }>;
     },
     initialPageParam: 1,
     getNextPageParam: wizardListNextPage,
@@ -165,7 +168,7 @@ export function GenerateWizard({
       if (historyBusinessType) params.set("businessType", historyBusinessType);
       const res = await fetch(`/api/knowledge/history?${params}`);
       if (!res.ok) throw new Error("Failed to load platform history");
-      return res.json() as Promise<WizardListPage & { items: { id: string; mdFileName: string }[] }>;
+      return res.json() as Promise<WizardListPage & { items: { id: string; mdFileName: string; businessType: string | null }[] }>;
     },
     initialPageParam: 1,
     getNextPageParam: wizardListNextPage,
@@ -183,7 +186,7 @@ export function GenerateWizard({
     const seen = new Set<string>();
     const uploadedItems =
       uploadedHistoryQuery.data?.pages.flatMap(
-        (p) => (p.items as { id: string; title: string; content: string; user?: { name: string | null }; createdAt?: string }[]) ?? [],
+        (p) => (p.items as { id: string; title: string; content: string; businessType: string | null; user?: { name: string | null }; createdAt?: string }[]) ?? [],
       ) ?? [];
     for (const item of uploadedItems) {
       const id = `knowledge:${item.id}`;
@@ -195,11 +198,12 @@ export function GenerateWizard({
         sourcePath: item.content,
         userName: item.user?.name || undefined,
         createdAt: item.createdAt,
+        businessType: item.businessType,
       });
     }
     const platformItems =
       platformHistoryQuery.data?.pages.flatMap(
-        (p) => (p.items as { id: string; mdFileName: string; userName?: string; createdAt?: string }[]) ?? [],
+        (p) => (p.items as { id: string; mdFileName: string; businessType: string | null; userName?: string; createdAt?: string }[]) ?? [],
       ) ?? [];
     for (const item of platformItems) {
       if (!item.mdFileName) continue;
@@ -213,6 +217,7 @@ export function GenerateWizard({
         mdFileName: item.mdFileName,
         userName: item.userName,
         createdAt: item.createdAt,
+        businessType: item.businessType,
       });
     }
     return result;
@@ -222,8 +227,8 @@ export function GenerateWizard({
     (uploadedHistoryQuery.data?.pages[0]?.total ?? 0) +
     (platformHistoryQuery.data?.pages[0]?.total ?? 0);
 
-  // 从已选知识条目推算 businessType
-  const inferredBusinessType = useMemo(() => {
+  // 优先级1：从已选知识条目推算 businessType
+  const inferredFromKnowledge = useMemo(() => {
     const items = kbItems;
     for (const id of selectedKnowledgeIds) {
       const item = items.find((i) => i.id === id);
@@ -231,6 +236,26 @@ export function GenerateWizard({
     }
     return null;
   }, [selectedKnowledgeIds, kbItems]);
+
+  // 优先级2：从已选历史用例范文推算 businessType
+  const inferredFromHistory = useMemo(() => {
+    for (const id of selectedHistoryIds) {
+      const opt = historyOptions.find((h) => h.id === id);
+      if (opt?.businessType) return opt.businessType;
+    }
+    return null;
+  }, [selectedHistoryIds, historyOptions]);
+
+  // 最终推算值：知识条目 → 历史用例 → 当前用户分组（fallback）
+  const inferredBusinessType = useMemo(() => {
+    if (inferredFromKnowledge) return inferredFromKnowledge;
+    if (inferredFromHistory) return inferredFromHistory;
+    const userGroup = currentUser?.group;
+    if (userGroup && (BUSINESS_TYPES as readonly string[]).includes(userGroup)) {
+      return userGroup;
+    }
+    return null;
+  }, [inferredFromKnowledge, inferredFromHistory, currentUser?.group]);
 
   // 自动同步推算值到 selectedBusinessType（仅当未手选时）
   useEffect(() => {
@@ -883,7 +908,10 @@ export function GenerateWizard({
                 ))}
               </select>
               {!businessTypeManuallySet && !inferredBusinessType && (
-                <span className="text-xs text-muted-foreground">关联知识条目后自动推算</span>
+                <span className="text-xs text-muted-foreground">关联知识条目或历史用例后自动推算</span>
+              )}
+              {!businessTypeManuallySet && inferredBusinessType && !inferredFromKnowledge && !inferredFromHistory && (
+                <span className="text-xs text-muted-foreground">根据您的人员分组推算</span>
               )}
             </div>
 

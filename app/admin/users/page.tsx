@@ -31,6 +31,8 @@ const STATUS_LABELS: Record<string, string> = {
   locked: "已锁定",
 };
 
+const USER_GROUPS = ["C1C", "C1B", "C2C", "C2B", "数科", "车小妹"] as const;
+
 export default function AdminUsersPage() {
   const router = useRouter();
   const { user: currentUser, isLoading: authLoading } = useAuthStore();
@@ -42,6 +44,7 @@ export default function AdminUsersPage() {
   const [groupFilter, setGroupFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchGroup, setBatchGroup] = useState("");
   const [loading, setLoading] = useState(false);
 
   const fetchUsers = useCallback(async () => {
@@ -112,6 +115,26 @@ export default function AdminUsersPage() {
     }
   };
 
+  const updateUserGroup = async (userId: string, group: string) => {
+    try {
+      const res = await fetch("/api/admin/users/batch-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: [userId], group: group || null }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "更新分组失败");
+        fetchUsers();
+        return;
+      }
+      fetchUsers();
+    } catch {
+      alert("更新分组失败");
+      fetchUsers();
+    }
+  };
+
   const totalPages = Math.ceil(total / pageSize);
 
   return (
@@ -133,6 +156,9 @@ export default function AdminUsersPage() {
           className="px-3 py-2 border rounded-lg text-sm outline-none"
         >
           <option value="">全部用户组</option>
+          {USER_GROUPS.map((g) => (
+            <option key={g} value={g}>{g}</option>
+          ))}
         </select>
         <select
           value={statusFilter}
@@ -176,7 +202,18 @@ export default function AdminUsersPage() {
                   />
                 </td>
                 <td className="px-4 py-3">{u.username || u.name || "-"}</td>
-                <td className="px-4 py-3">{u.group || "-"}</td>
+                <td className="px-4 py-3">
+                  <select
+                    value={u.group || ""}
+                    onChange={(e) => updateUserGroup(u.id, e.target.value)}
+                    className={`px-2 py-0.5 text-xs rounded-full border cursor-pointer outline-none focus:ring-1 focus:ring-blue-400 ${u.group ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100"}`}
+                  >
+                    <option value="">未分组</option>
+                    {USER_GROUPS.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[u.accountStatus] || "bg-gray-400"}`} />
@@ -222,6 +259,28 @@ export default function AdminUsersPage() {
                 className="px-3 py-1.5 text-xs bg-yellow-50 text-yellow-700 rounded border hover:bg-yellow-100"
               >
                 锁定
+              </button>
+              <span className="text-gray-300">|</span>
+              <select
+                value={batchGroup}
+                onChange={(e) => setBatchGroup(e.target.value)}
+                className="px-2 py-1.5 text-xs border rounded"
+              >
+                <option value="">设置分组...</option>
+                {USER_GROUPS.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  if (!batchGroup) return;
+                  batchUpdate({ group: batchGroup });
+                  setBatchGroup("");
+                }}
+                disabled={!batchGroup}
+                className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 rounded border hover:bg-blue-100 disabled:opacity-50"
+              >
+                应用分组
               </button>
             </>
           )}

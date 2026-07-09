@@ -2,11 +2,11 @@
 export type KpiRange = "all" | "week" | "7d" | "month" | "30d" | "custom";
 
 // 图表时间范围类型
-export type ChartRange = "all" | "7d" | "30d" | "90d" | "custom";
+export type ChartRange = "all" | "week" | "7d" | "month" | "30d" | "90d" | "custom";
 
 // 允许的图表范围选项（不同图表可选范围不同）
-const FULL_CHART_OPTIONS: ChartRange[] = ["all", "7d", "30d", "90d", "custom"];
-const SHORT_CHART_OPTIONS: ChartRange[] = ["all", "7d", "30d", "custom"];
+const FULL_CHART_OPTIONS: ChartRange[] = ["all", "week", "month", "7d", "30d", "90d", "custom"];
+const SHORT_CHART_OPTIONS: ChartRange[] = ["all", "week", "month", "7d", "30d", "custom"];
 
 // KPI 时间窗口
 export interface KpiDateWindow {
@@ -57,7 +57,9 @@ export const KPI_PERIOD_UNIT: Record<KpiRange, string> = {
 // 图表标签映射
 export const CHART_LABELS: Record<ChartRange, string> = {
   all: "全部",
+  week: "本周",
   "7d": "近7天",
+  month: "本月",
   "30d": "近30天",
   "90d": "近90天",
   custom: "自定义",
@@ -78,9 +80,14 @@ export function parseChartRange(
   return "30d";
 }
 
-/** 短范围选项（仅 all/7d/30d） */
+/** 短范围选项（仅 all/week/month/7d/30d） */
 export function shortChartOptions(): ChartRange[] {
   return SHORT_CHART_OPTIONS;
+}
+
+/** 全量范围选项（all/week/month/7d/30d/90d/custom） */
+export function fullChartOptions(): ChartRange[] {
+  return FULL_CHART_OPTIONS;
 }
 
 /** 获取 KPI 时间窗口（currentStart 到 now, previousStart 到 previousEnd） */
@@ -129,6 +136,19 @@ export function getKpiDateWindow(range: KpiRange): KpiDateWindow | null {
 /** 获取图表起始日期（null 表示不过滤，custom 由 route.ts 单独处理） */
 export function getChartStartDate(range: ChartRange): Date | null {
   if (range === "all" || range === "custom") return null;
+  if (range === "week") {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday...
+    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const thisMonday = new Date(now);
+    thisMonday.setHours(0, 0, 0, 0);
+    thisMonday.setDate(now.getDate() - daysSinceMonday);
+    return thisMonday;
+  }
+  if (range === "month") {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }
   const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }

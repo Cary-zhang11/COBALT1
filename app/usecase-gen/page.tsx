@@ -22,6 +22,7 @@ function UsecaseGenPageContent() {
   });
   const taskId = searchParams.get("taskId") || null;
   const editorFilePath = searchParams.get("filePath") || null;
+  const fromParam = searchParams.get("from");
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -38,13 +39,14 @@ function UsecaseGenPageContent() {
     setActiveTabState(i);
     const params = new URLSearchParams();
     params.set("tab", TAB_KEYS[i]);
+    if (fromParam) params.set("from", fromParam);
     if (extraParams) {
       for (const [k, v] of Object.entries(extraParams)) {
         if (v) params.set(k, v);
       }
     }
     router.replace(`/usecase-gen?${params.toString()}`, { scroll: false });
-  }, [router]);
+  }, [router, fromParam]);
 
   const skillId = process.env.NEXT_PUBLIC_USECASE_SKILL_ID;
 
@@ -66,11 +68,14 @@ function UsecaseGenPageContent() {
           (taskId ? (
             <div className="max-w-7xl mx-auto w-full">
               <button
-                onClick={() => router.replace("/usecase-gen?tab=history", { scroll: false })}
+                onClick={() => {
+                  const targetTab = fromParam === "dashboard" ? "dashboard" : "history";
+                  router.replace(`/usecase-gen?tab=${targetTab}`, { scroll: false });
+                }}
                 className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
               >
                 <ArrowLeft className="w-4 h-4" />
-                返回列表
+                {fromParam === "dashboard" ? "返回看板" : "返回列表"}
               </button>
               <GenerateWizard
                 key={taskId}
@@ -98,7 +103,8 @@ function UsecaseGenPageContent() {
               filePath={editorFilePath}
               onBack={() => {
                 if (taskId) {
-                  router.replace(`/usecase-gen?tab=history&taskId=${taskId}`, { scroll: false });
+                  const fromQs = fromParam ? `&from=${fromParam}` : "";
+                  router.replace(`/usecase-gen?tab=history&taskId=${taskId}${fromQs}`, { scroll: false });
                   setActiveTabState(TAB_INDEX["history"]);
                 } else {
                   setActiveTab(TAB_INDEX["generate"]);

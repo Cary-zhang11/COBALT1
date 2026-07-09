@@ -3,6 +3,13 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dashboard } from "../dashboard";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: vi.fn(),
+    push: vi.fn(),
+  }),
+}));
+
 const mockStats = {
   kpi: {
     totalCases: 100,
@@ -12,7 +19,7 @@ const mockStats = {
     tasksPerWeek: 12,
     requirementsPerWeek: 8,
   },
-  dailyTrend: [{ date: "2026-06-01", count: 3, avgScore: 80 }],
+  dailyTrend: [{ date: "2026-06-01", count: 3, userCount: 2 }],
   categoryDistribution: [{ category: "功能", count: 2 }],
   dimensionCoverage: [{ name: "边界", covered: 1, total: 2 }],
   topUsers: [{ userName: "Alice", count: 3 }],
@@ -34,6 +41,7 @@ const mockStats = {
   userRatingRate: { percent: 67, ratedCount: 2, completedCount: 3 },
   recentRecords: [
     {
+      id: "test-task-1",
       time: "2026/6/1",
       user: "Alice",
       req: "登录功能",

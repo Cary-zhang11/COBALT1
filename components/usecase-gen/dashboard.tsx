@@ -2,6 +2,7 @@
 
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   BarChart3, Users, Clock, Loader2, Star,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import {
   KPI_PERIOD_UNIT,
   CHART_LABELS,
   shortChartOptions,
+  fullChartOptions,
 } from "@/lib/stats-time-range";
 
 interface StatsData {
@@ -28,7 +30,7 @@ interface StatsData {
     tasksPerWeek: number;
     requirementsPerWeek: number;
   };
-  dailyTrend: { date: string; count: number; avgScore: number }[];
+  dailyTrend: { date: string; count: number; userCount: number }[];
   categoryDistribution: { category: string; count: number }[];
   dimensionCoverage: { name: string; covered: number; total: number }[];
   topUsers: { userName: string; count: number }[];
@@ -47,6 +49,7 @@ interface StatsData {
     requirementsPerWeek:{ current: number; previous: number; changePercent: number | null };
   };
   recentRecords: {
+    id: string;
     time: string;
     user: string;
     req: string;
@@ -186,7 +189,7 @@ function KpiTimeFilter({
 function ChartTimeFilter({
   value,
   onChange,
-  options = ["all", "7d", "30d", "90d", "custom"] as ChartRange[],
+  options = fullChartOptions(),
   customDates,
   onCustomDatesChange,
 }: {
@@ -228,7 +231,7 @@ function TrendLegend() {
       </span>
       <span className="flex items-center gap-1">
         <span className="inline-block w-3 h-0.5 bg-[#10b981] rounded" />
-        质量分（右轴）
+        使用人员（右轴）
       </span>
     </div>
   );
@@ -454,6 +457,7 @@ interface DashboardBodyProps {
   setRecordRange: (v: ChartRange) => void;
   recordCustom: CustomDates;
   setRecordCustom: (d: CustomDates) => void;
+  onRecordClick: (id: string) => void;
 }
 
 function DashboardBody({
@@ -465,6 +469,7 @@ function DashboardBody({
   ratingRange, setRatingRange, ratingCustom, setRatingCustom,
   userRange, setUserRange, userCustom, setUserCustom,
   recordRange, setRecordRange, recordCustom, setRecordCustom,
+  onRecordClick,
 }: DashboardBodyProps) {
   const [recordSearch, setRecordSearch] = useState("");
   const [recordFilter, setRecordFilter] = useState<RecordFilter>("all");
@@ -552,7 +557,7 @@ function DashboardBody({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <div className="lg:col-span-2 bg-card rounded-xl border border-border/60 p-5">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h4 className="font-semibold text-sm text-foreground/85">每日生成量 &amp; 质量分趋势</h4>
+            <h4 className="font-semibold text-sm text-foreground/85">每日生成量 &amp; 使用人员趋势</h4>
             <div className="flex items-center gap-3">
               <TrendLegend />
               <ChartTimeFilter value={trendRange} onChange={setTrendRange} customDates={trendCustom} onCustomDatesChange={setTrendCustom} />
@@ -567,7 +572,7 @@ function DashboardBody({
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
                 <Tooltip />
                 <Line yAxisId="left" type="monotone" dataKey="count" stroke="#3b82f6" name="生成量" />
-                <Line yAxisId="right" type="monotone" dataKey="avgScore" stroke="#10b981" name="质量分" />
+                <Line yAxisId="right" type="monotone" dataKey="userCount" stroke="#10b981" name="使用人员" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -586,9 +591,25 @@ function DashboardBody({
                   dataKey="count"
                   nameKey="category"
                   cx="50%"
-                  cy="42%"
-                  outerRadius={52}
-                  label={false}
+                  cy="45%"
+                  outerRadius={56}
+                  label={(entry: any) => {
+                    const { value, x, y, cx } = entry;
+                    return (
+                      <text
+                        x={x}
+                        y={y}
+                        fill="#374151"
+                        fontSize={13}
+                        fontWeight="bold"
+                        textAnchor={x > cx ? "start" : "end"}
+                        dominantBaseline="middle"
+                      >
+                        {value}
+                      </text>
+                    );
+                  }}
+                  labelLine={{ stroke: "#bbb", strokeWidth: 1 }}
                 >
                   {data.categoryDistribution.map((_, i) => (
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -688,8 +709,12 @@ function DashboardBody({
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((row, i) => (
-                  <tr key={i} className="border-b border-border/40 hover:bg-muted/30">
+                filteredRecords.map((row) => (
+                  <tr
+                    key={row.id}
+                    onClick={() => onRecordClick(row.id)}
+                    className="border-b border-border/40 hover:bg-blue-50/60 cursor-pointer transition-colors"
+                  >
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{row.time}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{row.user}</td>
                     <td className="px-4 py-3 max-w-[8rem] truncate" title={row.req}>
@@ -728,6 +753,7 @@ function DashboardBody({
 }
 
 export function Dashboard() {
+  const router = useRouter();
   const [kpiRange, setKpiRange] = useState<KpiRange>("7d");
   const [kpiCustom, setKpiCustom] = useState<CustomDates>({ start: "", end: "" });
   const [trendRange, setTrendRange] = useState<ChartRange>("30d");
@@ -831,6 +857,7 @@ export function Dashboard() {
           setRecordRange={setRecordRange}
           recordCustom={recordCustom}
           setRecordCustom={setRecordCustom}
+          onRecordClick={(id) => router.replace(`/usecase-gen?tab=history&taskId=${id}&from=dashboard`, { scroll: false })}
         />
         </div>
       )}
