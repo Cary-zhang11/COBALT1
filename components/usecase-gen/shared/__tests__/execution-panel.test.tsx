@@ -16,6 +16,13 @@ const defaultConfig = {
   history: "1 份",
 };
 
+const defaultMaterials = {
+  requirementFiles: ["需求A.docx", "需求B.md"],
+  requirementText: "这是本次需求的详细描述文本",
+  knowledgeItems: ["支付规范.md", "会员规则.md"],
+  historyItems: ["历史用例A.md"],
+};
+
 const foundFiles = [
   { name: "测试用例.md", relativePath: "测试用例.md" },
   { name: "测试用例.xmind", relativePath: "测试用例.xmind" },
@@ -30,6 +37,7 @@ const baseProps = {
   wizStep: 0,
   hasResult: false,
   configSummary: defaultConfig,
+  materials: defaultMaterials,
   foundFiles: [] as typeof foundFiles,
   onDownloadFile: noop,
   onScrollToAITweak: noop,
@@ -62,7 +70,111 @@ describe("ExecutionPanel", () => {
     });
   });
 
-  describe("Step 2 complete: quick actions + rating", () => {
+  describe("Step 2 complete: materials + quick actions + rating", () => {
+    it("renders materials section instead of workflow trajectory", () => {
+      render(
+        <ExecutionPanel
+          {...baseProps}
+          taskId="test-id"
+          wizStep={2}
+          hasResult={true}
+          foundFiles={foundFiles}
+        />
+      );
+      expect(screen.getByText("输入物料")).toBeDefined();
+      expect(screen.getByText("需求文件")).toBeDefined();
+      expect(screen.getByText("需求文案")).toBeDefined();
+      expect(screen.getByText("关联知识库")).toBeDefined();
+      expect(screen.getByText("历史范文")).toBeDefined();
+      // 结果页不再展示"执行轨迹"标题
+      expect(screen.queryByText("执行轨迹")).toBeNull();
+    });
+
+    it("shows requirement files and referenced items from materials", () => {
+      render(
+        <ExecutionPanel
+          {...baseProps}
+          taskId="test-id"
+          wizStep={2}
+          hasResult={true}
+          foundFiles={foundFiles}
+        />
+      );
+      expect(screen.getByText("需求A.docx")).toBeDefined();
+      expect(screen.getByText("需求B.md")).toBeDefined();
+      expect(screen.getByText("支付规范.md")).toBeDefined();
+      expect(screen.getByText("会员规则.md")).toBeDefined();
+      expect(screen.getByText("历史用例A.md")).toBeDefined();
+      expect(screen.getByText("这是本次需求的详细描述文本")).toBeDefined();
+    });
+
+    it("triggers onDownloadRequirementFile when clicking download icon on a requirement file", () => {
+      const onDownloadReq = vi.fn();
+      render(
+        <ExecutionPanel
+          {...baseProps}
+          taskId="test-id"
+          wizStep={2}
+          hasResult={true}
+          foundFiles={foundFiles}
+          onDownloadRequirementFile={onDownloadReq}
+        />
+      );
+      const downloadBtn = screen.getByLabelText("下载 需求A.docx");
+      fireEvent.click(downloadBtn);
+      expect(onDownloadReq).toHaveBeenCalledWith("需求A.docx");
+    });
+
+    it("opens full-text modal when clicking 查看全文", () => {
+      render(
+        <ExecutionPanel
+          {...baseProps}
+          taskId="test-id"
+          wizStep={2}
+          hasResult={true}
+          foundFiles={foundFiles}
+        />
+      );
+      fireEvent.click(screen.getByText("查看全文"));
+      expect(screen.getByRole("dialog")).toBeDefined();
+      expect(screen.getByText("需求文案全文")).toBeDefined();
+    });
+
+    it("does NOT render DoneBanner", () => {
+      render(
+        <ExecutionPanel
+          {...baseProps}
+          taskId="test-id"
+          wizStep={2}
+          hasResult={true}
+          foundFiles={foundFiles}
+        />
+      );
+      expect(screen.queryByText(/执行完成 · 文件已就绪/)).toBeNull();
+    });
+
+    it("shows empty placeholder when materials are missing", () => {
+      render(
+        <ExecutionPanel
+          {...baseProps}
+          taskId="test-id"
+          wizStep={2}
+          hasResult={true}
+          foundFiles={foundFiles}
+          materials={{
+            requirementFiles: [],
+            requirementText: "",
+            knowledgeItems: [],
+            historyItems: [],
+          }}
+        />
+      );
+      expect(screen.getByText("无上传文件")).toBeDefined();
+      expect(screen.getByText("未填写")).toBeDefined();
+      // 关联知识库 / 历史范文 都是 "未关联"
+      expect(screen.getAllByText("未关联").length).toBeGreaterThanOrEqual(2);
+    });
+
     it("renders 下载文件 and 编辑脑图 buttons", () => {
       render(
         <ExecutionPanel

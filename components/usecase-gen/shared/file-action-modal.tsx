@@ -41,7 +41,7 @@ export function FileActionModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] flex flex-col mx-4">
+      <div className="bg-card rounded-2xl shadow-2xl w-fit min-w-[320px] max-w-2xl max-h-[70vh] flex flex-col mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h3 className="font-semibold text-sm">{title}</h3>
           <button
@@ -64,7 +64,7 @@ export function FileActionModal({
                   key={i}
                   className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2 min-h-[40px]"
                 >
-                  <span className="truncate flex-1 min-w-0 text-sm font-medium">
+                  <span className="whitespace-nowrap text-sm font-medium">
                     {file.name}
                   </span>
                   <button

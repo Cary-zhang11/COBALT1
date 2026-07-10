@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
     const ratingRange = parseChartRange(searchParams.get("ratingRange"), shortChartOptions());
     const userRange = parseChartRange(searchParams.get("userRange"), shortChartOptions());
     const recordRange = parseChartRange(searchParams.get("recordRange"));
+    const includeAi = searchParams.get("includeAi") === "true";
 
     // 解析自定义日期参数（7 组 × 2 = 14 个）
     const kpiCustomStart = parseCustomDate(searchParams.get("kpiStart"));
@@ -100,17 +101,77 @@ export async function GET(req: NextRequest) {
       weeklyActiveUsers: number;
       avgDuration: number;
       avgUserRating: number;
+      avgUsabilityRate: number;
+      avgReviewDuration: number;
       tasksPerWeek: number;
       requirementsPerWeek: number;
+      savedDuration: number;        // 节省时间总值（分钟）
+      avgEfficiencyGain: number;     // 平均效率提升（%）
+      cEndUsabilityRate: number;     // C端可用率（C1C+C2C）
+      bEndUsabilityRate: number;     // B端可用率（C1B+C2B）
+      otherUsabilityRate: number;    // 其他可用率（数科/车小妹/未分类）
     };
     let kpiTrend: {
       totalCases: { current: number; previous: number; changePercent: number | null };
       weeklyActiveUsers: { current: number; previous: number; changePercent: number | null };
       avgDuration: { current: number; previous: number; changePercent: number | null };
       avgUserRating: { current: number; previous: number; changePercent: number | null };
+      avgUsabilityRate:   { current: number; previous: number; changePercent: number | null };
+      avgReviewDuration:  { current: number; previous: number; changePercent: number | null };
       tasksPerWeek: { current: number; previous: number; changePercent: number | null };
       requirementsPerWeek: { current: number; previous: number; changePercent: number | null };
+      savedDuration:      { current: number; previous: number; changePercent: number | null };
+      avgEfficiencyGain:  { current: number; previous: number; changePercent: number | null };
+      cEndUsabilityRate:  { current: number; previous: number; changePercent: number | null };
+      bEndUsabilityRate:  { current: number; previous: number; changePercent: number | null };
+      otherUsabilityRate: { current: number; previous: number; changePercent: number | null };
     };
+
+    // 计算一组任务的 节省时间总值 / 平均效率提升
+    // 只统计同时填写了 manualDuration 和 reviewDuration 的任务
+    // includeAi=true 时在节省值中额外扣除 AI 生成耗时（duration 字段，毫秒→分钟）
+    function computeEfficiency(
+      tasks: { manualDuration?: number | null; reviewDuration?: number | null; duration?: number | null }[],
+      includeAi: boolean,
+    ): { totalSaved: number; avgGain: number } {
+      const paired = tasks.filter(
+        (t) => t.manualDuration != null && t.reviewDuration != null,
+      ) as { manualDuration: number; reviewDuration: number; duration?: number | null }[];
+      if (paired.length === 0) return { totalSaved: 0, avgGain: 0 };
+      const aiMin = (t: { duration?: number | null }) =>
+        includeAi && t.duration != null ? t.duration / 60000 : 0;
+      const savedList = paired.map((t) => t.manualDuration - t.reviewDuration - aiMin(t));
+      const gainList = paired
+        .filter((t) => t.manualDuration > 0)
+        .map((t) => ((t.manualDuration - t.reviewDuration - aiMin(t)) / t.manualDuration) * 100);
+      const totalSaved = Math.round(savedList.reduce((a, b) => a + b, 0));
+      const avgGain = gainList.length > 0
+        ? Math.round(gainList.reduce((a, b) => a + b, 0) / gainList.length)
+        : 0;
+      return { totalSaved, avgGain };
+    }
+
+    // 按业务类型分组计算可用率
+    // C端: C1C, C2C; B端: C1B, C2B; 其他: 数科, 车小妹, null/未分类
+    function computeGroupedUsability(
+      tasks: { businessType?: string | null; usabilityRate?: number | null }[],
+    ): { cEnd: number; bEnd: number; other: number } {
+      const groups: { cEnd: number[]; bEnd: number[]; other: number[] } = { cEnd: [], bEnd: [], other: [] };
+      for (const t of tasks) {
+        if (t.usabilityRate == null) continue;
+        const bt = t.businessType;
+        if (bt === "C1C" || bt === "C2C") {
+          groups.cEnd.push(t.usabilityRate);
+        } else if (bt === "C1B" || bt === "C2B") {
+          groups.bEnd.push(t.usabilityRate);
+        } else {
+          groups.other.push(t.usabilityRate);
+        }
+      }
+      const avg = (arr: number[]) =>
+        arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+      return { cEnd: avg(groups.cEnd), bEnd: avg(groups.bEnd), other: avg(groups.other) };
+    }
 
     if (kpiWindow) {
       // 有时间窗口：查询两窗口数据，内存计算 KPI 值和同比
@@ -119,11 +180,11 @@ export async function GET(req: NextRequest) {
           where: { ...completedFilter, ...(kpiRange === "custom" && kpiCustomEnd
             ? { createdAt: { gte: kpiWindow.currentStart, lt: (() => { const d = new Date(kpiCustomEnd); d.setDate(d.getDate() + 1); return d; })() } }
             : { createdAt: { gte: kpiWindow.currentStart } }) },
-          select: { id: true, totalCases: true, duration: true, userId: true, inputFiles: true },
+          select: { id: true, totalCases: true, duration: true, userId: true, inputFiles: true, usabilityRate: true, reviewDuration: true, manualDuration: true, businessType: true },
         }),
         prisma.task.findMany({
           where: { ...completedFilter, createdAt: { gte: kpiWindow.previousStart, lt: kpiWindow.previousEnd } },
-          select: { id: true, totalCases: true, duration: true, userId: true, inputFiles: true },
+          select: { id: true, totalCases: true, duration: true, userId: true, inputFiles: true, usabilityRate: true, reviewDuration: true, manualDuration: true, businessType: true },
         }),
       ]);
 
@@ -146,13 +207,44 @@ export async function GET(req: NextRequest) {
       const thisRating = avgRatingForTaskIds(currentTasks.map((t) => t.id));
       const lastRating = avgRatingForTaskIds(previousTasks.map((t) => t.id));
 
+      const thisUsabilityRates = currentTasks.map((t) => t.usabilityRate).filter((r): r is number => r != null);
+      const lastUsabilityRates = previousTasks.map((t) => t.usabilityRate).filter((r): r is number => r != null);
+      const thisUsability = thisUsabilityRates.length > 0
+        ? Math.round(thisUsabilityRates.reduce((a, b) => a + b, 0) / thisUsabilityRates.length)
+        : 0;
+      const lastUsability = lastUsabilityRates.length > 0
+        ? Math.round(lastUsabilityRates.reduce((a, b) => a + b, 0) / lastUsabilityRates.length)
+        : 0;
+
+      const thisReviewDurations = currentTasks.map((t) => t.reviewDuration).filter((r): r is number => r != null);
+      const lastReviewDurations = previousTasks.map((t) => t.reviewDuration).filter((r): r is number => r != null);
+      const thisReviewDuration = thisReviewDurations.length > 0
+        ? Math.round(thisReviewDurations.reduce((a, b) => a + b, 0) / thisReviewDurations.length)
+        : 0;
+      const lastReviewDuration = lastReviewDurations.length > 0
+        ? Math.round(lastReviewDurations.reduce((a, b) => a + b, 0) / lastReviewDurations.length)
+        : 0;
+
+      const thisEff = computeEfficiency(currentTasks, includeAi);
+      const lastEff = computeEfficiency(previousTasks, includeAi);
+
+      const thisGroupedUsability = computeGroupedUsability(currentTasks);
+      const lastGroupedUsability = computeGroupedUsability(previousTasks);
+
       kpiValues = {
         totalCases: thisCaseSum,
         weeklyActiveUsers: thisUsers,
         avgDuration: thisDur,
         avgUserRating: thisRating,
+        avgUsabilityRate: thisUsability,
+        avgReviewDuration: thisReviewDuration,
         tasksPerWeek: thisTaskCount,
         requirementsPerWeek: thisReqIds.size,
+        savedDuration: thisEff.totalSaved,
+        avgEfficiencyGain: thisEff.avgGain,
+        cEndUsabilityRate: thisGroupedUsability.cEnd,
+        bEndUsabilityRate: thisGroupedUsability.bEnd,
+        otherUsabilityRate: thisGroupedUsability.other,
       };
 
       kpiTrend = {
@@ -160,8 +252,15 @@ export async function GET(req: NextRequest) {
         weeklyActiveUsers: { current: thisUsers, previous: lastUsers, changePercent: calcChangePercent(thisUsers, lastUsers) },
         avgDuration: { current: thisDur, previous: lastDur, changePercent: calcChangePercent(thisDur, lastDur) },
         avgUserRating: { current: thisRating, previous: lastRating, changePercent: calcChangePercent(thisRating, lastRating) },
+        avgUsabilityRate: { current: thisUsability, previous: lastUsability, changePercent: calcChangePercent(thisUsability, lastUsability) },
+        avgReviewDuration: { current: thisReviewDuration, previous: lastReviewDuration, changePercent: calcChangePercent(thisReviewDuration, lastReviewDuration) },
         tasksPerWeek: { current: thisTaskCount, previous: lastTaskCount, changePercent: calcChangePercent(thisTaskCount, lastTaskCount) },
         requirementsPerWeek: { current: thisReqIds.size, previous: lastReqIds.size, changePercent: calcChangePercent(thisReqIds.size, lastReqIds.size) },
+        savedDuration: { current: thisEff.totalSaved, previous: lastEff.totalSaved, changePercent: calcChangePercent(thisEff.totalSaved, lastEff.totalSaved) },
+        avgEfficiencyGain: { current: thisEff.avgGain, previous: lastEff.avgGain, changePercent: calcChangePercent(thisEff.avgGain, lastEff.avgGain) },
+        cEndUsabilityRate: { current: thisGroupedUsability.cEnd, previous: lastGroupedUsability.cEnd, changePercent: calcChangePercent(thisGroupedUsability.cEnd, lastGroupedUsability.cEnd) },
+        bEndUsabilityRate: { current: thisGroupedUsability.bEnd, previous: lastGroupedUsability.bEnd, changePercent: calcChangePercent(thisGroupedUsability.bEnd, lastGroupedUsability.bEnd) },
+        otherUsabilityRate: { current: thisGroupedUsability.other, previous: lastGroupedUsability.other, changePercent: calcChangePercent(thisGroupedUsability.other, lastGroupedUsability.other) },
       };
 
       // ===== DEBUG: 打印同比计算的原始数据 =====
@@ -204,13 +303,49 @@ export async function GET(req: NextRequest) {
       });
       const reqIdSet = new Set(reqTasks.map((t) => extractReqIdentifier(t.id, t.inputFiles)));
 
+      const usabilityAgg = await prisma.task.aggregate({
+        _avg: { usabilityRate: true },
+        where: { ...completedFilter, usabilityRate: { not: null } },
+      });
+      const avgUsability = Math.round(usabilityAgg._avg?.usabilityRate || 0);
+
+      const reviewDurationAgg = await prisma.task.aggregate({
+        _avg: { reviewDuration: true },
+        where: { ...completedFilter, reviewDuration: { not: null } },
+      });
+      const avgReviewDuration = Math.round(reviewDurationAgg._avg?.reviewDuration || 0);
+
+      const efficiencyTasks = await prisma.task.findMany({
+        where: {
+          ...completedFilter,
+          manualDuration: { not: null },
+          reviewDuration: { not: null },
+        },
+        select: { manualDuration: true, reviewDuration: true, duration: true },
+      });
+      const allEff = computeEfficiency(efficiencyTasks, includeAi);
+
+      // 分组可用率：需要 businessType + usabilityRate
+      const groupedUsabilityTasks = await prisma.task.findMany({
+        where: { ...completedFilter, usabilityRate: { not: null } },
+        select: { businessType: true, usabilityRate: true },
+      });
+      const allGroupedUsability = computeGroupedUsability(groupedUsabilityTasks);
+
       kpiValues = {
         totalCases: totalAgg._sum?.totalCases || 0,
         weeklyActiveUsers: wauResult.length,
         avgDuration: Math.round(avgDurAgg._avg?.duration || 0),
         avgUserRating: avgUserRating(allLatestRatings),
+        avgUsabilityRate: avgUsability,
+        avgReviewDuration: avgReviewDuration,
         tasksPerWeek: taskCount,
         requirementsPerWeek: reqIdSet.size,
+        savedDuration: allEff.totalSaved,
+        avgEfficiencyGain: allEff.avgGain,
+        cEndUsabilityRate: allGroupedUsability.cEnd,
+        bEndUsabilityRate: allGroupedUsability.bEnd,
+        otherUsabilityRate: allGroupedUsability.other,
       };
 
       kpiTrend = {
@@ -218,8 +353,15 @@ export async function GET(req: NextRequest) {
         weeklyActiveUsers: { current: 0, previous: 0, changePercent: null },
         avgDuration: { current: 0, previous: 0, changePercent: null },
         avgUserRating: { current: 0, previous: 0, changePercent: null },
+        avgUsabilityRate: { current: 0, previous: 0, changePercent: null },
+        avgReviewDuration: { current: 0, previous: 0, changePercent: null },
         tasksPerWeek: { current: 0, previous: 0, changePercent: null },
         requirementsPerWeek: { current: 0, previous: 0, changePercent: null },
+        savedDuration: { current: 0, previous: 0, changePercent: null },
+        avgEfficiencyGain: { current: 0, previous: 0, changePercent: null },
+        cEndUsabilityRate: { current: 0, previous: 0, changePercent: null },
+        bEndUsabilityRate: { current: 0, previous: 0, changePercent: null },
+        otherUsabilityRate: { current: 0, previous: 0, changePercent: null },
       };
     }
 

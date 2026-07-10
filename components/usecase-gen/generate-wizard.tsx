@@ -6,11 +6,12 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useOutputScanner, maxXmindVersion, maxMdVersion, type FileInfo } from "@/hooks/use-output-scanner";
 import { useTaskEvents } from "@/hooks/use-task-events";
-import { ExecutionPanel } from "./shared/execution-panel";
+import { ExecutionPanel, type ExecutionMaterials } from "./shared/execution-panel";
 import { OutputFiles } from "./shared/output-files";
 import { AITweakPanel } from "./shared/ai-tweak-panel";
 import { ModuleOverviewTable } from "./shared/module-overview-table";
 import { WizardSection } from "./shared/wizard-section";
+import type { UsabilityData } from "./shared/efficiency-comparison";
 
 import type { UsecaseModule, TweakEntry } from "./shared/types";
 import {
@@ -288,6 +289,10 @@ export function GenerateWizard({
   const [loadedFiles, setLoadedFiles] = useState<FileInfo[]>([]);
   const [xmindBaseline, setXmindBaseline] = useState(-1);
   const [mdBaseline, setMdBaseline] = useState<number | undefined>(undefined);
+  // 历史任务回显的输入物料（从 report API 拿到）
+  const [historicalMaterials, setHistoricalMaterials] = useState<ExecutionMaterials | null>(null);
+  // 用例复核数据（从 report API 拿到，避免额外 fetch）
+  const [usabilityData, setUsabilityData] = useState<UsabilityData | null>(null);
 
   // Internal state (previously from parent props)
   const [usecaseTree, setUsecaseTree] = useState<UsecaseModule[] | null>(null);
@@ -431,6 +436,14 @@ export function GenerateWizard({
 
         if (report.tweakHistory) {
           setTweakHistory(report.tweakHistory as TweakEntry[]);
+        }
+
+        if (report.materials) {
+          setHistoricalMaterials(report.materials as ExecutionMaterials);
+        }
+
+        if (report.usability) {
+          setUsabilityData(report.usability as UsabilityData);
         }
 
         if (report.tree && report.outputFiles?.length > 0) {
@@ -1290,6 +1303,19 @@ export function GenerateWizard({
           knowledge: `${selectedKnowledgeIds.size} 份`,
           history: `${selectedHistoryIds.size} 份`,
         }}
+        materials={
+          historicalMaterials ?? {
+            requirementFiles: uploadedFiles.map((f) => f.name),
+            requirementText,
+            knowledgeItems: Array.from(selectedKnowledgeIds)
+              .map((id) => kbItems.find((k) => k.id === id)?.title)
+              .filter((v): v is string => !!v),
+            historyItems: Array.from(selectedHistoryIds)
+              .map((id) => historyOptions.find((h) => h.id === id)?.displayName)
+              .filter((v): v is string => !!v),
+          }
+        }
+        usabilityData={usabilityData}
         foundFiles={mergedOutputFiles}
         logStages={logStages}
         onDownloadFile={(file) => {
@@ -1298,6 +1324,16 @@ export function GenerateWizard({
           const a = document.createElement("a");
           a.href = url;
           a.download = file.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }}
+        onDownloadRequirementFile={(fileName) => {
+          if (!taskId) return;
+          const url = `/api/tasks/${taskId}/download?dir=workspace&file=${encodeURIComponent(fileName)}`;
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = fileName;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);

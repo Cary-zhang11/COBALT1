@@ -84,13 +84,7 @@ export function RatingPanel({ taskId, sectioned }: RatingPanelProps) {
   const inner = (
     <>
       {!sectioned && (
-        <>
-          <h3 className="font-semibold text-sm mb-1">本次生成评价</h3>
-          <p className="text-xs text-muted-foreground mb-3">建议在 AI 微调后再评价</p>
-        </>
-      )}
-      {sectioned && (
-        <p className="text-xs text-muted-foreground mb-3 leading-snug">建议在 AI 微调后再评价</p>
+        <h3 className="font-semibold text-sm mb-3">本次生成评价</h3>
       )}
       {submitted ? (
         <div className="space-y-2">

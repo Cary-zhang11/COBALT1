@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
-import { getOutputPath, validatePath } from "@/lib/sandbox";
+import { getOutputPath, getWorkspacePath, validatePath } from "@/lib/sandbox";
 import fs from "fs/promises";
 import path from "path";
 
@@ -34,11 +34,13 @@ export async function GET(
     await getAuthUser(token);
 
     const taskId = params.id;
+    const dirParam = req.nextUrl.searchParams.get("dir"); // 可选：workspace | output
+    const baseDir =
+      dirParam === "workspace" ? getWorkspacePath(taskId) : getOutputPath(taskId);
     const outputDir = getOutputPath(taskId);
     const fileParam = req.nextUrl.searchParams.get("file");
 
     if (!fileParam) {
-      // List all output files (recursive, filename-only)
       const allFiles = await collectFilesRecursive(outputDir);
       const fileList = allFiles.map((fullPath) => {
         const name = path.basename(fullPath);
@@ -51,7 +53,7 @@ export async function GET(
       return NextResponse.json({ files: fileList });
     }
 
-    const filePath = path.resolve(outputDir, fileParam);
+    const filePath = path.resolve(baseDir, fileParam);
     if (!validatePath(filePath, taskId)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
@@ -76,10 +78,11 @@ export async function GET(
       ".pdf": "application/pdf",
     };
 
+    const downloadName = path.basename(fileParam);
     return new NextResponse(content, {
       headers: {
         "Content-Type": mimeTypes[ext] || "application/octet-stream",
-        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileParam)}`,
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
       },
     });
   } catch (error) {

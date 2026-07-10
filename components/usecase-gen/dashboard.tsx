@@ -4,7 +4,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BarChart3, Users, Clock, Loader2, Star,
+  BarChart3, Users, Clock, Loader2, Star, CheckCircle2, Zap, TrendingUp,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -27,8 +27,15 @@ interface StatsData {
     weeklyActiveUsers: number;
     avgDuration: number;
     avgUserRating: number;
+    avgUsabilityRate: number;
+    avgReviewDuration: number;
     tasksPerWeek: number;
     requirementsPerWeek: number;
+    savedDuration: number;
+    avgEfficiencyGain: number;
+    cEndUsabilityRate: number;
+    bEndUsabilityRate: number;
+    otherUsabilityRate: number;
   };
   dailyTrend: { date: string; count: number; userCount: number }[];
   categoryDistribution: { category: string; count: number }[];
@@ -45,8 +52,15 @@ interface StatsData {
     weeklyActiveUsers:  { current: number; previous: number; changePercent: number | null };
     avgDuration:        { current: number; previous: number; changePercent: number | null };
     avgUserRating:      { current: number; previous: number; changePercent: number | null };
+    avgUsabilityRate:   { current: number; previous: number; changePercent: number | null };
+    avgReviewDuration:  { current: number; previous: number; changePercent: number | null };
     tasksPerWeek:       { current: number; previous: number; changePercent: number | null };
     requirementsPerWeek:{ current: number; previous: number; changePercent: number | null };
+    savedDuration:      { current: number; previous: number; changePercent: number | null };
+    avgEfficiencyGain:  { current: number; previous: number; changePercent: number | null };
+    cEndUsabilityRate:  { current: number; previous: number; changePercent: number | null };
+    bEndUsabilityRate:  { current: number; previous: number; changePercent: number | null };
+    otherUsabilityRate: { current: number; previous: number; changePercent: number | null };
   };
   recentRecords: {
     id: string;
@@ -110,6 +124,11 @@ function formatDuration(ms: number): string {
 function formatTrendValue(trendKey: string, value: number): string {
   if (trendKey === "avgDuration") return formatDuration(value);
   if (trendKey === "avgUserRating") return value.toFixed(1);
+  if (trendKey === "avgUsabilityRate") return `${value}%`;
+  if (trendKey === "avgReviewDuration") return `${value}分钟`;
+  if (trendKey === "savedDuration") return `${value}分钟`;
+  if (trendKey === "avgEfficiencyGain") return `${value}%`;
+  if (trendKey === "cEndUsabilityRate" || trendKey === "bEndUsabilityRate" || trendKey === "otherUsabilityRate") return `${value}%`;
   return value.toString();
 }
 
@@ -222,17 +241,31 @@ function ChartTimeFilter({
   );
 }
 
-function TrendLegend() {
+function TrendLegend({
+  visible,
+  onToggle,
+}: {
+  visible: { count: boolean; userCount: boolean };
+  onToggle: (key: "count" | "userCount") => void;
+}) {
   return (
     <div className="flex items-center gap-3 text-[10px] text-muted-foreground shrink-0">
-      <span className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onToggle("count")}
+        className={`flex items-center gap-1 transition-opacity hover:text-foreground ${visible.count ? "" : "opacity-30"}`}
+      >
         <span className="inline-block w-3 h-0.5 bg-[#3b82f6] rounded" />
         生成量（左轴）
-      </span>
-      <span className="flex items-center gap-1">
+      </button>
+      <button
+        type="button"
+        onClick={() => onToggle("userCount")}
+        className={`flex items-center gap-1 transition-opacity hover:text-foreground ${visible.userCount ? "" : "opacity-30"}`}
+      >
         <span className="inline-block w-3 h-0.5 bg-[#10b981] rounded" />
         使用人员（右轴）
-      </span>
+      </button>
     </div>
   );
 }
@@ -323,7 +356,7 @@ function TopUsersScrollableList({
 function PieChartCentered({ children }: { children: ReactNode }) {
   return (
     <div className="h-full flex items-center justify-center">
-      <div className="w-full h-full">{children}</div>
+      <div className="w-full h-full [&_.recharts-surface]:overflow-visible">{children}</div>
     </div>
   );
 }
@@ -457,6 +490,8 @@ interface DashboardBodyProps {
   setRecordRange: (v: ChartRange) => void;
   recordCustom: CustomDates;
   setRecordCustom: (d: CustomDates) => void;
+  includeAi: boolean;
+  setIncludeAi: (v: boolean) => void;
   onRecordClick: (id: string) => void;
 }
 
@@ -469,10 +504,12 @@ function DashboardBody({
   ratingRange, setRatingRange, ratingCustom, setRatingCustom,
   userRange, setUserRange, userCustom, setUserCustom,
   recordRange, setRecordRange, recordCustom, setRecordCustom,
+  includeAi, setIncludeAi,
   onRecordClick,
 }: DashboardBodyProps) {
   const [recordSearch, setRecordSearch] = useState("");
   const [recordFilter, setRecordFilter] = useState<RecordFilter>("all");
+  const [trendVisible, setTrendVisible] = useState({ count: true, userCount: true });
 
   const filteredRecords = useMemo(
     () => filterRecentRecords(data.recentRecords, recordSearch, recordFilter),
@@ -495,16 +532,54 @@ function DashboardBody({
       iconColor: "text-amber-700",
       trendKey: "avgUserRating" as const,
     },
+    {
+      label: "平均可用率",
+      value: data.kpi.avgUsabilityRate > 0 ? `${data.kpi.avgUsabilityRate}%` : "—",
+      icon: CheckCircle2,
+      bg: "bg-teal-50",
+      iconColor: "text-teal-600",
+      trendKey: "avgUsabilityRate" as const,
+      subValues: [
+        { label: "C端", value: data.kpi.cEndUsabilityRate > 0 ? `${data.kpi.cEndUsabilityRate}%` : "—" },
+        { label: "B端", value: data.kpi.bEndUsabilityRate > 0 ? `${data.kpi.bEndUsabilityRate}%` : "—" },
+        { label: "其他", value: data.kpi.otherUsabilityRate > 0 ? `${data.kpi.otherUsabilityRate}%` : "—" },
+      ],
+    },
     { label: `任务数${periodSuffix}`, value: data.kpi.tasksPerWeek.toString(), icon: BarChart3, bg: "bg-emerald-50", iconColor: "text-emerald-600", trendKey: "tasksPerWeek" as const },
     { label: `需求数${periodSuffix}`, value: data.kpi.requirementsPerWeek.toString(), icon: BarChart3, bg: "bg-blue-50", iconColor: "text-blue-600", trendKey: "requirementsPerWeek" as const },
+    {
+      label: `节省时间${includeAi ? " (含AI)" : ""}`,
+      value: data.kpi.savedDuration !== 0 ? `${data.kpi.savedDuration} 分钟` : "—",
+      icon: Zap,
+      bg: "bg-orange-50",
+      iconColor: "text-orange-600",
+      trendKey: "savedDuration" as const,
+    },
+    {
+      label: `平均效率提升${includeAi ? " (含AI)" : ""}`,
+      value: data.kpi.avgEfficiencyGain !== 0 ? `${data.kpi.avgEfficiencyGain}%` : "—",
+      icon: TrendingUp,
+      bg: "bg-rose-50",
+      iconColor: "text-rose-600",
+      trendKey: "avgEfficiencyGain" as const,
+    },
   ];
 
   return (
     <>
-      <div className="flex justify-end mb-2">
+      <div className="flex justify-end items-center mb-2 gap-3">
+        <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={includeAi}
+            onChange={(e) => setIncludeAi(e.target.checked)}
+            className="accent-primary w-3 h-3"
+          />
+          计入 AI 耗时
+        </label>
         <KpiTimeFilter value={kpiRange} onChange={setKpiRange} customDates={kpiCustom} onCustomDatesChange={setKpiCustom} />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           const trend = data.kpiTrend[kpi.trendKey];
@@ -521,6 +596,11 @@ function DashboardBody({
                 <p className="text-xs text-muted-foreground mb-1">{kpi.label}</p>
                 <p className="text-2xl leading-7 font-semibold tabular-nums text-foreground/85 whitespace-nowrap">
                   {kpi.value}
+                  {"subValues" in kpi && kpi.subValues?.some((s) => s.value !== "—") && (
+                    <span className="text-xs font-normal text-muted-foreground/70 ml-1">
+                      ({kpi.subValues.filter((s) => s.value !== "—").map((s) => `${s.label} ${s.value}`).join(" · ")})
+                    </span>
+                  )}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {kpiRange !== "all" ? (
@@ -559,7 +639,10 @@ function DashboardBody({
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h4 className="font-semibold text-sm text-foreground/85">每日生成量 &amp; 使用人员趋势</h4>
             <div className="flex items-center gap-3">
-              <TrendLegend />
+              <TrendLegend
+                visible={trendVisible}
+                onToggle={(key) => setTrendVisible((prev) => ({ ...prev, [key]: !prev[key] }))}
+              />
               <ChartTimeFilter value={trendRange} onChange={setTrendRange} customDates={trendCustom} onCustomDatesChange={setTrendCustom} />
             </div>
           </div>
@@ -571,8 +654,8 @@ function DashboardBody({
                 <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Line yAxisId="left" type="monotone" dataKey="count" stroke="#3b82f6" name="生成量" />
-                <Line yAxisId="right" type="monotone" dataKey="userCount" stroke="#10b981" name="使用人员" />
+                <Line yAxisId="left" type="monotone" dataKey="count" stroke="#3b82f6" name="生成量" hide={!trendVisible.count} />
+                <Line yAxisId="right" type="monotone" dataKey="userCount" stroke="#10b981" name="使用人员" hide={!trendVisible.userCount} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -591,8 +674,8 @@ function DashboardBody({
                   dataKey="count"
                   nameKey="category"
                   cx="50%"
-                  cy="45%"
-                  outerRadius={56}
+                  cy="50%"
+                  outerRadius={48}
                   label={(entry: any) => {
                     const { value, x, y, cx } = entry;
                     return (
@@ -768,6 +851,7 @@ export function Dashboard() {
   const [userCustom, setUserCustom] = useState<CustomDates>({ start: "", end: "" });
   const [recordRange, setRecordRange] = useState<ChartRange>("30d");
   const [recordCustom, setRecordCustom] = useState<CustomDates>({ start: "", end: "" });
+  const [includeAi, setIncludeAi] = useState(false);
 
   const params = new URLSearchParams({
     kpiRange,
@@ -778,6 +862,9 @@ export function Dashboard() {
     userRange,
     recordRange,
   });
+  if (includeAi) {
+    params.set("includeAi", "true");
+  }
   if (kpiRange === "custom" && kpiCustom.start && kpiCustom.end) {
     params.set("kpiStart", kpiCustom.start);
     params.set("kpiEnd", kpiCustom.end);
@@ -808,7 +895,7 @@ export function Dashboard() {
   }
 
   const { data, error, isFetching } = useQuery<StatsData>({
-    queryKey: ["stats", kpiRange, kpiCustom, trendRange, trendCustom, categoryRange, categoryCustom, dimensionRange, dimensionCustom, ratingRange, ratingCustom, userRange, userCustom, recordRange, recordCustom],
+    queryKey: ["stats", kpiRange, kpiCustom, trendRange, trendCustom, categoryRange, categoryCustom, dimensionRange, dimensionCustom, ratingRange, ratingCustom, userRange, userCustom, recordRange, recordCustom, includeAi],
     queryFn: () => fetch(`/api/stats?${params}`).then((r) => r.json()),
     refetchInterval: 60_000,
     placeholderData: keepPreviousData,
@@ -857,6 +944,8 @@ export function Dashboard() {
           setRecordRange={setRecordRange}
           recordCustom={recordCustom}
           setRecordCustom={setRecordCustom}
+          includeAi={includeAi}
+          setIncludeAi={setIncludeAi}
           onRecordClick={(id) => router.replace(`/usecase-gen?tab=history&taskId=${id}&from=dashboard`, { scroll: false })}
         />
         </div>
