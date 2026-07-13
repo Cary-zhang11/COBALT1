@@ -150,9 +150,14 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // 内网局域网常以 HTTP 访问，不能仅按 NODE_ENV 开 secure，
+    // 改为根据实际请求协议动态判断
+    const proto = req.headers.get("x-forwarded-proto") || req.nextUrl.protocol.replace(":", "");
+    const isSecure = proto === "https";
+
     response.cookies.set("token", jwt, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecure,
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 7,
       path: "/",

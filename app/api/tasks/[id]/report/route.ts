@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
 import { getOutputPath, getWorkspacePath } from "@/lib/sandbox";
 import { parseTestcaseMarkdown } from "@/lib/parse-testcase-md";
+
+export const dynamic = "force-dynamic";
 import type { Prisma } from "@prisma/client";
 import fs from "fs/promises";
 import path from "path";

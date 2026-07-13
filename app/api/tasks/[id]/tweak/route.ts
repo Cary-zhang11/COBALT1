@@ -3,6 +3,8 @@ import { getAuthUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resumeTask } from "@/lib/task-engine";
 import { sanitizeEntry, type TweakEntry } from "@/lib/tweak-history";
+
+export const dynamic = "force-dynamic";
 import { Prisma } from "@prisma/client";
 
 export async function POST(

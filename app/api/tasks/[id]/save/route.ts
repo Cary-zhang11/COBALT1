@@ -8,6 +8,8 @@ import {
 import path from "path";
 import fs from "fs/promises";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Convert any input `.xmind` path to its `.edited.xmind` counterpart.
  * Idempotent: if the input already contains the `.edited.` infix it is

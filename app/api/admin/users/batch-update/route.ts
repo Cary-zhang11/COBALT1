@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 
+export const dynamic = "force-dynamic";
+
 const VALID_STATUSES = ["active", "inactive", "disabled", "locked"] as const;
 const VALID_GROUPS = ["C1C", "C1B", "C2C", "C2B", "数科", "车小妹"] as const;
 

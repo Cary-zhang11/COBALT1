@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 
 type QRStatus = "loading" | "pending" | "scanned" | "success" | "expired" | "error";
 
 function LoginPageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser } = useAuthStore();
   const [qrImage, setQrImage] = useState("");
@@ -59,7 +58,11 @@ function LoginPageContent() {
           if (intervalRef.current) clearInterval(intervalRef.current);
           if (data.user) setUser(data.user);
           const redirect = searchParams.get("redirect") || "/";
-          router.push(redirect);
+          // 使用 window.location.href 强制全页面跳转，
+          // 避免 router.push 在 App Router 中偶发静默失败
+          setTimeout(() => {
+            window.location.href = redirect;
+          }, 500);
         } else if (data.status === 50) {
           setStatus("expired");
           if (intervalRef.current) clearInterval(intervalRef.current);

@@ -5,6 +5,8 @@ import { createTask } from "@/lib/task-engine";
 import { taskHasTestcaseOutput } from "@/lib/task-display-status";
 import { buildTaskListWhere } from "@/lib/task-list-query";
 
+export const dynamic = "force-dynamic";
+
 const TASK_LIST_SELECT = {
   id: true,
   status: true,

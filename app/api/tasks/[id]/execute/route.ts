@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
 import { startTaskExecution } from "@/lib/task-engine";
 import { getOutputPath } from "@/lib/sandbox";
+
+export const dynamic = "force-dynamic";
 import path from "path";
 
 export async function POST(

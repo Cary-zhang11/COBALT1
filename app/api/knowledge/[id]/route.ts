@@ -4,6 +4,8 @@ import { getAuthUser } from "@/lib/auth";
 import { writeFile, unlink, mkdir } from "fs/promises";
 import path from "path";
 
+export const dynamic = "force-dynamic";
+
 const UPLOADS_ROOT = path.resolve(process.cwd(), "uploads");
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {

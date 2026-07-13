@@ -4,6 +4,8 @@ import { getAuthUser } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
+export const dynamic = "force-dynamic";
+
 const UPLOADS_ROOT = path.resolve(process.cwd(), "uploads");
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_EXTENSIONS = [".md"];

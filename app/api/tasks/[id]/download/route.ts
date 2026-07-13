@@ -4,6 +4,8 @@ import { getOutputPath, getWorkspacePath, validatePath } from "@/lib/sandbox";
 import fs from "fs/promises";
 import path from "path";
 
+export const dynamic = "force-dynamic";
+
 async function collectFilesRecursive(dir: string): Promise<string[]> {
   const results: string[] = [];
   try {
