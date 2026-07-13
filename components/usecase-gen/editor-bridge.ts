@@ -119,6 +119,10 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
       post({ type: "importXmind", payload: { base64 } });
     },
 
+    importXmindUrl: (url: string) => {
+      post({ type: "importXmindUrl", payload: { url } });
+    },
+
     undo: () => post({ type: "undo" }),
     redo: () => post({ type: "redo" }),
 

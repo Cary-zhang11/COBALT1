@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { Undo2, Redo2, Save, Download, ArrowLeft } from "lucide-react";
-import { createEditorBridge, markGlobalReady, type EditorBridge } from "./editor-bridge";
+import { createEditorBridge, resetGlobalReadyState, type EditorBridge } from "./editor-bridge";
 import type { MindMapData } from "@/lib/md-mindmap-convert";
 
 interface SaveResult {
@@ -44,7 +44,10 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
 
   // iframe onLoad
   const handleIframeLoad = useCallback(() => {
-    markGlobalReady();
+    // 注意：不能在这里调用 markGlobalReady()！
+    // onLoad 只表示 HTML 解析完成，不保证 mind-map.js 已执行完毕。
+    // "ready" 必须由 iframe 内的 mind-map.js 创建完 mindMap 实例后
+    // 通过 postMessage 发送，否则 bridge.importXmindFile 会发给空实例。
     setIframeLoaded(true);
   }, []);
 
@@ -55,7 +58,7 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
     try {
       const doc = iframe.contentDocument;
       if (doc && doc.readyState === "complete" && doc.URL !== "about:blank") {
-        markGlobalReady();
+        // 同样不能 markGlobalReady()，让 postMessage 来驱动
         setIframeLoaded(true);
       }
     } catch {
@@ -63,11 +66,28 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
     }
   }, []);
 
+  // iframe 加载超时保护：若 iframe 10秒内未 onLoad，显示错误
+  useEffect(() => {
+    if (iframeLoaded) return;
+    const timer = setTimeout(() => {
+      if (!iframeLoaded) {
+        console.error("[Editor] iframe onLoad timeout (10s)");
+        setErrorMsg("编辑器加载失败，请检查网络后刷新页面");
+        setLoadFailed(true);
+        setLoading(false);
+      }
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [iframeLoaded]);
+
   // 1) Bridge creation
   const readyRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     if (!iframeRef.current) return;
+    // 每次新编辑器实例化时重置，防止上一次会话遗留的 true
+    // 导致新 iframe 尚未 ready 就跳过等待
+    resetGlobalReadyState();
     const bridge = createEditorBridge(iframeRef.current);
     bridgeRef.current = bridge;
 
@@ -90,26 +110,7 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Helper: download file as base64 (for XMind binary).
-  // Status code is attached so callers can produce friendlier copy for 404 etc.
-  async function downloadAsBase64(url: string): Promise<string> {
-    const res = await fetch(url);
-    if (!res.ok) {
-      const err = new Error(`HTTP ${res.status}`) as Error & { status?: number };
-      err.status = res.status;
-      throw err;
-    }
-    const buffer = await res.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
-
-
-  // 2) Data loading: wait iframe ready → download XMind → import
+  // 2) Data loading: wait iframe ready → 让 iframe 直接 fetch 文件 URL → 解析
   useEffect(() => {
     if (!iframeLoaded || !bridgeRef.current) return;
     const bridge = bridgeRef.current;
@@ -119,12 +120,24 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
     setLoadFailed(false);
     setErrorMsg(null);
 
+    // 总超时保护：远程部署时网络慢可能导致加载卡死
+    const totalTimeout = setTimeout(() => {
+      if (cancelled || !loadingPhaseRef.current) return;
+      console.error("[Editor] 总加载超时(45s)");
+      loadingPhaseRef.current = false;
+      setErrorMsg("加载超时，请检查网络连接后重试");
+      setHasData(false);
+      setLoadFailed(true);
+      setLoading(false);
+    }, 45000);
+
     (async () => {
       try {
-        // Wait for iframe boot's "ready" — no need to init(null) since boot
-        // already creates an empty mindMap and posts ready.
-        await bridge.waitReady(30000);
+        // Wait for iframe boot's "ready" — mindMap 实例已创建
+        console.log("[Editor] Waiting for iframe ready...");
+        await bridge.waitReady(15000);
         if (cancelled) return;
+        console.log("[Editor] iframe ready received");
 
         const fp = filePathRef.current;
         const tid = taskIdRef.current;
@@ -135,40 +148,22 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
           return;
         }
 
-        try {
-          // Load exactly the file the user clicked — no redirect to .edited.
-          // Source entry shows the original; .edited entry shows the edits.
-          const url = `/api/tasks/${tid}/download?file=${encodeURIComponent(fp)}`;
-          const base64 = await downloadAsBase64(url);
-          if (cancelled) return;
-          bridge.importXmindFile(base64);
-          setHasData(true);
-          await bridge.waitReady(15000);
-          if (cancelled) return;
-          loadingPhaseRef.current = false;
-          setLoading(false);
-        } catch (err: unknown) {
-          if (cancelled) return;
-          const e = err as { status?: number; message?: string };
-          console.error("[Editor] load error:", e.message);
-          const msg =
-            e.status === 404
-              ? "文件不存在或已被删除"
-              : e.status && e.status >= 500
-              ? `服务异常（HTTP ${e.status}）`
-              : `加载失败：${e.message || "未知错误"}`;
-          loadingPhaseRef.current = false;
-          setErrorMsg(msg);
-          setHasData(false);
-          setLoadFailed(true);
-          setLoading(false);
-        }
+        // iframe 直接 fetch 服务端文件，不走 base64 中转
+        const url = `/api/tasks/${tid}/download?file=${encodeURIComponent(fp)}`;
+        console.log("[Editor] Telling iframe to fetch:", url);
+        setHasData(true);
+        bridge.importXmindUrl(url);
+        await bridge.waitReady(30000);
+        if (cancelled) return;
+        console.log("[Editor] Import complete");
+        loadingPhaseRef.current = false;
+        setLoading(false);
       } catch (err: unknown) {
         if (cancelled) return;
         const e = err as { message?: string };
-        console.error("[Editor] outer catch:", e?.message);
+        console.error("[Editor] load error:", e?.message);
         loadingPhaseRef.current = false;
-        setErrorMsg("脑图加载失败");
+        setErrorMsg(e?.message?.includes("超时") ? "脑图加载超时，请刷新重试" : "脑图加载失败");
         setLoadFailed(true);
         setLoading(false);
       }
@@ -177,6 +172,7 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
     return () => {
       cancelled = true;
       loadingPhaseRef.current = false;
+      clearTimeout(totalTimeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [iframeLoaded, filePath, taskId]);

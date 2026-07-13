@@ -179,6 +179,43 @@
     }
   }
 
+  // --- XMind import via URL (iframe 直接 fetch 服务端文件，避免 base64 中转) ---
+  async function handleImportXmindUrl(payload) {
+    if (!payload || !payload.url) {
+      post({ type: "error", payload: { message: "缺少文件 URL" } });
+      return;
+    }
+    try {
+      console.log("[mind-map] Fetching xmind from:", payload.url);
+      var res = await fetch(payload.url);
+      if (!res.ok) {
+        post({ type: "error", payload: { message: "文件加载失败: HTTP " + res.status } });
+        return;
+      }
+      var blob = await res.blob();
+      var file = new File([blob], "imported.xmind", { type: "application/x-zip-compressed" });
+
+      if (!xmind || typeof xmind.parseXmindFile !== "function") {
+        post({ type: "error", payload: { message: "脑图库未导出 xmind 解析器" } });
+        return;
+      }
+
+      var data = await xmind.parseXmindFile(file);
+      mindMap.setData(data);
+      snapshot();
+      setTimeout(snapshot, 500);
+      fitViewSoon();
+      console.log("[mind-map] Import from URL complete");
+      post({ type: "ready" });
+    } catch (err) {
+      console.error("[mind-map] importXmindUrl error:", err);
+      post({
+        type: "error",
+        payload: { message: "文件格式损坏，无法加载: " + (err && err.message ? err.message : String(err)) },
+      });
+    }
+  }
+
   // --- XMind export (delegate to simple-mind-map's built-in transformToXmind) ---
   function blobToBase64(blob) {
     return new Promise(function (resolve, reject) {
@@ -235,6 +272,9 @@
         break;
       case "importXmind":
         handleImportXmind(msg.payload);
+        break;
+      case "importXmindUrl":
+        handleImportXmindUrl(msg.payload);
         break;
       case "undo":
         if (mindMap) mindMap.execCommand("BACK");
