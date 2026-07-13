@@ -1,7 +1,10 @@
 (function () {
   "use strict";
+  var _t0 = performance.now();
+  console.log("[mind-map] script start, simpleMindMap=", typeof window.simpleMindMap);
 
   if (!window.simpleMindMap) {
+    console.error("[mind-map] simpleMindMap not loaded!");
     window.parent.postMessage(
       { type: "error", payload: { message: "脑图核心库加载失败，请检查网络连接后刷新页面" } },
       window.location.origin
@@ -85,6 +88,7 @@
   }
 
   function createMindMap(initialData) {
+    console.log("[mind-map] createMindMap, hasData=", !!(initialData && initialData.data));
     mindMap = new MindMap({
       el: document.getElementById("mindMapContainer"),
       data: initialData || { data: { text: "" }, children: [] },
@@ -186,13 +190,15 @@
       return;
     }
     try {
-      console.log("[mind-map] Fetching xmind from:", payload.url);
+      console.log("[mind-map] handleImportXmindUrl, fetching:", payload.url);
       var res = await fetch(payload.url);
+      console.log("[mind-map] fetch response: status=", res.status, "ok=", res.ok);
       if (!res.ok) {
         post({ type: "error", payload: { message: "文件加载失败: HTTP " + res.status } });
         return;
       }
       var blob = await res.blob();
+      console.log("[mind-map] blob size=", blob.size, "type=", blob.type);
       var file = new File([blob], "imported.xmind", { type: "application/x-zip-compressed" });
 
       if (!xmind || typeof xmind.parseXmindFile !== "function") {
@@ -201,11 +207,13 @@
       }
 
       var data = await xmind.parseXmindFile(file);
+      console.log("[mind-map] parsed xmind data, root=", data && data.data ? data.data.text : "null");
       mindMap.setData(data);
       snapshot();
       setTimeout(snapshot, 500);
       fitViewSoon();
-      console.log("[mind-map] Import from URL complete");
+      var importMs = Math.round(performance.now() - _t0);
+      console.log("[mind-map] Import from URL complete (+" + importMs + "ms)");
       post({ type: "ready" });
     } catch (err) {
       console.error("[mind-map] importXmindUrl error:", err);
@@ -253,9 +261,13 @@
 
   // --- Message dispatcher ---
   window.addEventListener("message", function (e) {
-    if (e.origin !== window.location.origin) return;
+    if (e.origin !== window.location.origin) {
+      console.log("[mind-map] ignored cross-origin message from:", e.origin);
+      return;
+    }
     var msg = e.data;
     if (!msg || !msg.type) return;
+    console.log("[mind-map] received message:", msg.type);
 
     switch (msg.type) {
       case "init":
@@ -287,7 +299,10 @@
 
   // --- Boot ---
   try {
+    console.log("[mind-map] booting...");
     createMindMap();
+    var bootMs = Math.round(performance.now() - _t0);
+    console.log("[mind-map] boot complete, posting ready (+" + bootMs + "ms)");
     post({ type: "ready" });
   } catch (err) {
     var bootMsg = "脑图初始化失败: " + (err && err.message ? err.message : String(err));

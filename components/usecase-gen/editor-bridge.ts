@@ -39,6 +39,7 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
     if (e.origin !== window.location.origin) return;
     const msg = e.data;
     if (!msg || !msg.type) return;
+    console.log("[Bridge] received:", msg.type, msg.payload ? JSON.stringify(msg.payload).slice(0, 200) : "");
 
     switch (msg.type) {
       case "ready":
@@ -73,11 +74,11 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
   }
 
   function waitFor(type: string, timeoutMs = 5000): Promise<unknown> {
-    // If iframe already sent "ready" (e.g. before StrictMode double-mount),
-    // resolve immediately instead of waiting for a message that will never come.
     if (type === "ready" && globalReadyReceived) {
+      console.log("[Bridge] waitFor(" + type + "): globalReady already true, resolve immediately");
       return Promise.resolve();
     }
+    console.log("[Bridge] waitFor(" + type + "), timeout=" + timeoutMs + "ms");
     return new Promise((resolve, reject) => {
       const id = `${type}:${msgId++}`;
       pendingResolvers.set(id, resolve);
@@ -85,6 +86,7 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
         setTimeout(() => {
           if (pendingResolvers.has(id)) {
             pendingResolvers.delete(id);
+            console.error("[Bridge] waitFor(" + type + ") TIMEOUT after " + timeoutMs + "ms");
             reject(new Error(`${type} 通信超时`));
           }
         }, timeoutMs);
@@ -93,6 +95,7 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
   }
 
   function post(msg: Record<string, unknown>) {
+    console.log("[Bridge] post:", msg.type, msg.payload ? JSON.stringify(msg.payload as object).slice(0, 200) : "");
     iframeRef.contentWindow?.postMessage(msg, window.location.origin);
   }
 

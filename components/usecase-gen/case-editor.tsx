@@ -28,11 +28,9 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
   const [hasData, setHasData] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
-  // `loadFailed` toggles the full-canvas error panel (retry + download buttons).
-  // It is set during the load phase only — save/export errors stay in the
-  // small status bar above the canvas.
   const [loadFailed, setLoadFailed] = useState(false);
   const loadingPhaseRef = useRef(true);
+  const mountTimeRef = useRef(performance.now());
 
   // Keep latest props in refs so async callbacks always read current values
   const filePathRef = useRef(filePath);
@@ -44,10 +42,8 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
 
   // iframe onLoad
   const handleIframeLoad = useCallback(() => {
-    // 注意：不能在这里调用 markGlobalReady()！
-    // onLoad 只表示 HTML 解析完成，不保证 mind-map.js 已执行完毕。
-    // "ready" 必须由 iframe 内的 mind-map.js 创建完 mindMap 实例后
-    // 通过 postMessage 发送，否则 bridge.importXmindFile 会发给空实例。
+    const ms = Math.round(performance.now() - mountTimeRef.current);
+    console.log(`[Editor] iframe onLoad fired (+${ms}ms)`);
     setIframeLoaded(true);
   }, []);
 
@@ -57,26 +53,28 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
     if (!iframe) return;
     try {
       const doc = iframe.contentDocument;
+      console.log("[Editor] check already-loaded: readyState=", doc?.readyState, "url=", doc?.URL);
       if (doc && doc.readyState === "complete" && doc.URL !== "about:blank") {
-        // 同样不能 markGlobalReady()，让 postMessage 来驱动
+        console.log("[Editor] iframe already loaded on mount");
         setIframeLoaded(true);
       }
-    } catch {
-      // cross-origin, fall back to onLoad
+    } catch (e) {
+      console.log("[Editor] cross-origin detect, fallback to onLoad", e);
     }
   }, []);
 
-  // iframe 加载超时保护：若 iframe 10秒内未 onLoad，显示错误
+  // iframe 加载超时保护：内联 HTML ~7MB，解析+执行 JS 库可能较慢
+  // 给 30 秒，实际加载成功后会自动清除
   useEffect(() => {
     if (iframeLoaded) return;
     const timer = setTimeout(() => {
       if (!iframeLoaded) {
-        console.error("[Editor] iframe onLoad timeout (10s)");
-        setErrorMsg("编辑器加载失败，请检查网络后刷新页面");
+        console.error("[Editor] iframe onLoad timeout (30s)");
+        setErrorMsg("编辑器加载超时，请刷新页面重试");
         setLoadFailed(true);
         setLoading(false);
       }
-    }, 10000);
+    }, 30000);
     return () => clearTimeout(timer);
   }, [iframeLoaded]);
 
@@ -85,8 +83,7 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
 
   useEffect(() => {
     if (!iframeRef.current) return;
-    // 每次新编辑器实例化时重置，防止上一次会话遗留的 true
-    // 导致新 iframe 尚未 ready 就跳过等待
+    console.log("[Editor] Creating bridge, resetting globalReadyState");
     resetGlobalReadyState();
     const bridge = createEditorBridge(iframeRef.current);
     bridgeRef.current = bridge;
@@ -94,6 +91,7 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
     bridge.onDirty((d: boolean) => setDirty(d));
     bridge.onSaveRequested(() => handleSave());
     bridge.onError((msg: string) => {
+      console.error("[Editor] iframe error:", msg);
       setErrorMsg(msg);
       // iframe-side errors during the load phase (e.g. parseXmindFile failure)
       // must route to the error panel — the empty mindmap behind it is misleading.
@@ -112,8 +110,10 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
 
   // 2) Data loading: wait iframe ready → 让 iframe 直接 fetch 文件 URL → 解析
   useEffect(() => {
+    console.log("[Editor] data-loading effect: iframeLoaded=", iframeLoaded, "bridge=", !!bridgeRef.current);
     if (!iframeLoaded || !bridgeRef.current) return;
     const bridge = bridgeRef.current;
+    console.log("[Editor] props: taskId=", taskIdRef.current, "filePath=", filePathRef.current);
 
     let cancelled = false;
     loadingPhaseRef.current = true;
@@ -133,16 +133,18 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
 
     (async () => {
       try {
+        const t0 = performance.now();
         // Wait for iframe boot's "ready" — mindMap 实例已创建
         console.log("[Editor] Waiting for iframe ready...");
         await bridge.waitReady(15000);
         if (cancelled) return;
-        console.log("[Editor] iframe ready received");
+        console.log(`[Editor] iframe ready received (+${Math.round(performance.now() - t0)}ms)`);
 
         const fp = filePathRef.current;
         const tid = taskIdRef.current;
 
         if (!fp || !tid) {
+          console.warn("[Editor] missing taskId or filePath, skip loading");
           loadingPhaseRef.current = false;
           setLoading(false);
           return;
@@ -150,18 +152,19 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
 
         // iframe 直接 fetch 服务端文件，不走 base64 中转
         const url = `/api/tasks/${tid}/download?file=${encodeURIComponent(fp)}`;
-        console.log("[Editor] Telling iframe to fetch:", url);
+        console.log(`[Editor] Telling iframe to fetch: ${url} (+${Math.round(performance.now() - t0)}ms)`);
         setHasData(true);
         bridge.importXmindUrl(url);
         await bridge.waitReady(30000);
         if (cancelled) return;
-        console.log("[Editor] Import complete");
+        const totalMs = Math.round(performance.now() - t0);
+        console.log(`[Editor] Import complete (+${totalMs}ms)`);
         loadingPhaseRef.current = false;
         setLoading(false);
       } catch (err: unknown) {
         if (cancelled) return;
         const e = err as { message?: string };
-        console.error("[Editor] load error:", e?.message);
+        console.error("[Editor] load error:", e?.message, e);
         loadingPhaseRef.current = false;
         setErrorMsg(e?.message?.includes("超时") ? "脑图加载超时，请刷新重试" : "脑图加载失败");
         setLoadFailed(true);
@@ -370,7 +373,7 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
 
         <iframe
           ref={iframeRef}
-          src="/editor/mind-map.html"
+          src="/api/editor-assets/html"
           className="w-full h-full border-0"
           title="用例脑图编辑器"
           sandbox="allow-scripts allow-same-origin allow-storage-access-by-user-activation allow-modals"
