@@ -27,7 +27,9 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
   const [dirty, setDirty] = useState(false);
   const [hasData, setHasData] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
+  // bridgeReady: bridge 已创建，可以开始等 iframe 的 postMessage("ready")
+  // 不依赖 iframe.onLoad（它要等 6.6MB JS 全部下载完才触发，慢网络会超时）
+  const [bridgeReady, setBridgeReady] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const loadingPhaseRef = useRef(true);
   const mountTimeRef = useRef(performance.now());
@@ -40,43 +42,13 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
   const fileNameRef = useRef(fileName);
   fileNameRef.current = fileName;
 
-  // iframe onLoad
+  // iframe onLoad — 仅记录日志，不再作为加载流程的触发条件
+  // onLoad 要等 iframe 内所有 <script> 下载执行完才触发（6.6MB），
+  // 慢网络下可能需要数分钟。postMessage 不受此限制。
   const handleIframeLoad = useCallback(() => {
     const ms = Math.round(performance.now() - mountTimeRef.current);
-    console.log(`[Editor] iframe onLoad fired (+${ms}ms)`);
-    setIframeLoaded(true);
+    console.log(`[Editor] iframe onLoad fired (+${ms}ms) — informational only`);
   }, []);
-
-  // Detect already-loaded iframe (direct refresh)
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-    try {
-      const doc = iframe.contentDocument;
-      console.log("[Editor] check already-loaded: readyState=", doc?.readyState, "url=", doc?.URL);
-      if (doc && doc.readyState === "complete" && doc.URL !== "about:blank") {
-        console.log("[Editor] iframe already loaded on mount");
-        setIframeLoaded(true);
-      }
-    } catch (e) {
-      console.log("[Editor] cross-origin detect, fallback to onLoad", e);
-    }
-  }, []);
-
-  // iframe 加载超时保护：内联 HTML ~7MB，解析+执行 JS 库可能较慢
-  // 给 30 秒，实际加载成功后会自动清除
-  useEffect(() => {
-    if (iframeLoaded) return;
-    const timer = setTimeout(() => {
-      if (!iframeLoaded) {
-        console.error("[Editor] iframe onLoad timeout (30s)");
-        setErrorMsg("编辑器加载超时，请刷新页面重试");
-        setLoadFailed(true);
-        setLoading(false);
-      }
-    }, 30000);
-    return () => clearTimeout(timer);
-  }, [iframeLoaded]);
 
   // 1) Bridge creation
   const readyRef = useRef<Promise<void> | null>(null);
@@ -93,8 +65,6 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
     bridge.onError((msg: string) => {
       console.error("[Editor] iframe error:", msg);
       setErrorMsg(msg);
-      // iframe-side errors during the load phase (e.g. parseXmindFile failure)
-      // must route to the error panel — the empty mindmap behind it is misleading.
       if (loadingPhaseRef.current) {
         setHasData(false);
         setLoadFailed(true);
@@ -102,16 +72,21 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
       }
     });
 
+    // Bridge 已就绪，触发数据加载流程
+    setBridgeReady(true);
+
     return () => {
       bridge.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 2) Data loading: wait iframe ready → 让 iframe 直接 fetch 文件 URL → 解析
+  // 2) Data loading: bridge 创建后立即开始，不依赖 iframe onLoad
+  //    waitReady() 会阻塞到 mind-map.js 发送 postMessage("ready")
+  //    postMessage 在 onLoad 之前就能工作，不受 6.6MB 下载阻塞
   useEffect(() => {
-    console.log("[Editor] data-loading effect: iframeLoaded=", iframeLoaded, "bridge=", !!bridgeRef.current);
-    if (!iframeLoaded || !bridgeRef.current) return;
+    console.log("[Editor] data-loading effect: bridgeReady=", bridgeReady, "bridge=", !!bridgeRef.current);
+    if (!bridgeReady || !bridgeRef.current) return;
     const bridge = bridgeRef.current;
     console.log("[Editor] props: taskId=", taskIdRef.current, "filePath=", filePathRef.current);
 
@@ -120,23 +95,24 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
     setLoadFailed(false);
     setErrorMsg(null);
 
-    // 总超时保护：远程部署时网络慢可能导致加载卡死
+    // 总超时保护：慢网络下 6.6MB 下载可能需要几分钟
     const totalTimeout = setTimeout(() => {
       if (cancelled || !loadingPhaseRef.current) return;
-      console.error("[Editor] 总加载超时(45s)");
+      console.error("[Editor] 总加载超时(180s)");
       loadingPhaseRef.current = false;
       setErrorMsg("加载超时，请检查网络连接后重试");
       setHasData(false);
       setLoadFailed(true);
       setLoading(false);
-    }, 45000);
+    }, 180000);
 
     (async () => {
       try {
         const t0 = performance.now();
-        // Wait for iframe boot's "ready" — mindMap 实例已创建
-        console.log("[Editor] Waiting for iframe ready...");
-        await bridge.waitReady(15000);
+        // 等 mind-map.js 创建完 mindMap 实例后发送的 "ready"
+        // 慢网络给 120 秒（6.6MB JS 下载+解析）
+        console.log("[Editor] Waiting for iframe ready (120s timeout)...");
+        await bridge.waitReady(120000);
         if (cancelled) return;
         console.log(`[Editor] iframe ready received (+${Math.round(performance.now() - t0)}ms)`);
 
@@ -155,7 +131,7 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
         console.log(`[Editor] Telling iframe to fetch: ${url} (+${Math.round(performance.now() - t0)}ms)`);
         setHasData(true);
         bridge.importXmindUrl(url);
-        await bridge.waitReady(30000);
+        await bridge.waitReady(60000);
         if (cancelled) return;
         const totalMs = Math.round(performance.now() - t0);
         console.log(`[Editor] Import complete (+${totalMs}ms)`);
@@ -178,7 +154,7 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
       clearTimeout(totalTimeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [iframeLoaded, filePath, taskId]);
+  }, [bridgeReady, filePath, taskId]);
 
   const handleSave = useCallback(async () => {
     if (!bridgeRef.current || !hasData) return;
