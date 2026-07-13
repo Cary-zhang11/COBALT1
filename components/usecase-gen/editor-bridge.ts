@@ -36,6 +36,17 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
   let errorCb: ErrorCallback | null = null;
 
   const handler: MessageHandler = (e) => {
+    // 全量日志：在过滤前记录所有消息，用于诊断
+    const rawType = typeof e.data === 'object' && e.data ? e.data.type : typeof e.data;
+    console.log("[Bridge] raw message:", {
+      origin: e.origin,
+      expectedOrigin: window.location.origin,
+      originMatch: e.origin === window.location.origin,
+      dataType: typeof e.data,
+      msgType: rawType,
+      preview: typeof e.data === 'string' ? e.data.slice(0, 80) : (e.data && typeof e.data === 'object' ? JSON.stringify(e.data).slice(0, 120) : String(e.data))
+    });
+
     if (e.origin !== window.location.origin) return;
     const msg = e.data;
     if (!msg || !msg.type) return;
