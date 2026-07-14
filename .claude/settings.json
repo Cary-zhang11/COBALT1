@@ -26,7 +26,9 @@
       "Bash(cp \".claude/skills/prd-to-tests-smoke/references/smoke_test_generation.md\" \".claude/skills/prd-to-tests-new/references/smoke_generation.md\")",
       "Bash(cp \".claude/skills/prd-to-tests-smoke/references/step05_output.md\" \".claude/skills/prd-to-tests-new/references/smoke_output.md\")",
       "Bash(cp \".claude/skills/prd-to-tests-smoke/scripts/md2excel.py\" \".claude/skills/prd-to-tests-new/scripts/md2excel.py\" && echo \"script copied\")",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)"
     ],
     "additionalDirectories": [
       "D:\\qorder_workspace\\Cobalt\\.claude\\skills\\prd-to-tests-smoke\\scripts"

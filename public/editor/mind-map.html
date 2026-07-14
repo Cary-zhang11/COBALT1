@@ -12,8 +12,44 @@
 </head>
 <body>
   <div id="mindMapContainer"></div>
-  <script src="/vendor/simple-mind-map.umd.min.js"></script>
-  <script src="/vendor/jszip.min.js"></script>
-  <script src="/editor/mind-map.js"></script>
+  <script>
+  (function() {
+    var origin = window.location.origin;
+    function post(msg) { window.parent.postMessage(msg, origin); }
+    post({ type: "loading", payload: { phase: "start" } });
+
+    var heartbeat = setInterval(function() {
+      post({ type: "loading", payload: { phase: "downloading" } });
+    }, 8000);
+
+    var scripts = [
+      "/vendor/simple-mind-map.umd.min.js",
+      "/vendor/jszip.min.js",
+      "/editor/mind-map.js"
+    ];
+    var idx = 0;
+
+    function loadNext() {
+      if (idx >= scripts.length) {
+        clearInterval(heartbeat);
+        return;
+      }
+      var src = scripts[idx++];
+      post({ type: "loading", payload: { phase: "downloading", file: src } });
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = function() {
+        if (idx < scripts.length) loadNext();
+        else clearInterval(heartbeat);
+      };
+      s.onerror = function() {
+        clearInterval(heartbeat);
+        post({ type: "error", payload: { message: "脚本加载失败: " + src } });
+      };
+      document.body.appendChild(s);
+    }
+    loadNext();
+  })();
+  </script>
 </body>
 </html>

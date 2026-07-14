@@ -12,6 +12,7 @@ type MessageHandler = (e: MessageEvent) => void;
 type DirtyCallback = (dirty: boolean) => void;
 type SaveRequestedCallback = () => void;
 type ErrorCallback = (error: string) => void;
+type LoadingCallback = (phase: string) => void;
 
 // Module-level flag: persists across StrictMode double-mount so the second
 // bridge instance can resolve waitReady immediately when the iframe has
@@ -34,6 +35,7 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
   let dirtyCb: DirtyCallback | null = null;
   let saveCb: SaveRequestedCallback | null = null;
   let errorCb: ErrorCallback | null = null;
+  let loadingCb: LoadingCallback | null = null;
 
   const handler: MessageHandler = (e) => {
     // 全量日志：在过滤前记录所有消息，用于诊断
@@ -55,7 +57,17 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
     switch (msg.type) {
       case "ready":
         globalReadyReceived = true;
+        if (readyTimeoutHandle) {
+          clearTimeout(readyTimeoutHandle);
+          readyTimeoutHandle = null;
+          readyTimeoutReject = null;
+          readyResolverId = null;
+        }
         resolveAll("ready", null);
+        break;
+      case "loading":
+        loadingCb?.(msg.payload?.phase ?? "downloading");
+        resetReadyTimeout();
         break;
       case "data":
         resolveAll("data", msg.payload?.json ?? null);
@@ -84,6 +96,26 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
     }
   }
 
+  // Resettable timeout for "ready" — heartbeat messages extend the deadline
+  let readyTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  let readyTimeoutMs = 30000;
+  let readyTimeoutReject: ((err: Error) => void) | null = null;
+  let readyResolverId: string | null = null;
+
+  function resetReadyTimeout() {
+    if (!readyTimeoutHandle || !readyTimeoutReject) return;
+    clearTimeout(readyTimeoutHandle);
+    readyTimeoutHandle = setTimeout(() => {
+      if (readyResolverId && pendingResolvers.has(readyResolverId)) {
+        pendingResolvers.delete(readyResolverId);
+        console.error("[Bridge] waitFor(ready) TIMEOUT after heartbeat gap >" + readyTimeoutMs + "ms");
+        readyTimeoutReject!(new Error("ready 通信超时"));
+      }
+      readyTimeoutReject = null;
+      readyResolverId = null;
+    }, readyTimeoutMs);
+  }
+
   function waitFor(type: string, timeoutMs = 5000): Promise<unknown> {
     if (type === "ready" && globalReadyReceived) {
       console.log("[Bridge] waitFor(" + type + "): globalReady already true, resolve immediately");
@@ -94,13 +126,28 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
       const id = `${type}:${msgId++}`;
       pendingResolvers.set(id, resolve);
       if (timeoutMs > 0) {
-        setTimeout(() => {
-          if (pendingResolvers.has(id)) {
-            pendingResolvers.delete(id);
-            console.error("[Bridge] waitFor(" + type + ") TIMEOUT after " + timeoutMs + "ms");
-            reject(new Error(`${type} 通信超时`));
-          }
-        }, timeoutMs);
+        if (type === "ready") {
+          readyTimeoutMs = Math.min(timeoutMs, 30000);
+          readyTimeoutReject = reject;
+          readyResolverId = id;
+          readyTimeoutHandle = setTimeout(() => {
+            if (pendingResolvers.has(id)) {
+              pendingResolvers.delete(id);
+              console.error("[Bridge] waitFor(ready) TIMEOUT after " + timeoutMs + "ms");
+              reject(new Error(`${type} 通信超时`));
+            }
+            readyTimeoutReject = null;
+            readyResolverId = null;
+          }, timeoutMs);
+        } else {
+          setTimeout(() => {
+            if (pendingResolvers.has(id)) {
+              pendingResolvers.delete(id);
+              console.error("[Bridge] waitFor(" + type + ") TIMEOUT after " + timeoutMs + "ms");
+              reject(new Error(`${type} 通信超时`));
+            }
+          }, timeoutMs);
+        }
       }
     });
   }
@@ -143,10 +190,13 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
     onDirty: (cb: DirtyCallback) => { dirtyCb = cb; },
     onSaveRequested: (cb: SaveRequestedCallback) => { saveCb = cb; },
     onError: (cb: ErrorCallback) => { errorCb = cb; },
+    onLoading: (cb: LoadingCallback) => { loadingCb = cb; },
 
     destroy: () => {
       window.removeEventListener("message", handler);
       pendingResolvers.clear();
+      if (readyTimeoutHandle) clearTimeout(readyTimeoutHandle);
+      readyTimeoutReject = null;
     },
   };
 }

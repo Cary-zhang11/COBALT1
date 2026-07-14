@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
-export const dynamic = "force-dynamic";
-
 /**
  * 构建时将编辑器资源嵌入 bundle，运行时零 IO。
  * HTML 极小（<1KB），JS 库由浏览器并行加载、可缓存。
@@ -29,20 +27,20 @@ for (const [slug, filePath, contentType] of ASSETS) {
   }
 }
 
-// HTML 中把外部 script src 替换为 API 路由地址
+// HTML 中把 boot 脚本里的路径替换为 API 路由地址
 if (FILE_MAP["html"]) {
   FILE_MAP["html"].content = FILE_MAP["html"].content
     .replace(
-      'src="/vendor/simple-mind-map.umd.min.js"',
-      'src="/api/editor-assets/simple-mind-map"'
+      '"/vendor/simple-mind-map.umd.min.js"',
+      '"/api/editor-assets/simple-mind-map"'
     )
     .replace(
-      'src="/vendor/jszip.min.js"',
-      'src="/api/editor-assets/jszip"'
+      '"/vendor/jszip.min.js"',
+      '"/api/editor-assets/jszip"'
     )
     .replace(
-      'src="/editor/mind-map.js"',
-      'src="/api/editor-assets/mind-map-js"'
+      '"/editor/mind-map.js"',
+      '"/api/editor-assets/mind-map-js"'
     );
 }
 
@@ -58,10 +56,13 @@ export async function GET(
   }
   const sizeKB = Math.round(asset.content.length / 1024);
   console.log(`[Editor Assets] Serving: ${slug} (${sizeKB}KB, ${asset.contentType})`);
+  const cacheControl = asset.contentType.includes("javascript")
+    ? "public, max-age=86400, immutable"
+    : "public, max-age=60";
   return new NextResponse(asset.content, {
     headers: {
       "Content-Type": `${asset.contentType}; charset=utf-8`,
-      "Cache-Control": "public, max-age=3600",
+      "Cache-Control": cacheControl,
     },
   });
 }

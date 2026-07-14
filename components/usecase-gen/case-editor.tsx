@@ -27,6 +27,7 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
   const [dirty, setDirty] = useState(false);
   const [hasData, setHasData] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState("加载脑图画布...");
   // bridgeReady: bridge 已创建，可以开始等 iframe 的 postMessage("ready")
   // 不依赖 iframe.onLoad（它要等 6.6MB JS 全部下载完才触发，慢网络会超时）
   const [bridgeReady, setBridgeReady] = useState(false);
@@ -62,6 +63,11 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
 
     bridge.onDirty((d: boolean) => setDirty(d));
     bridge.onSaveRequested(() => handleSave());
+    bridge.onLoading((phase: string) => {
+      if (phase === "start") setLoadingStatus("正在初始化编辑器...");
+      else if (phase === "downloading") setLoadingStatus("正在下载脑图引擎...");
+      else setLoadingStatus("正在加载...");
+    });
     bridge.onError((msg: string) => {
       console.error("[Editor] iframe error:", msg);
       setErrorMsg(msg);
@@ -304,7 +310,7 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
           <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
             <div className="text-center">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">加载脑图画布...</p>
+              <p className="text-sm text-muted-foreground">{loadingStatus}</p>
             </div>
           </div>
         )}
