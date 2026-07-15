@@ -10,6 +10,7 @@ import {
   BookOpen,
   History,
   X,
+  Ticket,
 } from "lucide-react";
 import type { FileInfo } from "@/hooks/use-output-scanner";
 import { FileActionModal } from "./file-action-modal";
@@ -34,6 +35,10 @@ export interface ExecutionMaterials {
   knowledgeItems: string[];
   /** 关联的历史用例范文（文件名或标题） */
   historyItems: string[];
+  /** 工单地址（完整 URL） */
+  ticketUrl: string;
+  /** 需求地址（知识库文档链接） */
+  requirementUrl: string;
 }
 
 interface ExecutionPanelProps {
@@ -387,6 +392,40 @@ function MaterialsSection({
           label="历史范文"
           items={materials.historyItems}
         />
+        {materials.ticketUrl && (
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Ticket className="w-3.5 h-3.5 text-primary/70 flex-shrink-0" />
+              <span className="text-xs font-medium text-foreground/85">工单</span>
+            </div>
+            <a
+              href={materials.ticketUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pl-5 block text-xs text-primary hover:underline truncate"
+              title={materials.ticketUrl}
+            >
+              {materials.ticketUrl}
+            </a>
+          </div>
+        )}
+        {materials.requirementUrl && (
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1">
+              <FileText className="w-3.5 h-3.5 text-primary/70 flex-shrink-0" />
+              <span className="text-xs font-medium text-foreground/85">需求地址</span>
+            </div>
+            <a
+              href={materials.requirementUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pl-5 block text-xs text-primary hover:underline truncate"
+              title={materials.requirementUrl}
+            >
+              {materials.requirementUrl}
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -446,6 +485,8 @@ const EMPTY_MATERIALS: ExecutionMaterials = {
   requirementText: "",
   knowledgeItems: [],
   historyItems: [],
+  ticketUrl: "",
+  requirementUrl: "",
 };
 
 export function ExecutionPanel({

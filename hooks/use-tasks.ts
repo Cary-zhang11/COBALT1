@@ -102,6 +102,8 @@ export function useCreateTask() {
       input: string;
       uploadedFiles?: string[];
       businessType?: string | null;
+      ticketId?: string | null;
+      requirementUrl?: string | null;
     }) => {
       const res = await fetch("/api/tasks", {
         method: "POST",

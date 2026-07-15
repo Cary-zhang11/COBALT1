@@ -21,6 +21,8 @@ const defaultMaterials = {
   requirementText: "这是本次需求的详细描述文本",
   knowledgeItems: ["支付规范.md", "会员规则.md"],
   historyItems: ["历史用例A.md"],
+  ticketUrl: "",
+  requirementUrl: "",
 };
 
 const foundFiles = [
@@ -166,6 +168,8 @@ describe("ExecutionPanel", () => {
             requirementText: "",
             knowledgeItems: [],
             historyItems: [],
+            ticketUrl: "",
+            requirementUrl: "",
           }}
         />
       );

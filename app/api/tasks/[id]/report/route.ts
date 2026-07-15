@@ -218,6 +218,12 @@ export async function GET(
     ]);
     const inputFileNames = (task.inputFiles || []).map((p) => path.basename(p));
     const requirementText = extractOriginalInputText(task.input);
+    // 工单地址：从 ticketId 还原完整 URL
+    const ticketUrl = task.ticketId
+      ? `https://xz.corpautohome.com/requirement/detail/${task.ticketId}`
+      : "";
+    // 需求地址：导入时捕获的知识库文档链接
+    const requirementUrl = task.requirementUrl || "";
 
     console.log(`[report] taskId="${params.id}" status="${task.status}" duration=${task.duration} outputFiles=${fileList.length}`);
     return NextResponse.json({
@@ -235,6 +241,8 @@ export async function GET(
         requirementText,
         knowledgeItems: knowledgeRefs,
         historyItems: historyRefs,
+        ticketUrl,
+        requirementUrl,
       },
       usability: {
         usabilityRate: task.usabilityRate,

@@ -86,6 +86,8 @@ model Task {
   qualityScore      Int?
   category          String?
   businessType      String?
+  ticketId          String?
+  requirementUrl    String?  @db.Text
   dimensionCoverage Json?
   usabilityRate     Int?
   reviewDuration    Int?

@@ -6,5 +6,7 @@ sandbox/
 storage/
 
 /lib/generated/prisma
-.next/ 
+.next/
 uploads/
+data/knowledge-credential.json
+data/knowledge-account.json

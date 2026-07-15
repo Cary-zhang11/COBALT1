@@ -28,7 +28,24 @@
       "Bash(cp \".claude/skills/prd-to-tests-smoke/scripts/md2excel.py\" \".claude/skills/prd-to-tests-new/scripts/md2excel.py\" && echo \"script copied\")",
       "Bash(npx vitest *)",
       "Bash(npx tsc *)",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(ls \"d:\\\\qorder_workspace\\\\\" 2>/dev/null | head -30)",
+      "Read(//d/qorder_workspace\" 2>/dev/**)",
+      "Bash(ls d:/qorder_workspace/ 2>/dev/null | head -30)",
+      "Read(//d/qorder_workspace/**)",
+      "Bash(ls d:/qorder_workspace/agents/ 2>/dev/null | head -30)",
+      "Read(//d/qorder_workspace/agents/**)",
+      "Bash(ls d:/qorder_workspace/DST/ 2>/dev/null | head -30)",
+      "Read(//d/qorder_workspace/DST/**)",
+      "Bash(ls d:/qorder_workspace/agents/agents/ 2>/dev/null | head -30)",
+      "Read(//d/qorder_workspace/agents/agents/**)",
+      "Bash(ls d:/qorder_workspace/DST/DST/ 2>/dev/null | head -30)",
+      "Read(//d/qorder_workspace/DST/DST/**)",
+      "Bash(ls \"d:/qorder_workspace/Cobalt - 副本/\" 2>/dev/null | head -30)",
+      "Read(//d/qorder_workspace/Cobalt - 副本/**)",
+      "Bash(ls \"d:/qorder_workspace/Cobalt - 副本/app/\" 2>/dev/null | head -30)",
+      "Read(//d/qorder_workspace/Cobalt - 副本/app/**)",
+      "Bash(npm install *)"
     ],
     "additionalDirectories": [
       "D:\\qorder_workspace\\Cobalt\\.claude\\skills\\prd-to-tests-smoke\\scripts"

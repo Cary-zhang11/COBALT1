@@ -56,6 +56,7 @@ export default function TaskExecutePage() {
   useEffect(() => {
     if (!initialPromptShown && taskData?.task?.input) {
       setInitialPromptShown(true);
+      sentMessagesRef.current.add(taskData.task.input);
       setDisplayMessages((prev) => [
         {
           id: "initial-prompt",

@@ -15,6 +15,8 @@ import {
   Users,
   Package,
   Plus,
+  KeyRound,
+  Download,
 } from "lucide-react";
 
 const navItems = [
@@ -142,16 +144,46 @@ export function Sidebar() {
               href="/admin/users"
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                pathname.startsWith("/admin")
+                pathname.startsWith("/admin/users")
                   ? "bg-blue-50 text-blue-700 shadow-sm"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
             >
               <Users className={cn(
                 "w-4 h-4 transition-colors",
-                pathname.startsWith("/admin") ? "text-blue-600" : "text-muted-foreground"
+                pathname.startsWith("/admin/users") ? "text-blue-600" : "text-muted-foreground"
               )} />
               用户管理
+            </Link>
+            <Link
+              href="/admin/knowledge-credential"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                pathname.startsWith("/admin/knowledge-credential")
+                  ? "bg-blue-50 text-blue-700 shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <KeyRound className={cn(
+                "w-4 h-4 transition-colors",
+                pathname.startsWith("/admin/knowledge-credential") ? "text-blue-600" : "text-muted-foreground"
+              )} />
+              知识库凭证
+            </Link>
+            <Link
+              href="/knowledge-download"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                pathname.startsWith("/knowledge-download")
+                  ? "bg-blue-50 text-blue-700 shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <Download className={cn(
+                "w-4 h-4 transition-colors",
+                pathname.startsWith("/knowledge-download") ? "text-blue-600" : "text-muted-foreground"
+              )} />
+              知识库下载
             </Link>
           </>
         )}

@@ -17,7 +17,7 @@ import type { UsecaseModule, TweakEntry } from "./shared/types";
 import {
   Upload, Loader2, FileText, CheckCircle2, ArrowLeft, ChevronRight,
   Wand2, AlertTriangle, RefreshCw,
-  Sparkles,
+  Sparkles, Link as LinkIcon, XCircle, Ticket, Download,
 } from "lucide-react";
 
 interface GenerateWizardProps {
@@ -98,6 +98,18 @@ export function GenerateWizard({
   const [requirementText, setRequirementText] = useState("");
   const [validationMsg, setValidationMsg] = useState("");
   const [dragOverUpload, setDragOverUpload] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkProgress, setLinkProgress] = useState(0);
+  const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
+  const [ticketUrl, setTicketUrl] = useState("");
+  const [ticketError, setTicketError] = useState<string | null>(null);
+  const [ticketLoading, setTicketLoading] = useState(false);
+  const [ticketFetchMsg, setTicketFetchMsg] = useState<string | null>(null);
+  const [ticketDocUrls, setTicketDocUrls] = useState<string[]>([]);
+  const ticketFilePathsRef = useRef<string[]>([]);
+  const [requirementUrl, setRequirementUrl] = useState("");
 
   // ---- Step 2: 知识库关联 ----
   const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<Set<string>>(new Set());
@@ -676,6 +688,121 @@ export function GenerateWizard({
     setUploadedFiles((prev) => prev.filter((f) => f.path !== path));
   };
 
+  // 从工单地址中提取 ID（取 URL 路径末尾的数字段，忽略查询参数）
+  const extractTicketId = (url: string): string | null => {
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+    const withoutQuery = trimmed.split(/[?#]/)[0];
+    const m = withoutQuery.match(/(\d+)\/?$/);
+    return m ? m[1] : null;
+  };
+
+  // 规范化需求地址：裸 targetId 还原为完整知识库链接
+  const normalizeRequirementUrl = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^[A-Za-z0-9_-]{8,64}$/.test(trimmed)) {
+      return `https://zhishi.autohome.com.cn/home/teamplace/file?targetId=${trimmed}`;
+    }
+    return trimmed;
+  };
+
+  // Download from knowledge link
+  const handleLinkDownload = async () => {
+    const trimmed = linkUrl.trim();
+    if (!trimmed) return;
+    setLinkError(null);
+    setLinkSuccess(null);
+    setLinkLoading(true);
+    setLinkProgress(8);
+    // 模拟分阶段进度（凭证校验 → 下载 → 保存）
+    const timer = setInterval(() => {
+      setLinkProgress((p) => (p < 90 ? p + Math.max(1, (90 - p) * 0.12) : p));
+    }, 400);
+    try {
+      const res = await fetch("/api/upload-from-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmed, format: "raw" }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || `下载失败 (${res.status})`);
+      }
+      const data = await res.json();
+      setLinkProgress(100);
+      setUploadedFiles((prev) => [...prev, { name: data.fileName, path: data.filePath }]);
+      setRequirementUrl(normalizeRequirementUrl(trimmed));
+      setLinkSuccess(`已导入 ${data.fileName}`);
+      setLinkUrl("");
+    } catch (err: any) {
+      setLinkError(err?.message || "下载失败");
+    } finally {
+      clearInterval(timer);
+      setLinkLoading(false);
+      setTimeout(() => setLinkProgress(0), 600);
+    }
+  };
+
+  // 通过工单地址获取需求文档和描述
+  const handleTicketFetch = async () => {
+    const trimmed = ticketUrl.trim();
+    if (!trimmed) {
+      setTicketError("请先填写工单地址");
+      return;
+    }
+    setTicketError(null);
+    setTicketFetchMsg(null);
+    setTicketLoading(true);
+    try {
+      const res = await fetch("/api/ticket-needs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmed }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || `获取失败 (${res.status})`);
+      }
+      const data = await res.json();
+      // 移除上一次工单获取的文件（替换，不累加）
+      const prevPaths = ticketFilePathsRef.current;
+      if (prevPaths.length > 0) {
+        setUploadedFiles((prev) => prev.filter((f) => !prevPaths.includes(f.path)));
+      }
+      // 添加本次下载的文件
+      const newFiles = (data.files || []).map((f: { fileName: string; filePath: string }) => ({ name: f.fileName, path: f.filePath }));
+      ticketFilePathsRef.current = newFiles.map((f: { name: string; path: string }) => f.path);
+      if (newFiles.length > 0) {
+        setUploadedFiles((prev) => [...prev, ...newFiles]);
+      }
+      // 将需求描述填入补充说明（替换，不累加）
+      if (data.description) {
+        setRequirementText(data.description);
+      }
+      // 将识别到的需求地址反显在输入框中，并同步到 requirementUrl 用于入库和结果页展示
+      if (data.documentUrls && data.documentUrls.length > 0) {
+        const docUrl = normalizeRequirementUrl(data.documentUrls[0]);
+        setLinkUrl(docUrl);
+        setRequirementUrl(docUrl);
+      }
+      setTicketDocUrls(data.documentUrls || []);
+      const fileCount = data.files?.length || 0;
+      setTicketFetchMsg(
+        fileCount > 0
+          ? `已获取 ${fileCount} 个需求文档${data.description ? "及需求描述" : ""}`
+          : data.description
+            ? "已获取需求描述"
+            : "未获取到需求文档或描述",
+      );
+    } catch (err: any) {
+      setTicketError(err?.message || "获取需求失败");
+    } finally {
+      setTicketLoading(false);
+    }
+  };
+
   // Start Generate
   const startGenerate = async () => {
     if (!skillId) return;
@@ -713,6 +840,8 @@ export function GenerateWizard({
         input,
         uploadedFiles: uploadedFiles.map((f) => f.path),
         businessType: selectedBusinessType || undefined,
+        ticketId: extractTicketId(ticketUrl),
+        requirementUrl: requirementUrl || null,
       });
       setTaskId(newTaskId);
 
@@ -833,40 +962,145 @@ export function GenerateWizard({
         {wizStep === 0 && (
           <div className="space-y-4 w-full">
             <div className="bg-card rounded-xl shadow-sm border border-border/60 p-5">
-              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                <Upload className="w-4 h-4 text-primary" />
-                输入需求
-              </h3>
-              <div
-                className={`border-2 border-dashed rounded-xl py-8 px-4 text-center cursor-pointer transition-all ${
-                  dragOverUpload ? "border-primary bg-primary/5" : "border-border hover:border-primary/30 hover:bg-primary/5"
-                }`}
-                onClick={() => document.getElementById("wizard-file-input")?.click()}
-                onDragOver={(e) => { e.preventDefault(); setDragOverUpload(true); }}
-                onDragLeave={() => setDragOverUpload(false)}
-                onDrop={handleDropUpload}
-              >
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-primary font-medium">点击上传</span> 或拖拽文件到此处 · 支持 .docx .md .txt
-                </p>
-                <input id="wizard-file-input" type="file" className="hidden" multiple onChange={handleFileUpload} />
-              </div>
-              {uploadedFiles.length > 0 && (
-                <div className="mt-3 space-y-1.5">
-                  {uploadedFiles.map((f) => (
-                    <div key={f.path} className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2 text-sm">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                        <span className="truncate">{f.name}</span>
-                      </div>
-                      <button onClick={(ev) => { ev.stopPropagation(); removeFile(f.path); }} className="text-muted-foreground hover:text-red-500 flex-shrink-0 ml-2">
-                        <span className="text-sm">✕</span>
-                      </button>
-                    </div>
-                  ))}
+              {/* 工单地址 */}
+              <div>
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                  <Ticket className="w-3.5 h-3.5 text-primary" />
+                  工单地址
+                </h4>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={ticketUrl}
+                    onChange={(e) => { setTicketUrl(e.target.value); setTicketError(null); setTicketFetchMsg(null); setTicketDocUrls([]); setLinkUrl(""); setRequirementUrl(""); }}
+                    placeholder="https://xz.corpautohome.com/requirement/detail/XXXXXX"
+                    className={`flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 ${ticketError ? "border-red-300" : "border-border"}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTicketFetch}
+                    disabled={ticketLoading}
+                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {ticketLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    导入
+                  </button>
                 </div>
-              )}
-              <h4 className="text-sm font-medium mb-2 mt-4">粘贴需求或者补充说明</h4>
+                {ticketError ? (
+                  <div className="flex items-start gap-1.5 mt-1.5 text-xs text-red-600">
+                    <XCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>{ticketError}</span>
+                  </div>
+                ) : ticketFetchMsg ? (
+                  <div className="flex items-start gap-1.5 mt-1.5 text-xs text-green-600">
+                    <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>{ticketFetchMsg}</span>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    用于关联需求工单；填写后可点击「导入」自动下载需求文档
+                  </div>
+                )}
+              </div>
+
+              {/* 知识库链接下载 */}
+              <div className="mt-4 pt-4 border-t border-border/60">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                  <LinkIcon className="w-3.5 h-3.5 text-primary" />
+                  需求地址
+                </h4>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={linkUrl}
+                    onChange={(e) => { setLinkUrl(e.target.value); setLinkError(null); setLinkSuccess(null); }}
+                    placeholder="粘贴知识库链接（含 targetId=xxx）"
+                    className="flex-1 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    disabled={linkLoading}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && linkUrl.trim() && !linkLoading) handleLinkDownload();
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLinkDownload}
+                    disabled={!linkUrl.trim() || linkLoading}
+                    className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-1.5 flex-shrink-0"
+                  >
+                    {linkLoading ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" />下载中</>
+                    ) : (
+                      <><LinkIcon className="w-3.5 h-3.5" />导入</>
+                    )}
+                  </button>
+                </div>
+                {linkLoading && linkProgress > 0 && (
+                  <div className="mt-2">
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all duration-300"
+                        style={{ width: `${Math.round(linkProgress)}%` }}
+                      />
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {linkProgress >= 100 ? "保存完成..." : linkProgress >= 50 ? "下载文档中..." : "验证凭证中..."}
+                    </div>
+                  </div>
+                )}
+                {linkError ? (
+                  <div className="flex items-start gap-1.5 mt-1.5 text-xs text-red-600">
+                    <XCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>{linkError}</span>
+                  </div>
+                ) : linkSuccess ? (
+                  <div className="flex items-start gap-1.5 mt-1.5 text-xs text-green-600">
+                    <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>{linkSuccess}</span>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* 手动上传文件 */}
+              <div className="mt-4 pt-4 border-t border-border/60">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                  <Upload className="w-3.5 h-3.5 text-primary" />
+                  手动上传文件
+                </h4>
+                <div
+                  className={`border-2 border-dashed rounded-xl py-4 px-4 text-center cursor-pointer transition-all ${
+                    dragOverUpload ? "border-primary bg-primary/5" : "border-border hover:border-primary/30 hover:bg-primary/5"
+                  }`}
+                  onClick={() => document.getElementById("wizard-file-input")?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverUpload(true); }}
+                  onDragLeave={() => setDragOverUpload(false)}
+                  onDrop={handleDropUpload}
+                >
+                  <p className="text-xs text-muted-foreground">
+                    <span className="text-primary font-medium">点击上传</span> 或拖拽文件到此处 · 支持 .docx .md .txt
+                  </p>
+                  <input id="wizard-file-input" type="file" className="hidden" multiple onChange={handleFileUpload} />
+                </div>
+                {uploadedFiles.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    {uploadedFiles.map((f) => (
+                      <div key={f.path} className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2 text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span className="truncate">{f.name}</span>
+                        </div>
+                        <button onClick={(ev) => { ev.stopPropagation(); removeFile(f.path); }} className="text-muted-foreground hover:text-red-500 flex-shrink-0 ml-2">
+                          <span className="text-sm">✕</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <h4 className="text-sm font-medium mb-2 mt-4 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-primary" />
+                粘贴需求或者补充说明
+              </h4>
               <textarea
                 value={requirementText}
                 onChange={(e) => setRequirementText(e.target.value)}
@@ -1096,6 +1330,11 @@ export function GenerateWizard({
               <button
                 type="button"
                 onClick={() => {
+                  if (ticketUrl.trim() && !extractTicketId(ticketUrl)) {
+                    setTicketError("无法从工单地址中解析出工单ID");
+                    setValidationMsg("");
+                    return;
+                  }
                   if (!uploadedFiles.length && !requirementText.trim()) {
                     setValidationMsg("请至少上传一个需求文档，或粘贴需求或者补充说明");
                     return;
@@ -1313,6 +1552,10 @@ export function GenerateWizard({
             historyItems: Array.from(selectedHistoryIds)
               .map((id) => historyOptions.find((h) => h.id === id)?.displayName)
               .filter((v): v is string => !!v),
+            ticketUrl: extractTicketId(ticketUrl)
+              ? `https://xz.corpautohome.com/requirement/detail/${extractTicketId(ticketUrl)}`
+              : "",
+            requirementUrl,
           }
         }
         usabilityData={usabilityData}

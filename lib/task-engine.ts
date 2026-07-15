@@ -7,6 +7,7 @@ import { parseTestcaseMarkdown } from "./parse-testcase-md";
 import { findRunningTweakEntry, markTweakEntryDone, markTweakEntryFailed, type TweakEntry } from "./tweak-history";
 import fs from "fs/promises";
 import path from "path";
+import { execFileSync } from "child_process";
 
 const runtime = cliRuntime;
 
@@ -39,7 +40,9 @@ export async function createTask(
   skillId: string,
   input: string,
   uploadedFiles?: string[],
-  businessType?: string | null
+  businessType?: string | null,
+  ticketId?: string | null,
+  requirementUrl?: string | null
 ): Promise<string> {
   const skill = await prisma.skill.findUnique({
     where: { id: skillId },
@@ -59,6 +62,8 @@ export async function createTask(
       input,
       inputFiles: uploadedFiles || [],
       businessType: businessType || null,
+      ticketId: ticketId || null,
+      requirementUrl: requirementUrl || null,
     },
   });
 
@@ -104,6 +109,32 @@ export async function startTaskExecution(
     console.log(`[task-engine] userInput (first 500 chars):`, task.input.slice(0, 500));
     console.log(`[task-engine] skillContent (first 300 chars):`, skillContent.slice(0, 300));
     console.log(`[task-engine] workspaceFiles:`, workspaceFiles);
+
+    // .md 输入预处理：剥离 base64 生成 _source.md，并就地清理 workspace 中的 .md
+    if (workspaceFiles.length > 0) {
+      const outputDir = getOutputPath(taskId);
+      const workspaceDir = getWorkspacePath(taskId);
+      const stripScript = path.join(skillDir, "scripts", "md_strip_base64.py");
+      let scriptExists = false;
+      try { await fs.access(stripScript); scriptExists = true; } catch {}
+      if (scriptExists) {
+        await fs.mkdir(outputDir, { recursive: true });
+        for (const wsFile of workspaceFiles) {
+          if (!wsFile.toLowerCase().endsWith(".md")) continue;
+          if (path.dirname(wsFile) !== workspaceDir) continue; // 只处理根目录的主输入文件
+          const baseName = path.basename(wsFile, path.extname(wsFile));
+          const sourceMdPath = path.join(outputDir, `${baseName}_source.md`);
+          try {
+            execFileSync("python", [stripScript, wsFile, "--output", sourceMdPath], { stdio: "pipe" });
+            // 就地清理：用剥离后的内容覆盖原 .md，防止 agent 直接读 .md 时 base64 撑爆上下文
+            await fs.copyFile(sourceMdPath, wsFile);
+            console.log(`[task-engine] md_strip_base64: ${path.basename(wsFile)} → _source.md (in-place cleaned)`);
+          } catch (err) {
+            console.warn(`[task-engine] md_strip_base64 failed for ${wsFile}:`, err);
+          }
+        }
+      }
+    }
 
     const stream = runtime.start({
       taskId: task.id,
