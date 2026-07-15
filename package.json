@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "node -e \"const os=require('os');const ip=Object.values(os.networkInterfaces()).flat().find(i=>!i.internal&&i.family==='IPv4');console.log('  ▲ 外部访问: http://'+(ip?ip.address:'localhost')+':3000')\"",
+    "predev": "node -e \"const os=require('os');const ips=Object.values(os.networkInterfaces()).flat().filter(i=>!i.internal&&i.family==='IPv4').map(i=>i.address);const ip=ips.find(a=>a.startsWith('10.168.'))||ips[0]||'localhost';console.log('  ▲ 外部访问: http://'+ip+':3000')\"",
     "dev": "next dev -H 0.0.0.0",
     "build": "next build",
-    "prestart": "node -e \"const os=require('os');const ip=Object.values(os.networkInterfaces()).flat().find(i=>!i.internal&&i.family==='IPv4');console.log('  ▲ 外部访问: http://'+(ip?ip.address:'localhost')+':3000')\"",
+    "prestart": "node -e \"const os=require('os');const ips=Object.values(os.networkInterfaces()).flat().filter(i=>!i.internal&&i.family==='IPv4').map(i=>i.address);const ip=ips.find(a=>a.startsWith('10.168.'))||ips[0]||'localhost';console.log('  ▲ 外部访问: http://'+ip+':3000')\"",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "test": "vitest run",
