@@ -697,6 +697,25 @@ export function GenerateWizard({
     return m ? m[1] : null;
   };
 
+  // 校验工单地址格式
+  const validateTicketUrl = (url: string): string | null => {
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+    // 必须是 http(s) 开头
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return "工单地址必须以 http:// 或 https:// 开头";
+    }
+    // 必须包含域名
+    if (!/https?:\/\/[^\s/]+/i.test(trimmed)) {
+      return "工单地址格式不正确，缺少域名";
+    }
+    // 末尾必须是数字 ID
+    if (!extractTicketId(trimmed)) {
+      return "工单地址末尾需为工单 ID（纯数字），如 .../detail/123456";
+    }
+    return null;
+  };
+
   // 规范化需求地址：裸 targetId 还原为完整知识库链接
   const normalizeRequirementUrl = (raw: string): string => {
     const trimmed = raw.trim();
@@ -972,8 +991,21 @@ export function GenerateWizard({
                   <input
                     type="text"
                     value={ticketUrl}
-                    onChange={(e) => { setTicketUrl(e.target.value); setTicketError(null); setTicketFetchMsg(null); setTicketDocUrls([]); setLinkUrl(""); setRequirementUrl(""); }}
-                    placeholder="https://xz.corpautohome.com/requirement/detail/XXXXXX"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTicketUrl(val);
+                      setTicketError(null);
+                      setTicketFetchMsg(null);
+                      setTicketDocUrls([]);
+                      setLinkUrl("");
+                      setRequirementUrl("");
+                      // 实时校验格式
+                      const formatError = validateTicketUrl(val);
+                      if (formatError && val.trim()) {
+                        setTicketError(formatError);
+                      }
+                    }}
+                    placeholder="https://xz.corpautohome.com/requirement/detail/123456"
                     className={`flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 ${ticketError ? "border-red-300" : "border-border"}`}
                   />
                   <button
@@ -999,6 +1031,13 @@ export function GenerateWizard({
                 ) : (
                   <div className="text-xs text-muted-foreground mt-1">
                     用于关联需求工单；填写后可点击「导入」自动下载需求文档
+                  </div>
+                )}
+                {/* 工单地址格式提示 */}
+                {!ticketError && !ticketFetchMsg && ticketUrl.trim() && extractTicketId(ticketUrl) && (
+                  <div className="flex items-center gap-1.5 mt-1 text-xs text-green-600">
+                    <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>工单 ID：{extractTicketId(ticketUrl)}</span>
                   </div>
                 )}
               </div>
@@ -1330,10 +1369,13 @@ export function GenerateWizard({
               <button
                 type="button"
                 onClick={() => {
-                  if (ticketUrl.trim() && !extractTicketId(ticketUrl)) {
-                    setTicketError("无法从工单地址中解析出工单ID");
-                    setValidationMsg("");
-                    return;
+                  if (ticketUrl.trim()) {
+                    const formatError = validateTicketUrl(ticketUrl);
+                    if (formatError) {
+                      setTicketError(formatError);
+                      setValidationMsg("");
+                      return;
+                    }
                   }
                   if (!uploadedFiles.length && !requirementText.trim()) {
                     setValidationMsg("请至少上传一个需求文档，或粘贴需求或者补充说明");

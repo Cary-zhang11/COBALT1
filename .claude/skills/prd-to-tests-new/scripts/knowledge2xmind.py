@@ -35,6 +35,9 @@ def convert(md_text, section_number):
 
     title = None
     title_found = False
+    section_found = False  # H2/H3 等章节标题出现后才为 True
+    in_bold_scope = False  # 当前是否处于"场景"等加粗标签的下属内容中
+    indent_step = "  "
 
     for line in lines:
         stripped = line.rstrip()
@@ -62,23 +65,44 @@ def convert(md_text, section_number):
                 continue
 
             # 后续标题加深 2 级（H2→H4, H3→H5），上限 H6
+            section_found = True
+            in_bold_scope = False
             new_level = min(len(hashes) + 2, 6)
             output.append(f"{'#' * new_level} {text}")
             continue
 
-        # 列表项（- * +）：保留原始缩进
+        # 加粗段落（整行被 ** 包裹）：
+        #   - 章节标题出现之前：视为说明文字，转为列表项
+        #   - 章节标题出现之后：视为"场景"等分组标签，转为列表项，
+        #     并将其后的列表项缩进一级，使其在 XMind 中成为子节点
+        bold_para = re.match(r'^\*\*(.+)\*\*$', stripped)
+        if bold_para:
+            text = bold_para.group(1).strip().rstrip('：:')
+            if section_found:
+                output.append(f"- {text}")
+                in_bold_scope = True
+            else:
+                output.append(f"- {text}")
+                in_bold_scope = False
+            continue
+
+        # 列表项（- * +）：保留原始缩进；如果在场景标签作用域内，整体缩进一级
         list_match = re.match(r'^(\s*)[-*+]\s+(.*)', stripped)
         if list_match:
             indent = list_match.group(1)
             content = list_match.group(2).strip()
+            if in_bold_scope:
+                indent = indent + indent_step
             output.append(f"{indent}- {content}")
             continue
 
-        # 编号列表（1. 2. 等）：转为 - 列表项
+        # 编号列表（1. 2. 等）：转为 - 列表项；如果在场景标签作用域内，整体缩进一级
         numbered_match = re.match(r'^(\s*)\d+[.)]\s+(.*)', stripped)
         if numbered_match:
             indent = numbered_match.group(1)
             content = numbered_match.group(2).strip()
+            if in_bold_scope:
+                indent = indent + indent_step
             output.append(f"{indent}- {content}")
             continue
 
@@ -102,8 +126,9 @@ def convert(md_text, section_number):
                 output.append(f"- {' | '.join(cells)}")
             continue
 
-        # 普通段落：转为列表项
-        output.append(f"- {stripped}")
+        # 普通段落：转为列表项；如果在场景标签作用域内，整体缩进一级
+        indent = indent_step if in_bold_scope else ""
+        output.append(f"{indent}- {stripped}")
 
     # 如果没有找到标题，从文件名提取
     if not title_found and len(sys.argv) > 1:
