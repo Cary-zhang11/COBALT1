@@ -6,12 +6,78 @@
   <title>用例编辑器 — 脑图画布</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body, #mindMapContainer { width: 100%; height: 100%; overflow: hidden; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    /* 画布容器 + 右下滚动条布局 */
+    #editorWrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    #mindMapContainer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 12px;      /* 让出右侧滚动条空间 */
+      bottom: 12px;     /* 让出底部滚动条空间 */
+      overflow: hidden;
+    }
+
+    /* 滚动条轨道 */
+    .mm-scrollbar {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.04);
+      border-radius: 6px;
+      z-index: 10;
+    }
+    .mm-scrollbar-v {
+      right: 2px;
+      top: 2px;
+      bottom: 14px;
+      width: 8px;
+    }
+    .mm-scrollbar-h {
+      left: 2px;
+      right: 14px;
+      bottom: 2px;
+      height: 8px;
+    }
+
+    /* 滚动条 thumb */
+    .mm-scrollbar-thumb {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.28);
+      border-radius: 6px;
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+    .mm-scrollbar-thumb:hover,
+    .mm-scrollbar-thumb.dragging {
+      background: rgba(0, 0, 0, 0.45);
+    }
+    .mm-scrollbar-v .mm-scrollbar-thumb {
+      left: 0;
+      right: 0;
+      min-height: 24px;
+    }
+    .mm-scrollbar-h .mm-scrollbar-thumb {
+      top: 0;
+      bottom: 0;
+      min-width: 24px;
+    }
   </style>
 </head>
 <body>
-  <div id="mindMapContainer"></div>
+  <div id="editorWrap">
+    <div id="mindMapContainer"></div>
+    <div class="mm-scrollbar mm-scrollbar-v" id="scrollbarV">
+      <div class="mm-scrollbar-thumb" id="thumbV"></div>
+    </div>
+    <div class="mm-scrollbar mm-scrollbar-h" id="scrollbarH">
+      <div class="mm-scrollbar-thumb" id="thumbH"></div>
+    </div>
+  </div>
   <script>
   (function() {
     var origin = window.location.origin;
@@ -23,9 +89,9 @@
     }, 8000);
 
     var scripts = [
-      "/vendor/simple-mind-map.umd.min.js",
-      "/vendor/jszip.min.js",
-      "/editor/mind-map.js"
+      "/api/editor-assets/simple-mind-map",
+      "/api/editor-assets/jszip",
+      "/api/editor-assets/mind-map-js"
     ];
     var idx = 0;
 

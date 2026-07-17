@@ -186,6 +186,9 @@ export function createEditorBridge(iframeRef: HTMLIFrameElement) {
 
     undo: () => post({ type: "undo" }),
     redo: () => post({ type: "redo" }),
+    zoomIn: () => post({ type: "zoomIn" }),
+    zoomOut: () => post({ type: "zoomOut" }),
+    resetZoom: () => post({ type: "resetZoom" }),
 
     onDirty: (cb: DirtyCallback) => { dirtyCb = cb; },
     onSaveRequested: (cb: SaveRequestedCallback) => { saveCb = cb; },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Undo2, Redo2, Save, Download, ArrowLeft } from "lucide-react";
+import { Undo2, Redo2, Save, Download, ArrowLeft, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { createEditorBridge, resetGlobalReadyState, type EditorBridge } from "./editor-bridge";
 import type { MindMapData } from "@/lib/md-mindmap-convert";
 
@@ -265,6 +265,37 @@ export function CaseEditor({ fileName, onSave, onBack, taskId, filePath }: CaseE
             title="重做 (Ctrl+Y)"
           >
             <Redo2 className="w-4 h-4" />
+          </button>
+          <span className="w-px h-5 bg-border mx-1" />
+          <button
+            onClick={() => bridgeRef.current?.zoomOut()}
+            disabled={!hasData}
+            className={`p-2 rounded-lg text-sm ${
+              hasData ? "hover:bg-muted" : "text-muted-foreground cursor-not-allowed"
+            }`}
+            title="缩小 (Ctrl+滚轮向下)"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => bridgeRef.current?.zoomIn()}
+            disabled={!hasData}
+            className={`p-2 rounded-lg text-sm ${
+              hasData ? "hover:bg-muted" : "text-muted-foreground cursor-not-allowed"
+            }`}
+            title="放大 (Ctrl+滚轮向上)"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => bridgeRef.current?.resetZoom()}
+            disabled={!hasData}
+            className={`p-2 rounded-lg text-sm ${
+              hasData ? "hover:bg-muted" : "text-muted-foreground cursor-not-allowed"
+            }`}
+            title="恢复 100%"
+          >
+            <Maximize2 className="w-4 h-4" />
           </button>
           <span className="w-px h-5 bg-border mx-1" />
           <button
