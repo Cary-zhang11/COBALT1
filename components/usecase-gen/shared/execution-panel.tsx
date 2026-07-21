@@ -64,6 +64,8 @@ interface ExecutionPanelProps {
   onNavigateToEditor: (filePath?: string) => void;
   /** 下载需求文件（从 workspace 目录取），传 taskId 时才可用 */
   onDownloadRequirementFile?: (fileName: string) => void;
+  /** 工单地址编辑回调 */
+  onTicketUrlChange?: (url: string) => void;
 }
 
 function PanelShell({ children }: { children: ReactNode }) {
@@ -361,12 +363,76 @@ function RequirementTextRow({ text }: { text: string }) {
   );
 }
 
+function TicketUrlRow({
+  url,
+  onChange,
+}: {
+  url: string;
+  onChange?: (val: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(url);
+
+  const commit = () => {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed !== url) onChange?.(trimmed);
+  };
+
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-1.5 mb-1">
+        <Ticket className="w-3.5 h-3.5 text-primary/70 flex-shrink-0" />
+        <span className="text-xs font-medium text-foreground/85">工单地址</span>
+      </div>
+      {editing ? (
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setDraft(url); setEditing(false); } }}
+          className="pl-5 w-full text-xs border border-primary/40 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary/40"
+          placeholder="https://xz.corpautohome.com/requirement/detail/123456"
+        />
+      ) : url ? (
+        <div className="pl-5 flex items-center gap-1 group">
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline truncate flex-1 min-w-0"
+            title={url}
+          >
+            {url}
+          </a>
+          {onChange && (
+            <button type="button" onClick={() => { setDraft(url); setEditing(true); }} className="flex-shrink-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity">
+              <Edit3 className="w-3 h-3 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => { setDraft(""); setEditing(true); }}
+          className="pl-5 text-xs text-muted-foreground/60 hover:text-primary transition-colors"
+        >
+          点击填写工单地址…
+        </button>
+      )}
+    </div>
+  );
+}
+
 function MaterialsSection({
   materials,
   onDownloadRequirementFile,
+  onTicketUrlChange,
 }: {
   materials: ExecutionMaterials;
   onDownloadRequirementFile?: (fileName: string) => void;
+  onTicketUrlChange?: (url: string) => void;
 }) {
   return (
     <div>
@@ -392,23 +458,7 @@ function MaterialsSection({
           label="历史范文"
           items={materials.historyItems}
         />
-        {materials.ticketUrl && (
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Ticket className="w-3.5 h-3.5 text-primary/70 flex-shrink-0" />
-              <span className="text-xs font-medium text-foreground/85">工单</span>
-            </div>
-            <a
-              href={materials.ticketUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="pl-5 block text-xs text-primary hover:underline truncate"
-              title={materials.ticketUrl}
-            >
-              {materials.ticketUrl}
-            </a>
-          </div>
-        )}
+        <TicketUrlRow url={materials.ticketUrl} onChange={onTicketUrlChange} />
         {materials.requirementUrl && (
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 mb-1">
@@ -504,6 +554,7 @@ export function ExecutionPanel({
   onScrollToAITweak,
   onNavigateToEditor,
   onDownloadRequirementFile,
+  onTicketUrlChange,
 }: ExecutionPanelProps) {
   const nodes = useMemo(
     () => deriveNodeStates(foundFiles, generating, logStages),
@@ -553,6 +604,7 @@ export function ExecutionPanel({
             <MaterialsSection
               materials={mat}
               onDownloadRequirementFile={onDownloadRequirementFile}
+              onTicketUrlChange={onTicketUrlChange}
             />
             <div className="border-t border-border" />
             <QuickActions
@@ -562,7 +614,8 @@ export function ExecutionPanel({
             />
             <div className="border-t border-border" />
             <EfficiencyComparison taskId={taskId} initialData={usabilityData} />
-            {taskId && (
+            {/* TODO: 本次生成评价模块暂时隐藏，后续可能恢复 */}
+            {false && taskId && (
               <>
                 <div className="border-t border-border" />
                 <div>

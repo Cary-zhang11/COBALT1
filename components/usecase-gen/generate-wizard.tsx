@@ -1653,6 +1653,13 @@ export function GenerateWizard({
           document.getElementById("step3-ai-tweak")?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
         onNavigateToEditor={(filePath) => onNavigateToTab?.(2, taskId ? { taskId, filePath } : undefined)}
+        onTicketUrlChange={(url) => {
+          if (historicalMaterials) {
+            setHistoricalMaterials({ ...historicalMaterials, ticketUrl: url });
+          } else {
+            setTicketUrl(url);
+          }
+        }}
       />
     </div>
   );
