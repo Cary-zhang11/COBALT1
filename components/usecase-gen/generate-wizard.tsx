@@ -110,6 +110,7 @@ export function GenerateWizard({
   const [ticketDocUrls, setTicketDocUrls] = useState<string[]>([]);
   const ticketFilePathsRef = useRef<string[]>([]);
   const [requirementUrl, setRequirementUrl] = useState("");
+  const [ticketDocDownloadFailed, setTicketDocDownloadFailed] = useState(false);
 
   // ---- Step 2: 知识库关联 ----
   const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<Set<string>>(new Set());
@@ -804,16 +805,25 @@ export function GenerateWizard({
       if (data.documentUrls && data.documentUrls.length > 0) {
         const docUrl = normalizeRequirementUrl(data.documentUrls[0]);
         setLinkUrl(docUrl);
+        setLinkError(null);
+        setLinkSuccess(null);
         setRequirementUrl(docUrl);
       }
       setTicketDocUrls(data.documentUrls || []);
       const fileCount = data.files?.length || 0;
+      const invalidCount = data.invalidUrls?.length || 0;
+      // 有需求地址但下载文件数为 0，或有无效地址 -> 标记下载失败
+      const hasDocUrls = data.documentUrls && data.documentUrls.length > 0;
+      const downloadFailed = (hasDocUrls && fileCount === 0) || invalidCount > 0;
+      setTicketDocDownloadFailed(downloadFailed);
       setTicketFetchMsg(
-        fileCount > 0
-          ? `已获取 ${fileCount} 个需求文档${data.description ? "及需求描述" : ""}`
-          : data.description
-            ? "已获取需求描述"
-            : "未获取到需求文档或描述",
+        invalidCount > 0 && fileCount === 0
+          ? "需求地址不符合可下载格式，无法自动下载"
+          : fileCount > 0
+            ? `已获取 ${fileCount} 个需求文档${data.description ? "及需求描述" : ""}`
+            : data.description
+              ? "已获取需求描述"
+              : "未获取到需求文档或描述",
       );
     } catch (err: any) {
       setTicketError(err?.message || "获取需求失败");
@@ -986,6 +996,7 @@ export function GenerateWizard({
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1.5">
                   <Ticket className="w-3.5 h-3.5 text-primary" />
                   工单地址
+                  <span className="text-red-500 ml-0.5">*</span>
                 </h4>
                 <div className="flex gap-2">
                   <input
@@ -997,6 +1008,7 @@ export function GenerateWizard({
                       setTicketError(null);
                       setTicketFetchMsg(null);
                       setTicketDocUrls([]);
+                      setTicketDocDownloadFailed(false);
                       setLinkUrl("");
                       setRequirementUrl("");
                       // 实时校验格式
@@ -1097,6 +1109,16 @@ export function GenerateWizard({
                     <span>{linkSuccess}</span>
                   </div>
                 ) : null}
+                {/* 需求地址解析成功但下载失败的提醒 */}
+                {ticketDocDownloadFailed && (
+                  <div className="flex items-start gap-1.5 mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-amber-800">
+                      <p className="font-medium">需求地址不符合规则，无法自动下载</p>
+                      <p className="mt-0.5">请手动上传需求文档（支持 .docx .md .txt）</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 手动上传文件 */}
@@ -1369,13 +1391,17 @@ export function GenerateWizard({
               <button
                 type="button"
                 onClick={() => {
-                  if (ticketUrl.trim()) {
-                    const formatError = validateTicketUrl(ticketUrl);
-                    if (formatError) {
-                      setTicketError(formatError);
-                      setValidationMsg("");
-                      return;
-                    }
+                  // 工单地址必填校验
+                  if (!ticketUrl.trim()) {
+                    setTicketError("请先填写工单地址");
+                    setValidationMsg("");
+                    return;
+                  }
+                  const formatError = validateTicketUrl(ticketUrl);
+                  if (formatError) {
+                    setTicketError(formatError);
+                    setValidationMsg("");
+                    return;
                   }
                   if (!uploadedFiles.length && !requirementText.trim()) {
                     setValidationMsg("请至少上传一个需求文档，或粘贴需求或者补充说明");

@@ -65,8 +65,24 @@ function isKnowledgeLink(url: string): boolean {
   return /zhishi\.autohome\.com\.cn|doc\.autohome\.com\.cn/i.test(url) || !!extractTargetId(url);
 }
 
+/**
+ * 判断 targetId 是否为有效的可下载格式
+ * 有效的需求文档 ID 通常是纯数字或字母数字组合，不含 share/share_ 等前缀
+ */
+function isValidDownloadTargetId(targetId: string): boolean {
+  // share_ 开头的为共享链接，不是可下载的需求文档
+  if (/^share[-_]/i.test(targetId)) return false;
+  return true;
+}
+
 /** 通过知识库认证下载 */
 async function downloadFromKnowledge(targetId: string): Promise<{ buffer: Buffer; filename: string } | null> {
+  // 提前校验 targetId 是否为可下载格式
+  if (!isValidDownloadTargetId(targetId)) {
+    console.warn(`[ticket-needs] targetId "${targetId}" 不符合可下载格式，跳过下载`);
+    return null;
+  }
+
   const doDownload = async (cookieValue: string) => {
     const downloadUrl = `${KB_BASE}/download/${encodeURIComponent(targetId)}?k=`;
     return fetch(downloadUrl, {
@@ -155,13 +171,21 @@ export async function POST(req: NextRequest) {
     await mkdir(uploadsDir, { recursive: true });
 
     const files: { fileName: string; filePath: string }[] = [];
+    const invalidUrls: string[] = [];
     for (const docUrl of documentUrls) {
       try {
         let result: { buffer: Buffer; filename: string } | null = null;
 
         if (isKnowledgeLink(docUrl)) {
           const targetId = extractTargetId(docUrl);
-          if (targetId) result = await downloadFromKnowledge(targetId);
+          if (targetId) {
+            if (!isValidDownloadTargetId(targetId)) {
+              invalidUrls.push(docUrl);
+              console.warn(`[ticket-needs] 跳过无效需求地址: ${docUrl} (targetId=${targetId})`);
+              continue;
+            }
+            result = await downloadFromKnowledge(targetId);
+          }
         } else {
           result = await downloadDirect(docUrl);
         }
@@ -180,7 +204,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ files, description, documentUrls });
+    return NextResponse.json({ files, description, documentUrls, invalidUrls });
   } catch (error) {
     console.error("[ticket-needs] error:", error);
     const message = error instanceof Error ? error.message : "Failed";

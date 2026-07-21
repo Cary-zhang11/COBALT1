@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
+import { buildTaskListWhere } from "@/lib/task-list-query";
 import {
   avgUserRating,
   ratingDistribution,
@@ -65,8 +66,10 @@ export async function GET(req: NextRequest) {
       return start ? { createdAt: { gte: start } } : {};
     }
 
-    // 统计不按任务状态过滤，所有任务均计入
-    const completedFilter = {};
+    // 与任务列表"已完成"筛选口径一致：
+    // status='completed' OR (status='paused' AND (totalCases>0 OR report IS NOT NULL))
+    // 注意：最近生成记录使用独立的全量口径，不套用此过滤。
+    const completedFilter = buildTaskListWhere({ displayStatus: "completed" });
 
     // KPI 时间窗口
     const kpiWindow = kpiRange === "custom" && kpiCustomStart && kpiCustomEnd
@@ -461,10 +464,9 @@ export async function GET(req: NextRequest) {
       count: r._count,
     }));
 
-    // ---- 评价率（全量，不随时间筛选变化） ----
-    const terminalFilter = {};
+    // ---- 评价率（全量，不随时间筛选变化；分母为"已完成"任务） ----
     const terminalTasks = await prisma.task.findMany({
-      where: terminalFilter,
+      where: completedFilter,
       select: { id: true },
     });
     const terminalCount = terminalTasks.length;
@@ -494,10 +496,10 @@ export async function GET(req: NextRequest) {
     }
     const ratingDist = ratingDistribution(ratingRatings);
 
-    // ---- Recent records（使用 recordRange） ----
+    // ---- Recent records（使用 recordRange；保持全量口径，不过滤已完成） ----
     const recordDateFilter = buildDateFilter(recordRange, recordCustomStart, recordCustomEnd);
     const recent = await prisma.task.findMany({
-      where: { ...completedFilter, ...recordDateFilter },
+      where: { ...recordDateFilter },
       select: {
         id: true,
         createdAt: true,
