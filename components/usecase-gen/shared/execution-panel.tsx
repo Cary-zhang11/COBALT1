@@ -614,8 +614,7 @@ export function ExecutionPanel({
             />
             <div className="border-t border-border" />
             <EfficiencyComparison taskId={taskId} initialData={usabilityData} />
-            {/* TODO: 本次生成评价模块暂时隐藏，后续可能恢复 */}
-            {false && taskId && (
+            {taskId && (
               <>
                 <div className="border-t border-border" />
                 <div>
