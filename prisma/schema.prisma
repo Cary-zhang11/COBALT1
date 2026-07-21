@@ -26,7 +26,6 @@ model User {
 
   tasks     Task[]
   skills    Skill[]
-  feedbacks TaskFeedback[]
   knowledge Knowledge[]
 }
 
@@ -131,14 +130,12 @@ model TaskLog {
 }
 
 model TaskFeedback {
-  id            String   @id @default(uuid())
-  taskId        String
-  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  rating        Int
-  comment       String?
-  createdAt     DateTime @default(now())
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
 }
 
 model Knowledge {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Star } from "lucide-react";
+import { Star, Edit3 } from "lucide-react";
 
 interface RatingPanelProps {
   taskId: string | null;
@@ -88,9 +88,20 @@ export function RatingPanel({ taskId, sectioned }: RatingPanelProps) {
       )}
       {submitted ? (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm text-emerald-600">
-            <Star className="w-4 h-4 fill-emerald-500 text-emerald-500" />
-            已提交 · {rating} 分
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm text-emerald-600">
+              <Star className="w-4 h-4 fill-emerald-500 text-emerald-500" />
+              已提交 · {rating} 分
+            </div>
+            <button
+              type="button"
+              onClick={() => setSubmitted(false)}
+              className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+              title="重新编辑评价"
+            >
+              <Edit3 className="w-3 h-3" />
+              编辑
+            </button>
           </div>
           {comment.trim() && (
             <p className="text-xs text-muted-foreground">{comment.trim()}</p>
