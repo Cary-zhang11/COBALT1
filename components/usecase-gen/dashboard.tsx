@@ -4,7 +4,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BarChart3, Users, Clock, Loader2, Star, CheckCircle2, Zap, TrendingUp,
+  BarChart3, Users, Clock, Loader2, Star, CheckCircle2, Zap, TrendingUp, ExternalLink, Copy,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -68,8 +68,10 @@ interface StatsData {
     user: string;
     req: string;
     count: number;
-    score: number;
-    tokens: number;
+    ticketId: string | null;
+    usabilityRate: number | null;
+    manualDuration: number | null;
+    reviewDuration: number | null;
     category: string;
     userRating: number | null;
     userComment: string | null;
@@ -369,18 +371,75 @@ function filterRecentRecords(
   rows: RecentRecord[],
   search: string,
   filter: RecordFilter,
+  ticketIdFilter: string,
 ): RecentRecord[] {
   return rows.filter((row) => {
     if (filter === "rated" && row.userRating == null) return false;
     if (filter === "unrated" && row.userRating != null) return false;
+
+    // 工单ID精确匹配
+    const ticketQ = ticketIdFilter.trim();
+    if (ticketQ && row.ticketId !== ticketQ) return false;
+
+    // 普通搜索
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
       row.req.toLowerCase().includes(q) ||
       row.user.toLowerCase().includes(q) ||
-      row.category.toLowerCase().includes(q)
+      row.category.toLowerCase().includes(q) ||
+      (row.ticketId && row.ticketId.includes(q))
     );
   });
+}
+
+function copyToClipboard(text: string) {
+  // 优先使用 Clipboard API
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
+      showCopyTip('已复制');
+    }).catch(() => {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text: string) {
+  // 降级方案：使用 textarea
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+    showCopyTip('已复制');
+  } catch (err) {
+    showCopyTip('复制失败');
+  }
+  document.body.removeChild(textarea);
+}
+
+function showCopyTip(message: string) {
+  const tip = document.createElement('div');
+  tip.textContent = message;
+  tip.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.8);color:white;padding:8px 16px;border-radius:4px;z-index:9999;font-size:14px;';
+  document.body.appendChild(tip);
+  setTimeout(() => {
+    if (document.body.contains(tip)) {
+      document.body.removeChild(tip);
+    }
+  }, 1500);
+}
+
+function getUsabilityRateColor(rate: number | null): string {
+  if (rate === null) return "text-muted-foreground";
+  if (rate < 60) return "text-red-600 bg-red-50";
+  if (rate < 80) return "text-amber-600 bg-amber-50";
+  return "text-emerald-600 bg-emerald-50";
 }
 
 function UserRatingCell({
@@ -509,11 +568,12 @@ function DashboardBody({
 }: DashboardBodyProps) {
   const [recordSearch, setRecordSearch] = useState("");
   const [recordFilter, setRecordFilter] = useState<RecordFilter>("all");
+  const [ticketIdSearch, setTicketIdSearch] = useState("");
   const [trendVisible, setTrendVisible] = useState({ count: true, userCount: true });
 
   const filteredRecords = useMemo(
-    () => filterRecentRecords(data.recentRecords, recordSearch, recordFilter),
-    [data.recentRecords, recordSearch, recordFilter],
+    () => filterRecentRecords(data.recentRecords, recordSearch, recordFilter, ticketIdSearch),
+    [data.recentRecords, recordSearch, recordFilter, ticketIdSearch],
   );
 
   // 根据 kpiRange 动态生成周期后缀
@@ -749,6 +809,13 @@ function DashboardBody({
               onChange={(e) => setRecordSearch(e.target.value)}
               className="border border-border rounded px-2 py-1 text-xs w-32 bg-background focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
+            <input
+              type="text"
+              placeholder="工单ID"
+              value={ticketIdSearch}
+              onChange={(e) => setTicketIdSearch(e.target.value)}
+              className="border border-border rounded px-2 py-1 text-xs w-24 bg-background focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
             <select
               value={recordFilter}
               onChange={(e) => setRecordFilter(e.target.value as RecordFilter)}
@@ -766,66 +833,120 @@ function DashboardBody({
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">时间</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">用户</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">需求名</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">用例数</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">AI质量分</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">需求名称</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">生成人</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">工单ID</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">工单地址</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground whitespace-nowrap">用例条数</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground whitespace-nowrap">可用率</th>
                 <th className="px-4 py-3 text-left font-semibold whitespace-nowrap bg-amber-100/80 text-amber-900">
                   用户评价
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">Token</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">生成时间</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground whitespace-nowrap">人工时间</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground whitespace-nowrap">复核时间</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">类型</th>
               </tr>
             </thead>
             <tbody>
               {data.recentRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-12 text-center text-muted-foreground">
                     暂无生成记录
                   </td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-12 text-center text-muted-foreground">
                     无匹配记录
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((row) => (
-                  <tr
-                    key={row.id}
-                    onClick={() => onRecordClick(row.id)}
-                    className="border-b border-border/40 hover:bg-blue-50/60 cursor-pointer transition-colors"
-                  >
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{row.time}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{row.user}</td>
-                    <td className="px-4 py-3 max-w-[8rem] truncate" title={row.req}>
-                      {row.req}
-                    </td>
-                    <td className="px-4 py-3 tabular-nums">{row.count}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-1.5 py-0.5 rounded tabular-nums ${
-                          row.score >= 90
-                            ? "text-emerald-600 bg-emerald-50"
-                            : row.score >= 60
-                              ? "text-amber-600 bg-amber-50"
-                              : "text-red-500 bg-red-50"
-                        }`}
+                filteredRecords.map((row) => {
+                  const ticketUrl = row.ticketId
+                    ? `https://xz.corpautohome.com/requirement/detail/${row.ticketId}`
+                    : null;
+                  const formattedTime = row.time
+                    ? new Date(row.time).toLocaleString("zh-CN", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false
+                      }).replace(/\//g, "-")
+                    : "-";
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className="border-b border-border/40 hover:bg-blue-50/60 transition-colors"
+                    >
+                      <td
+                        className="px-4 py-3 max-w-[12rem] truncate cursor-pointer"
+                        title={row.req}
+                        onClick={() => onRecordClick(row.id)}
                       >
-                        {row.score}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-top bg-amber-50/40">
-                      <UserRatingCell rating={row.userRating} comment={row.userComment} />
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground tabular-nums">
-                      {row.tokens.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">{row.category}</td>
-                  </tr>
-                ))
+                        {row.req}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">{row.user}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {row.ticketId ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyToClipboard(row.ticketId!);
+                            }}
+                            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 group"
+                            title="点击复制"
+                          >
+                            <span className="tabular-nums">{row.ticketId}</span>
+                            <Copy className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        {ticketUrl ? (
+                          <a
+                            href={ticketUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                          >
+                            查看
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 tabular-nums text-right">{row.count || 0}</td>
+                      <td className="px-4 py-3 text-right">
+                        {row.usabilityRate !== null ? (
+                          <span className={`px-1.5 py-0.5 rounded tabular-nums ${getUsabilityRateColor(row.usabilityRate)}`}>
+                            {row.usabilityRate}%
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 align-top bg-amber-50/40">
+                        <UserRatingCell rating={row.userRating} comment={row.userComment} />
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formattedTime}</td>
+                      <td className="px-4 py-3 tabular-nums text-right text-muted-foreground">
+                        {row.manualDuration !== null ? `${row.manualDuration}分钟` : "—"}
+                      </td>
+                      <td className="px-4 py-3 tabular-nums text-right text-muted-foreground">
+                        {row.reviewDuration !== null ? `${row.reviewDuration}分钟` : "—"}
+                      </td>
+                      <td className="px-4 py-3">{row.category}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
