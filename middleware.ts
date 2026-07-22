@@ -47,7 +47,7 @@ export default function proxy(request: NextRequest) {
     return withCorsHeaders(NextResponse.next(), origin);
   }
 
-  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth/") && !pathname.startsWith("/api/editor-assets/")) {
+  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth/") && !pathname.startsWith("/api/editor-assets/") && !pathname.startsWith("/api/ticket-info")) {
     const token = request.cookies.get("token")?.value;
     if (!token) {
       return withCorsHeaders(
